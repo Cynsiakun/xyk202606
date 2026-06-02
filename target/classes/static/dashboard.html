@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台主页</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="./css/main.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="layui-row layui-col-space16 stat-grid">
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">用户总数</div>
+                <div class="metric-value" id="totalUsers">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">今日登录次数</div>
+                <div class="metric-value" id="todayLoginCount">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">今日新增用户</div>
+                <div class="metric-value" id="todayNewUsers">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">近7天活跃用户</div>
+                <div class="metric-value" id="weekActiveUsers">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card dashboard-summary">
+        <div class="section-title">系统概览</div>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span>登录日志总数</span>
+                <strong id="totalLogs">0</strong>
+            </div>
+            <div class="summary-item">
+                <span>运行状态</span>
+                <strong class="text-success">正常</strong>
+            </div>
+            <div class="summary-item">
+                <span>技术栈</span>
+                <strong>Spring Boot 3 + MyBatis</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="./js/request.js"></script>
+<script>
+layui.use(["layer"], function () {
+    var layer = layui.layer;
+
+    loadStatistics();
+
+    async function loadStatistics() {
+        try {
+            var result = await AppRequest.request("/api/dashboard/statistics", {method: "GET"});
+            var data = result.data || {};
+            setText("totalUsers", data.totalUsers);
+            setText("todayLoginCount", data.todayLoginCount);
+            setText("todayNewUsers", data.todayNewUsers);
+            setText("weekActiveUsers", data.weekActiveUsers);
+            setText("totalLogs", data.totalLogs);
+        } catch (error) {
+            layer.msg(error.message || "加载统计数据失败", {icon: 2, time: 1800});
+        }
+    }
+
+    function setText(id, value) {
+        document.getElementById(id).textContent = value == null ? 0 : value;
+    }
+});
+</script>
+</body>
+</html>

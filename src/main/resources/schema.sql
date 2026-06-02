@@ -1,0 +1,35 @@
+CREATE TABLE IF NOT EXISTS test (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL,
+    status TINYINT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_name VARCHAR(50) NOT NULL UNIQUE,
+    user_pwd VARCHAR(64) NOT NULL,
+    user_avatar VARCHAR(255),
+    user_phone VARCHAR(20) UNIQUE,
+    user_email VARCHAR(100) UNIQUE,
+    status TINYINT DEFAULT 1,
+    create_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_login_time DATETIME
+);
+
+INSERT INTO user (user_name, user_pwd, status)
+SELECT 'admin', '21232f297a57a5a743894a0e4a801fc3', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM user WHERE user_name = 'admin'
+);
+
+CREATE TABLE IF NOT EXISTS login_log (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT,
+    user_name VARCHAR(50),
+    login_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(50),
+    status TINYINT,
+    message VARCHAR(255)
+);

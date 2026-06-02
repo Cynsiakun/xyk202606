@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: threat-platform
+  profiles:
+    active: dev

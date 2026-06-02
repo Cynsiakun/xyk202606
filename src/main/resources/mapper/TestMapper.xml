@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.TestMapper">
+
+    <resultMap id="TestEntityResultMap" type="com.cd.entity.TestEntity">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cd.entity.TestEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO test (name, status)
+        VALUES (#{name}, #{status})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM test WHERE id = #{id}
+    </delete>
+
+    <update id="updateById" parameterType="com.cd.entity.TestEntity">
+        UPDATE test
+        SET name = #{name},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="TestEntityResultMap">
+        SELECT id, name, status, created_at
+        FROM test
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectPage" resultMap="TestEntityResultMap">
+        SELECT id, name, status, created_at
+        FROM test
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1) FROM test
+    </select>
+</mapper>

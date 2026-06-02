@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="./css/main.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="userSearchForm">
+            <div class="toolbar-group">
+                <input type="text" name="userName" placeholder="按用户名搜索" autocomplete="off" class="layui-input toolbar-input">
+                <button type="submit" class="layui-btn" lay-submit lay-filter="userSearchSubmit">搜索</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
+            </div>
+            <button type="button" class="layui-btn" id="addUserButton">
+                <i class="layui-icon layui-icon-add-1"></i> 新增用户
+            </button>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="userTable" lay-filter="userTable"></table>
+    </div>
+</div>
+
+<script type="text/html" id="avatarTpl">
+    {{# if(d.userAvatar){ }}
+    <img class="table-avatar" src="{{ d.userAvatar }}" alt="头像">
+    {{# } else { }}
+    <span class="empty-text">-</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="statusTpl">
+    {{# if(d.status === 1){ }}
+    <span class="status-tag success">启用</span>
+    {{# } else { }}
+    <span class="status-tag fail">禁用</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="actionTpl">
+    <button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>
+    <button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>
+</script>
+
+<script type="text/html" id="userFormTpl">
+    <form class="layui-form popup-form" lay-filter="userForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">用户名</label>
+            <div class="layui-input-block">
+                <input type="text" name="userName" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item" id="passwordItem">
+            <label class="layui-form-label">密码</label>
+            <div class="layui-input-block">
+                <input type="password" name="userPwd" autocomplete="new-password" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">手机号</label>
+            <div class="layui-input-block">
+                <input type="text" name="userPhone" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">邮箱</label>
+            <div class="layui-input-block">
+                <input type="text" name="userEmail" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">头像URL</label>
+            <div class="layui-input-block">
+                <input type="text" name="userAvatar" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <select name="status">
+                    <option value="1">启用</option>
+                    <option value="0">禁用</option>
+                </select>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveUser">保存</button>
+        </div>
+    </form>
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="./js/request.js"></script>
+<script>
+layui.use(["table", "form", "layer"], function () {
+    var table = layui.table;
+    var form = layui.form;
+    var layer = layui.layer;
+    var editingUserId = null;
+
+    table.render({
+        elem: "#userTable",
+        url: "/api/user/list",
+        method: "GET",
+        headers: {Authorization: "Bearer " + AppRequest.getToken()},
+        page: true,
+        limit: 10,
+        limits: [10, 20, 50],
+        request: {pageName: "page", limitName: "size"},
+        parseData: function (res) {
+            var pageData = res.data || {};
+            return {
+                code: res.code === 200 ? 0 : res.code,
+                msg: res.message,
+                count: pageData.total || 0,
+                data: pageData.list || []
+            };
+        },
+        cols: [[
+            {field: "id", title: "ID", width: 80, sort: true},
+            {field: "userName", title: "用户名", minWidth: 140},
+            {field: "userAvatar", title: "头像", width: 90, templet: "#avatarTpl"},
+            {field: "userPhone", title: "手机号", minWidth: 140, templet: function (d) { return d.userPhone || "-"; }},
+            {field: "userEmail", title: "邮箱", minWidth: 180, templet: function (d) { return d.userEmail || "-"; }},
+            {field: "status", title: "状态", width: 90, templet: "#statusTpl"},
+            {field: "lastLoginTime", title: "最后登录时间", minWidth: 180, templet: function (d) { return AppRequest.formatDateTime(d.lastLoginTime); }},
+            {title: "操作", width: 150, toolbar: "#actionTpl", fixed: "right"}
+        ]]
+    });
+
+    form.on("submit(userSearchSubmit)", function (data) {
+        table.reload("userTable", {
+            page: {curr: 1},
+            where: {userName: data.field.userName || ""}
+        });
+        return false;
+    });
+
+    form.on("submit(saveUser)", async function (data) {
+        var payload = normalizePayload(data.field);
+        try {
+            if (editingUserId) {
+                delete payload.userPwd;
+                await AppRequest.request("/api/user/" + editingUserId, {
+                    method: "PUT",
+                    body: payload
+                });
+            } else {
+                if (!payload.userPwd) {
+                    layer.msg("新增用户时密码必填", {icon: 2, time: 1600});
+                    return false;
+                }
+                await AppRequest.request("/api/user", {
+                    method: "POST",
+                    body: payload
+                });
+            }
+            layer.closeAll("page");
+            layer.msg("保存成功", {icon: 1, time: 1200});
+            table.reload("userTable");
+        } catch (error) {
+            layer.msg(error.message || "保存失败", {icon: 2, time: 1800});
+        }
+        return false;
+    });
+
+    table.on("tool(userTable)", function (obj) {
+        if (obj.event === "edit") {
+            openUserDialog(obj.data);
+        }
+        if (obj.event === "delete") {
+            confirmDelete(obj.data);
+        }
+    });
+
+    document.getElementById("addUserButton").addEventListener("click", function () {
+        openUserDialog(null);
+    });
+
+    document.getElementById("resetButton").addEventListener("click", function () {
+        form.val("userSearchForm", {userName: ""});
+        table.reload("userTable", {page: {curr: 1}, where: {userName: ""}});
+    });
+
+    function openUserDialog(user) {
+        editingUserId = user ? user.id : null;
+        var index = layer.open({
+            type: 1,
+            title: editingUserId ? "编辑用户" : "新增用户",
+            area: ["560px", "520px"],
+            content: document.getElementById("userFormTpl").innerHTML,
+            success: function (layero) {
+                if (editingUserId) {
+                    layero.find("#passwordItem").hide();
+                } else {
+                    layero.find('input[name="userPwd"]').attr("required", true).attr("lay-verify", "required");
+                }
+                form.render();
+                form.val("userForm", {
+                    userName: user ? user.userName : "",
+                    userPwd: "",
+                    userPhone: user ? user.userPhone || "" : "",
+                    userEmail: user ? user.userEmail || "" : "",
+                    userAvatar: user ? user.userAvatar || "" : "",
+                    status: user && user.status === 0 ? "0" : "1"
+                });
+                layero.find('[data-action="close"]').on("click", function () {
+                    layer.close(index);
+                });
+            },
+            end: function () {
+                editingUserId = null;
+            }
+        });
+    }
+
+    function confirmDelete(user) {
+        layer.confirm("确定删除用户「" + user.userName + "」吗？", {icon: 3, title: "删除确认"}, async function (index) {
+            try {
+                await AppRequest.request("/api/user/" + user.id, {method: "DELETE"});
+                layer.close(index);
+                layer.msg("删除成功", {icon: 1, time: 1200});
+                table.reload("userTable");
+            } catch (error) {
+                layer.msg(error.message || "删除失败", {icon: 2, time: 1800});
+            }
+        });
+    }
+
+    function normalizePayload(field) {
+        return {
+            userName: field.userName,
+            userPwd: field.userPwd,
+            userPhone: field.userPhone || "",
+            userEmail: field.userEmail || "",
+            userAvatar: field.userAvatar || "",
+            status: Number(field.status)
+        };
+    }
+});
+</script>
+</body>
+</html>
