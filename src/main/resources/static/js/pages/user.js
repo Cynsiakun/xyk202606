@@ -3,7 +3,13 @@ layui.use(["table", "form", "layer"], function () {
     var form = layui.form;
     var layer = layui.layer;
     var editingUserId = null;
+    var roleAssignUserId = null;
     var userTableId = "userTable";
+    var roleApi = {
+        allRoles: "/api/rbac/role/all",
+        userRoles: "/api/rbac/user/{userId}/roles",
+        assignUserRoles: "/api/rbac/user/{userId}/roles"
+    };
 
     AppTable.renderPageTable(table, {
         elem: "#" + userTableId,
@@ -24,8 +30,9 @@ layui.use(["table", "form", "layer"], function () {
                         : '<span class="status-tag fail">禁用</span>';
             }},
             {field: "lastLoginTime", title: "最后登录时间", minWidth: 180, templet: function (d) { return AppUtils.formatDateTime(d.lastLoginTime); }},
-            {title: "操作", width: 150, fixed: "right", templet: function () {
+            {title: "操作", width: 230, fixed: "right", templet: function () {
                 return '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
+                        + '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="assignRole">分配角色</button>'
                         + '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
             }}
         ]]
@@ -69,9 +76,36 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
+    form.on("submit(saveUserRoles)", async function (data) {
+        var roleIds = [];
+        Object.keys(data.field).forEach(function (key) {
+            if (key.indexOf("role_") === 0) {
+                roleIds.push(Number(data.field[key]));
+            }
+        });
+
+        try {
+            await AppRequest.request(roleApi.assignUserRoles.replace("{userId}", roleAssignUserId), {
+                method: "POST",
+                body: {
+                    roleIds: roleIds
+                }
+            }, {
+                successMessage: "角色分配成功"
+            });
+            layer.closeAll("page");
+        } catch (error) {
+            return false;
+        }
+        return false;
+    });
+
     table.on("tool(userTable)", function (obj) {
         if (obj.event === "edit") {
             openUserDialog(obj.data);
+        }
+        if (obj.event === "assignRole") {
+            openRoleAssignDialog(obj.data);
         }
         if (obj.event === "delete") {
             confirmDelete(obj.data);
@@ -136,6 +170,43 @@ layui.use(["table", "form", "layer"], function () {
         });
     }
 
+    async function openRoleAssignDialog(user) {
+        roleAssignUserId = user.id;
+        try {
+            var roleResult = await AppRequest.request(roleApi.allRoles, {method: "GET"}, {showErrorMessage: true});
+            var selectedRoleResult = await AppRequest.request(
+                roleApi.userRoles.replace("{userId}", user.id),
+                {method: "GET"},
+                {showErrorMessage: true}
+            );
+
+            var roleList = roleResult.data || [];
+            var selectedRoleIds = selectedRoleResult.data || [];
+            var index = layer.open({
+                type: 1,
+                title: "分配角色",
+                area: ["560px", "480px"],
+                content: AppUtils.getTemplateHtml("userRoleTemplate"),
+                success: function (layero) {
+                    var checkboxGroup = layero.find("#userRoleCheckboxGroup");
+                    checkboxGroup.html(buildRoleCheckboxHtml(roleList, selectedRoleIds));
+                    form.render("checkbox");
+                    form.val("userRoleForm", {
+                        userName: user.userName
+                    });
+                    layero.find('[data-action="close"]').on("click", function () {
+                        layer.close(index);
+                    });
+                },
+                end: function () {
+                    roleAssignUserId = null;
+                }
+            });
+        } catch (error) {
+            roleAssignUserId = null;
+        }
+    }
+
     function normalizePayload(field) {
         return {
             userName: field.userName,
@@ -145,5 +216,17 @@ layui.use(["table", "form", "layer"], function () {
             userAvatar: field.userAvatar || "",
             status: Number(field.status)
         };
+    }
+
+    function buildRoleCheckboxHtml(roleList, selectedRoleIds) {
+        var selectedMap = {};
+        selectedRoleIds.forEach(function (roleId) {
+            selectedMap[roleId] = true;
+        });
+
+        return roleList.map(function (role) {
+            var checked = selectedMap[role.id] ? "checked" : "";
+            return '<input type="checkbox" name="role_' + role.id + '" title="' + role.roleName + ' (' + role.roleCode + ')" value="' + role.id + '" ' + checked + '>';
+        }).join("");
     }
 });

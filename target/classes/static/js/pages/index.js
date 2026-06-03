@@ -13,7 +13,8 @@ layui.use(["element", "layer"], function () {
 
     var API_CONFIG = {
         currentUser: "/api/current-user",
-        logout: "/api/user/logout"
+        logout: "/api/user/logout",
+        currentMenus: "/api/rbac/menu/current"
     };
 
     var menuDescriptions = {
@@ -33,12 +34,12 @@ layui.use(["element", "layer"], function () {
             return;
         }
 
-        bindMenuEvents();
         bindSidebarToggle();
         bindLogout();
-        bindProfileButton();
         fillCurrentUser();
         await syncCurrentUserFromApi();
+        await loadMenus();
+        bindProfileButton();
     }
 
     function bindMenuEvents() {
@@ -54,6 +55,8 @@ layui.use(["element", "layer"], function () {
             appSidebar.classList.toggle("is-collapsed");
         });
     }
+
+    bindFrameGuard();
 
     function bindLogout() {
         logoutButton.addEventListener("click", async function () {
@@ -75,6 +78,21 @@ layui.use(["element", "layer"], function () {
         });
     }
 
+    function bindFrameGuard() {
+        contentFrame.addEventListener("load", function () {
+            try {
+                var frameWindow = contentFrame.contentWindow;
+                var frameLocation = frameWindow.location.href;
+                if (frameLocation === "http://localhost:8080/" || frameLocation === "http://127.0.0.1:8080/") {
+                    AppAuth.redirectToLogin();
+                }
+            } catch (error) {
+                return null;
+            }
+            return null;
+        });
+    }
+
     function fillCurrentUser() {
         currentUserName.textContent = AppAuth.getCurrentUserName() || "管理员";
     }
@@ -88,6 +106,37 @@ layui.use(["element", "layer"], function () {
             }
         } catch (error) {
             return null;
+        }
+    }
+
+    async function loadMenus() {
+        try {
+            var result = await AppRequest.request(API_CONFIG.currentMenus, {method: "GET"});
+            var menus = result.data || [];
+            renderMenus(menus);
+            bindMenuEvents();
+            element.render("nav");
+            activateDefaultMenu();
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function renderMenus(menus) {
+        sideNav.innerHTML = menus.map(function (menu, index) {
+            return ''
+                + '<li class="layui-nav-item ' + (index === 0 ? 'layui-this' : '') + '">'
+                + '    <a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
+                + '        <i class="layui-icon ' + menu.icon + '"></i><span>' + menu.title + '</span>'
+                + '    </a>'
+                + '</li>';
+        }).join("");
+    }
+
+    function activateDefaultMenu() {
+        var defaultLink = sideNav.querySelector("a[data-page]");
+        if (defaultLink) {
+            switchTo(defaultLink);
         }
     }
 

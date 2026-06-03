@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.SysPermissionMapper">
+
+    <resultMap id="SysPermissionResultMap" type="com.cd.entity.SysPermissionEntity">
+        <id column="id" property="id"/>
+        <result column="permission_code" property="permissionCode"/>
+        <result column="permission_name" property="permissionName"/>
+        <result column="permission_type" property="permissionType"/>
+        <result column="path" property="path"/>
+        <result column="status" property="status"/>
+        <result column="create_at" property="createAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cd.entity.SysPermissionEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+        VALUES (#{permissionCode}, #{permissionName}, #{permissionType}, #{path}, #{status})
+    </insert>
+
+    <update id="updateById" parameterType="com.cd.entity.SysPermissionEntity">
+        UPDATE sys_permission
+        SET permission_code = #{permissionCode},
+            permission_name = #{permissionName},
+            permission_type = #{permissionType},
+            path = #{path},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_permission WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="SysPermissionResultMap">
+        SELECT id, permission_code, permission_name, permission_type, path, status, create_at
+        FROM sys_permission
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByPermissionCode" resultMap="SysPermissionResultMap">
+        SELECT id, permission_code, permission_name, permission_type, path, status, create_at
+        FROM sys_permission
+        WHERE permission_code = #{permissionCode}
+    </select>
+
+    <select id="selectPage" resultMap="SysPermissionResultMap">
+        SELECT id, permission_code, permission_name, permission_type, path, status, create_at
+        FROM sys_permission
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (permission_code LIKE CONCAT('%', #{keyword}, '%')
+                OR permission_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1)
+        FROM sys_permission
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (permission_code LIKE CONCAT('%', #{keyword}, '%')
+                OR permission_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="selectAll" resultMap="SysPermissionResultMap">
+        SELECT id, permission_code, permission_name, permission_type, path, status, create_at
+        FROM sys_permission
+        ORDER BY id DESC
+    </select>
+</mapper>

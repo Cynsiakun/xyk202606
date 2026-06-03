@@ -1,9 +1,14 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
-import com.cd.common.auth.LoginSessionManager;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
+import com.cd.common.security.CustomUserDetailsService;
+import com.cd.common.security.JwtTokenBlacklistService;
+import com.cd.common.security.JwtTokenProvider;
+import com.cd.common.security.Md5PasswordEncoder;
+import com.cd.common.security.SecurityUser;
+import com.cd.common.security.SecurityUtils;
 import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
@@ -18,15 +23,17 @@ import com.cd.mapper.UserMapper;
 import com.cd.service.LoginLogService;
 import com.cd.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,28 +50,49 @@ public class UserServiceImpl implements UserService {
     private static final long MAX_AVATAR_SIZE = 5L * 1024 * 1024;
 
     private final UserMapper userMapper;
-    private final LoginSessionManager loginSessionManager;
     private final LoginLogService loginLogService;
+    private final AuthenticationManager authenticationManager;
+    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenBlacklistService jwtTokenBlacklistService;
+    private final Md5PasswordEncoder md5PasswordEncoder;
 
     @Override
     public UserLoginResponseDTO login(UserLoginDTO dto, String ipAddress) {
         UserEntity user = userMapper.selectByUserName(dto.getUserName());
-        if (user == null || !user.getUserPwd().equals(md5(dto.getPassword()))) {
-            loginLogService.record(user == null ? null : user.getId(), dto.getUserName(), ipAddress, 0, "用户名或密码错误");
+        if (user == null) {
+            loginLogService.record(null, dto.getUserName(), ipAddress, 0, "用户名或密码错误");
             throw new UnauthorizedException("用户名或密码错误");
         }
 
-        userMapper.updateLastLoginTime(user.getId());
-        UserEntity latestUser = userMapper.selectById(user.getId());
-        String token = loginSessionManager.createToken(latestUser.getId());
-        loginLogService.record(latestUser.getId(), latestUser.getUserName(), ipAddress, 1, "登录成功");
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(dto.getUserName(), dto.getPassword())
+            );
+            SecurityUser securityUser = (SecurityUser) authentication.getPrincipal();
+            List<String> roles = customUserDetailsService.loadRoleCodes(securityUser.getUserId());
+            String token = jwtTokenProvider.createToken(securityUser, roles);
 
-        UserLoginResponseDTO response = new UserLoginResponseDTO();
-        response.setToken(token);
-        response.setUserId(latestUser.getId());
-        response.setUserName(latestUser.getUserName());
-        response.setLastLoginTime(latestUser.getLastLoginTime());
-        return response;
+            userMapper.updateLastLoginTime(user.getId());
+            UserEntity latestUser = userMapper.selectById(user.getId());
+            loginLogService.record(latestUser.getId(), latestUser.getUserName(), ipAddress, 1, "登录成功");
+
+            UserLoginResponseDTO response = new UserLoginResponseDTO();
+            response.setToken(token);
+            response.setUserId(latestUser.getId());
+            response.setUserName(latestUser.getUserName());
+            response.setLastLoginTime(latestUser.getLastLoginTime());
+            return response;
+        } catch (BadCredentialsException e) {
+            loginLogService.record(user.getId(), dto.getUserName(), ipAddress, 0, "用户名或密码错误");
+            throw new UnauthorizedException("用户名或密码错误");
+        }
+    }
+
+    @Override
+    public UserCurrentDTO currentUser() {
+        Long currentUserId = requireCurrentUserId();
+        return currentUser(currentUserId);
     }
 
     @Override
@@ -73,9 +101,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void logout(String token) {
+    public void logout() {
+        String token = SecurityUtils.getCurrentToken();
         validateToken(token);
-        loginSessionManager.removeToken(token);
+        jwtTokenBlacklistService.revokeToken(token, jwtTokenProvider.parseClaims(token));
+    }
+
+    @Override
+    public UserCurrentDTO updateSelf(UserUpdateSelfDTO dto) {
+        return updateSelf(requireCurrentUserId(), dto);
     }
 
     @Override
@@ -89,6 +123,11 @@ public class UserServiceImpl implements UserService {
         existing.setUserEmail(emptyToNull(dto.getUserEmail()));
         userMapper.updateSelfById(existing);
         return toCurrentResponse(userMapper.selectById(currentUserId));
+    }
+
+    @Override
+    public UserAvatarUploadResponseDTO uploadAvatar(MultipartFile file) {
+        return uploadAvatar(requireCurrentUserId(), file);
     }
 
     @Override
@@ -118,12 +157,17 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public void changePassword(UserChangePasswordDTO dto) {
+        changePassword(requireCurrentUserId(), dto);
+    }
+
+    @Override
     public void changePassword(Long currentUserId, UserChangePasswordDTO dto) {
         UserEntity existing = ensureExists(currentUserId);
-        if (!existing.getUserPwd().equals(md5(dto.getOldPwd()))) {
+        if (!md5PasswordEncoder.matches(dto.getOldPwd(), existing.getUserPwd())) {
             throw new IllegalArgumentException("原密码不正确");
         }
-        userMapper.updatePasswordById(currentUserId, md5(dto.getNewPwd()));
+        userMapper.updatePasswordById(currentUserId, md5PasswordEncoder.encode(dto.getNewPwd()));
     }
 
     @Override
@@ -131,7 +175,7 @@ public class UserServiceImpl implements UserService {
         validateUnique(null, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         UserEntity entity = new UserEntity();
         entity.setUserName(dto.getUserName());
-        entity.setUserPwd(md5(dto.getUserPwd()));
+        entity.setUserPwd(md5PasswordEncoder.encode(dto.getUserPwd()));
         entity.setUserAvatar(dto.getUserAvatar());
         entity.setUserPhone(emptyToNull(dto.getUserPhone()));
         entity.setUserEmail(emptyToNull(dto.getUserEmail()));
@@ -184,15 +228,18 @@ public class UserServiceImpl implements UserService {
     }
 
     private Long validateToken(String token) {
-        if (!StringUtils.hasText(token)) {
+        if (!StringUtils.hasText(token) || !jwtTokenProvider.isValid(token) || jwtTokenBlacklistService.isRevoked(token)) {
             throw new UnauthorizedException("未登录或登录状态已失效");
         }
+        return jwtTokenProvider.getUserId(token);
+    }
 
-        Long userId = loginSessionManager.getUserId(token);
-        if (userId == null) {
+    private Long requireCurrentUserId() {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        if (currentUserId == null) {
             throw new UnauthorizedException("未登录或登录状态已失效");
         }
-        return userId;
+        return currentUserId;
     }
 
     private void validateUnique(Long id, String userName, String userPhone, String userEmail) {
@@ -244,10 +291,6 @@ public class UserServiceImpl implements UserService {
         dto.setUpdateAt(entity.getUpdateAt());
         dto.setLastLoginTime(entity.getLastLoginTime());
         return dto;
-    }
-
-    private String md5(String value) {
-        return DigestUtils.md5DigestAsHex(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private String emptyToNull(String value) {

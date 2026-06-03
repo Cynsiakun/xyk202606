@@ -33,3 +33,221 @@ CREATE TABLE IF NOT EXISTS login_log (
     status TINYINT,
     message VARCHAR(255)
 );
+
+CREATE TABLE IF NOT EXISTS sys_role (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    role_code VARCHAR(50) NOT NULL UNIQUE,
+    role_name VARCHAR(100) NOT NULL,
+    status TINYINT DEFAULT 1,
+    create_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sys_permission (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    permission_code VARCHAR(100) NOT NULL UNIQUE,
+    permission_name VARCHAR(100) NOT NULL,
+    permission_type VARCHAR(20) DEFAULT 'API',
+    path VARCHAR(255),
+    status TINYINT DEFAULT 1,
+    create_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    UNIQUE KEY uk_user_role (user_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS sys_role_permission (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    role_id BIGINT NOT NULL,
+    permission_id BIGINT NOT NULL,
+    UNIQUE KEY uk_role_permission (role_id, permission_id)
+);
+
+CREATE TABLE IF NOT EXISTS sys_menu (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    menu_code VARCHAR(50) NOT NULL UNIQUE,
+    menu_name VARCHAR(100) NOT NULL,
+    menu_path VARCHAR(255) NOT NULL,
+    menu_icon VARCHAR(100),
+    permission_id BIGINT,
+    sort_order INT DEFAULT 0,
+    status TINYINT DEFAULT 1
+);
+
+INSERT INTO sys_role (role_code, role_name, status)
+SELECT 'SUPER_ADMIN', '超级管理员', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_role WHERE role_code = 'SUPER_ADMIN'
+);
+
+INSERT INTO sys_role (role_code, role_name, status)
+SELECT 'SECURITY_ADMIN', '安全管理员', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_role WHERE role_code = 'SECURITY_ADMIN'
+);
+
+INSERT INTO sys_role (role_code, role_name, status)
+SELECT 'ANALYST', '分析员', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_role WHERE role_code = 'ANALYST'
+);
+
+INSERT INTO sys_role (role_code, role_name, status)
+SELECT 'AUDITOR', '审计员', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_role WHERE role_code = 'AUDITOR'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'dashboard:view', '查看仪表盘', 'API', '/api/dashboard/statistics', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'dashboard:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'user:view', '查看用户', 'API', '/api/user/list', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'user:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'user:create', '新增用户', 'API', '/api/user', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'user:create'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'user:update', '修改用户', 'API', '/api/user/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'user:update'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'user:delete', '删除用户', 'API', '/api/user/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'user:delete'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'login-log:view', '查看登录日志', 'API', '/api/login-log/list', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'login-log:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'role:view', '查看角色', 'API', '/api/rbac/role/list', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'role:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'role:create', '新增角色', 'API', '/api/rbac/role', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'role:create'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'role:update', '修改角色', 'API', '/api/rbac/role/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'role:update'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'role:delete', '删除角色', 'API', '/api/rbac/role/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'role:delete'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'role:permission:assign', '分配角色权限', 'API', '/api/rbac/role/{id}/permissions', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'role:permission:assign'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'permission:view', '查看权限', 'API', '/api/rbac/permission/list', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'permission:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'permission:create', '新增权限', 'API', '/api/rbac/permission', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'permission:create'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'permission:update', '修改权限', 'API', '/api/rbac/permission/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'permission:update'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'permission:delete', '删除权限', 'API', '/api/rbac/permission/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'permission:delete'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'user:role:assign', '分配用户角色', 'API', '/api/rbac/user/{userId}/roles', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'user:role:assign'
+);
+
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM user u
+         JOIN sys_role r ON r.role_code = 'SUPER_ADMIN'
+WHERE u.user_name = 'admin'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+WHERE r.role_code = 'SUPER_ADMIN'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM sys_role_permission rp
+    WHERE rp.role_id = r.id
+      AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'dashboard', '后台主页', './pages/dashboard.html', 'layui-icon-home', p.id, 1, 1
+FROM sys_permission p
+WHERE p.permission_code = 'dashboard:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'dashboard');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'user', '用户管理', './pages/user.html', 'layui-icon-user', p.id, 2, 1
+FROM sys_permission p
+WHERE p.permission_code = 'user:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'user');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'log', '登录日志', './pages/log.html', 'layui-icon-log', p.id, 3, 1
+FROM sys_permission p
+WHERE p.permission_code = 'login-log:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'log');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'profile', '个人信息', './pages/profile.html', 'layui-icon-about', NULL, 4, 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'profile');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'role', '角色管理', './pages/role.html', 'layui-icon-group', p.id, 5, 1
+FROM sys_permission p
+WHERE p.permission_code = 'role:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'role');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'permission', '权限管理', './pages/permission.html', 'layui-icon-auz', p.id, 6, 1
+FROM sys_permission p
+WHERE p.permission_code = 'permission:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'permission');

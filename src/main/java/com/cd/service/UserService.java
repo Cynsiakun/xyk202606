@@ -16,13 +16,21 @@ public interface UserService {
 
     UserLoginResponseDTO login(UserLoginDTO dto, String ipAddress);
 
+    UserCurrentDTO currentUser();
+
     UserCurrentDTO currentUser(Long currentUserId);
 
-    void logout(String token);
+    void logout();
+
+    UserCurrentDTO updateSelf(UserUpdateSelfDTO dto);
 
     UserCurrentDTO updateSelf(Long currentUserId, UserUpdateSelfDTO dto);
 
+    UserAvatarUploadResponseDTO uploadAvatar(MultipartFile file);
+
     UserAvatarUploadResponseDTO uploadAvatar(Long currentUserId, MultipartFile file);
+
+    void changePassword(UserChangePasswordDTO dto);
 
     void changePassword(Long currentUserId, UserChangePasswordDTO dto);
 

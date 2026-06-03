@@ -2,7 +2,7 @@
 
 Threat Awareness Platform
 
-基于 Spring Boot 3、MyBatis 与 Layui 的后台管理项目。当前版本已包含登录、后台框架、仪表盘、用户管理、个人信息、系统日志，以及角色管理、权限管理占位模块。
+基于 Spring Boot 3、MyBatis、Spring Security、JWT 与 Layui 的后台管理项目。当前版本已包含登录、后台框架、仪表盘、用户管理、个人信息、系统日志，以及 RBAC 权限基础设施。
 
 ## 环境要求
 
@@ -47,8 +47,10 @@ mvn spring-boot:run
 
 ## 已实现功能
 
-- 登录、退出登录、登录状态维护
-- 登录拦截：除 `POST /api/user/login` 外，`/api/**` 接口需携带 `Authorization: Bearer <token>`
+- 登录、退出登录、JWT 登录状态维护
+- Spring Security + JWT 鉴权
+- RBAC 权限模型：用户、角色、权限、用户角色关联、角色权限关联
+- 登录拦截：除 `POST /api/user/login` 外，受保护接口需携带 `Authorization: Bearer <token>`
 - 用户管理：新增、编辑、删除、单个查询、分页列表、用户名模糊搜索、用户名/手机号/邮箱唯一性校验
 - 个人信息：查看当前用户信息、修改手机号/邮箱、上传头像、修改密码
 - 登录日志：记录登录成功和失败日志，支持分页、用户名搜索和状态筛选
@@ -67,10 +69,25 @@ mvn spring-boot:run
 
 1. 在 `login.html` 输入用户名和密码
 2. 前端通过统一请求模块调用 `POST /api/user/login`
-3. 后端校验 `user_name` 与 MD5 密码
-4. 登录成功后更新 `last_login_time` 并写入登录日志
-5. 前端保存登录态并跳转 `index.html`
-6. 后续页面请求通过 `Authorization` 请求头携带 token
+3. Spring Security 使用 `UserDetailsService` 加载用户并校验 MD5 密码
+4. 登录成功后生成 JWT，包含 `userId`、`userName`、角色和权限信息
+5. 登录成功后更新 `last_login_time` 并写入登录日志
+6. 前端保存 JWT 并跳转 `index.html`
+7. 后续页面请求通过 `Authorization: Bearer <token>` 携带 JWT
+
+## JWT 认证流程
+
+1. 用户提交用户名密码到 `/api/user/login`
+2. Spring Security 完成认证
+3. 后端生成 JWT
+4. JWT 载荷包含：
+- `userId`
+- `userName`
+- `roles`
+- `authorities`
+5. 前端将 JWT 保存到 `localStorage`
+6. JWT 过滤器解析令牌并恢复认证信息到 SecurityContext
+7. `@PreAuthorize` 基于权限表达式控制访问
 
 ## 后端接口
 
@@ -242,8 +259,8 @@ src/main/resources/static/
 - `static/js/pages/user.js`：处理用户管理列表、搜索、新增、编辑、删除
 - `static/js/pages/profile.js`：处理个人信息展示、资料修改、头像上传预览、密码修改
 - `static/js/pages/log.js`：处理登录日志查询与分页
-- `static/js/pages/role.js`：角色管理页面占位模块，当前仅保留结构
-- `static/js/pages/permission.js`：权限管理页面占位模块，当前仅保留结构
+- `static/js/pages/role.js`：处理角色管理列表、搜索、新增、编辑、删除、权限分配
+- `static/js/pages/permission.js`：处理权限管理列表、搜索、新增、编辑、删除
 
 ## 页面结构
 
@@ -284,7 +301,6 @@ src/main/resources/static/
 ## 后续规划
 
 - 用户管理增强
-- JWT 认证替换
 - 威胁分析
 - 风险评估
 - 系统日志扩展
@@ -297,6 +313,44 @@ src/main/resources/static/
 - `user`：后台用户表
 - `login_log`：登录日志表
 - `test`：原有 CRUD 示例表
+- `sys_role`：角色表
+- `sys_permission`：权限表
+- `sys_user_role`：用户角色关联表
+- `sys_role_permission`：角色权限关联表
+
+## RBAC 权限模型
+
+- 用户 ←→ 角色：`sys_user_role`
+- 角色 ←→ 权限：`sys_role_permission`
+- 角色定义：`sys_role`
+- 权限定义：`sys_permission`
+- 接口权限控制：`@PreAuthorize("hasAuthority('xxx')")`
+
+## 默认角色说明
+
+- `SUPER_ADMIN`：超级管理员，拥有全部权限
+- `SECURITY_ADMIN`：安全管理员
+- `ANALYST`：分析员
+- `AUDITOR`：审计员
+- 默认账号 `admin` 自动拥有 `SUPER_ADMIN`
+
+## 数据库设计说明
+
+本阶段新增 RBAC 相关表：
+
+```sql
+sys_role
+sys_permission
+sys_user_role
+sys_role_permission
+```
+
+说明：
+
+- `sys_role` 保存角色编码和角色名称
+- `sys_permission` 保存权限编码、权限名称、类型和路径
+- `sys_user_role` 建立用户与角色的多对多关系
+- `sys_role_permission` 建立角色与权限的多对多关系
 
 `login_log` 表结构：
 
