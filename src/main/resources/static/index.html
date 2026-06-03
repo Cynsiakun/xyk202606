@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>后台管理系统</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
-    <link rel="stylesheet" href="./css/main.css">
+    <link rel="stylesheet" href="./css/common.css">
 </head>
 <body>
 <div class="app-shell">
@@ -27,7 +27,7 @@
                 <span class="current-user-label">当前用户</span>
                 <strong id="currentUserName">未登录</strong>
             </div>
-            <button type="button" class="layui-btn layui-btn-danger" id="logoutButton">退出登录</button>
+            <button type="button" class="layui-btn layui-btn-danger logout-button" id="logoutButton">退出登录</button>
         </div>
     </header>
 
@@ -35,23 +35,33 @@
         <aside class="app-sidebar" id="appSidebar">
             <ul class="layui-nav layui-nav-tree app-nav" lay-filter="sideNav" id="sideNav">
                 <li class="layui-nav-item layui-this">
-                    <a href="javascript:;" data-title="后台主页" data-page="./dashboard.html">
+                    <a href="javascript:;" data-title="后台主页" data-page="./pages/dashboard.html">
                         <i class="layui-icon layui-icon-home"></i><span>后台主页</span>
                     </a>
                 </li>
                 <li class="layui-nav-item">
-                    <a href="javascript:;" data-title="用户管理" data-page="./user-list.html">
+                    <a href="javascript:;" data-title="用户管理" data-page="./pages/user.html">
                         <i class="layui-icon layui-icon-user"></i><span>用户管理</span>
                     </a>
                 </li>
                 <li class="layui-nav-item">
-                    <a href="javascript:;" data-title="登录日志" data-page="./login-log.html">
+                    <a href="javascript:;" data-title="登录日志" data-page="./pages/log.html">
                         <i class="layui-icon layui-icon-log"></i><span>登录日志</span>
                     </a>
                 </li>
                 <li class="layui-nav-item">
-                    <a href="javascript:;" data-title="个人信息" data-page="./profile.html">
+                    <a href="javascript:;" data-title="个人信息" data-page="./pages/profile.html">
                         <i class="layui-icon layui-icon-about"></i><span>个人信息</span>
+                    </a>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:;" data-title="角色管理" data-page="./pages/role.html">
+                        <i class="layui-icon layui-icon-group"></i><span>角色管理</span>
+                    </a>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:;" data-title="权限管理" data-page="./pages/permission.html">
+                        <i class="layui-icon layui-icon-auz"></i><span>权限管理</span>
                     </a>
                 </li>
             </ul>
@@ -65,14 +75,18 @@
                 </div>
             </div>
             <div class="content-frame-wrapper">
-                <iframe id="contentFrame" class="content-frame" src="./dashboard.html" title="页面内容"></iframe>
+                <iframe id="contentFrame" class="content-frame" src="./pages/dashboard.html" title="页面内容"></iframe>
             </div>
         </main>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
-<script src="./js/request.js"></script>
-<script src="./js/main.js"></script>
+<script src="./js/common/auth.js"></script>
+<script src="./js/common/utils.js"></script>
+<script src="./js/common/dialog.js"></script>
+<script src="./js/common/request.js"></script>
+<script src="./js/common/table.js"></script>
+<script src="./js/pages/index.js"></script>
 </body>
 </html>

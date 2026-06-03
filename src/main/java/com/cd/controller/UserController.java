@@ -3,6 +3,7 @@ package com.cd.controller;
 import com.cd.common.PageResult;
 import com.cd.common.Result;
 import com.cd.common.constant.AuthConstants;
+import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
 import com.cd.dto.UserCurrentDTO;
@@ -16,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Validated
 @RestController
@@ -56,6 +59,13 @@ public class UserController {
     public Result<UserCurrentDTO> updateSelf(@RequestAttribute(AuthConstants.CURRENT_USER_ID) Long currentUserId,
                                              @Valid @RequestBody UserUpdateSelfDTO dto) {
         return Result.success(userService.updateSelf(currentUserId, dto));
+    }
+
+    @PostMapping(value = "/avatar/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<UserAvatarUploadResponseDTO> uploadAvatar(
+            @RequestAttribute(AuthConstants.CURRENT_USER_ID) Long currentUserId,
+            @RequestParam("file") MultipartFile file) {
+        return new Result<>(200, "上传成功", userService.uploadAvatar(currentUserId, file));
     }
 
     @PostMapping("/changePassword")

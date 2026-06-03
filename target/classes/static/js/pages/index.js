@@ -20,14 +20,16 @@ layui.use(["element", "layer"], function () {
         "后台主页": "查看用户、登录和活跃情况统计。",
         "用户管理": "维护后台用户，支持新增、编辑、删除、搜索和分页。",
         "登录日志": "审计登录成功和失败记录，支持用户名与状态筛选。",
-        "个人信息": "查看并维护当前登录账号的基础资料和密码。"
+        "个人信息": "查看并维护当前登录账号的基础资料和密码。",
+        "角色管理": "角色管理模块。",
+        "权限管理": "权限管理模块。"
     };
 
     init();
 
     async function init() {
-        if (!AppRequest.isLoggedIn()) {
-            AppRequest.redirectToLogin();
+        if (!AppAuth.isLoggedIn()) {
+            AppAuth.redirectToLogin();
             return;
         }
 
@@ -57,20 +59,16 @@ layui.use(["element", "layer"], function () {
         logoutButton.addEventListener("click", async function () {
             try {
                 await AppRequest.request(API_CONFIG.logout, {method: "POST"});
-            } catch (error) {
-                if (error.code !== 401) {
-                    layer.msg(error.message || "退出登录失败", {icon: 2, time: 1800});
-                }
             } finally {
-                AppRequest.clearLogin();
-                AppRequest.redirectToLogin();
+                AppAuth.clearLogin();
+                AppAuth.redirectToLogin();
             }
         });
     }
 
     function bindProfileButton() {
         profileButton.addEventListener("click", function () {
-            var link = sideNav.querySelector('a[data-page="./profile.html"]');
+            var link = sideNav.querySelector('a[data-page="./pages/profile.html"]');
             if (link) {
                 switchTo(link);
             }
@@ -78,7 +76,7 @@ layui.use(["element", "layer"], function () {
     }
 
     function fillCurrentUser() {
-        currentUserName.textContent = AppRequest.getCurrentUserName() || "管理员";
+        currentUserName.textContent = AppAuth.getCurrentUserName() || "管理员";
     }
 
     async function syncCurrentUserFromApi() {
@@ -89,9 +87,7 @@ layui.use(["element", "layer"], function () {
                 localStorage.setItem("currentUserName", currentUserName.textContent);
             }
         } catch (error) {
-            if (error.code !== 401) {
-                layer.msg(error.message || "获取当前用户失败", {icon: 2, time: 1800});
-            }
+            return null;
         }
     }
 

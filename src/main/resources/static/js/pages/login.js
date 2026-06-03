@@ -29,13 +29,13 @@ layui.use(["form", "layer"], function () {
                 redirectOnUnauthorized: false
             });
 
-            AppRequest.saveLogin({
+            AppAuth.saveLogin({
                 token: result.data.token,
                 userName: result.data.userName
             });
-            window.location.href = "./index.html";
+            window.location.href = "/index.html";
         } catch (error) {
-            layer.msg(error.message || "登录失败", {icon: 2, time: 2000});
+            return null;
         }
     }
 });

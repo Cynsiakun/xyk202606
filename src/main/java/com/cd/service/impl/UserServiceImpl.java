@@ -4,6 +4,7 @@ import com.cd.common.PageResult;
 import com.cd.common.auth.LoginSessionManager;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
+import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
 import com.cd.dto.UserCurrentDTO;
@@ -20,13 +21,26 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+
+    private static final Set<String> ALLOWED_AVATAR_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif");
+    private static final long MAX_AVATAR_SIZE = 5L * 1024 * 1024;
 
     private final UserMapper userMapper;
     private final LoginSessionManager loginSessionManager;
@@ -68,11 +82,39 @@ public class UserServiceImpl implements UserService {
     public UserCurrentDTO updateSelf(Long currentUserId, UserUpdateSelfDTO dto) {
         UserEntity existing = ensureExists(currentUserId);
         validateUnique(currentUserId, existing.getUserName(), dto.getUserPhone(), dto.getUserEmail());
-        existing.setUserAvatar(dto.getUserAvatar());
+        if (dto.getUserAvatar() != null) {
+            existing.setUserAvatar(dto.getUserAvatar());
+        }
         existing.setUserPhone(emptyToNull(dto.getUserPhone()));
         existing.setUserEmail(emptyToNull(dto.getUserEmail()));
         userMapper.updateSelfById(existing);
         return toCurrentResponse(userMapper.selectById(currentUserId));
+    }
+
+    @Override
+    public UserAvatarUploadResponseDTO uploadAvatar(Long currentUserId, MultipartFile file) {
+        UserEntity existing = ensureExists(currentUserId);
+        validateAvatarFile(file);
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        String fileName = UUID.randomUUID().toString().replace("-", "") + "." + extension;
+        Path avatarDirectory = Paths.get("uploads", "avatar").toAbsolutePath().normalize();
+        Path targetPath = avatarDirectory.resolve(fileName);
+
+        try {
+            Files.createDirectories(avatarDirectory);
+            file.transferTo(targetPath);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("头像上传失败");
+        }
+
+        String avatarUrl = "/uploads/avatar/" + fileName;
+        existing.setUserAvatar(avatarUrl);
+        userMapper.updateSelfById(existing);
+
+        UserAvatarUploadResponseDTO response = new UserAvatarUploadResponseDTO();
+        response.setAvatarUrl(avatarUrl);
+        return response;
     }
 
     @Override
@@ -210,5 +252,42 @@ public class UserServiceImpl implements UserService {
 
     private String emptyToNull(String value) {
         return StringUtils.hasText(value) ? value : null;
+    }
+
+    private void validateAvatarFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("请选择图片文件");
+        }
+
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new IllegalArgumentException("图片大小不能超过5MB");
+        }
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        if (!ALLOWED_AVATAR_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("仅支持 jpg、jpeg、png、gif 格式图片");
+        }
+
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType) || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new IllegalArgumentException("仅支持上传图片文件");
+        }
+
+        try {
+            BufferedImage image = ImageIO.read(file.getInputStream());
+            if (image == null) {
+                throw new IllegalArgumentException("仅支持上传图片文件");
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("读取图片文件失败");
+        }
+    }
+
+    private String getFileExtension(String originalFilename) {
+        String extension = StringUtils.getFilenameExtension(originalFilename);
+        if (!StringUtils.hasText(extension)) {
+            throw new IllegalArgumentException("文件格式不正确");
+        }
+        return extension.toLowerCase(Locale.ROOT);
     }
 }

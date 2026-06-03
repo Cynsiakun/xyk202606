@@ -3,73 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>首页</title>
+    <title>后台主页</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
-    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
 </head>
 <body class="page-body">
 <div class="page-shell">
-    <div class="page-heading">
-        <h1>欢迎使用威胁感知平台</h1>
-        <p>这里展示系统总体状态与关键指标，当前为演示数据，后续可无缝替换为接口返回内容。</p>
+    <div class="layui-row layui-col-space16 stat-grid">
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">用户总数</div>
+                <div class="metric-value" id="totalUsers">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">今日登录次数</div>
+                <div class="metric-value" id="todayLoginCount">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">今日新增用户</div>
+                <div class="metric-value" id="todayNewUsers">0</div>
+            </div>
+        </div>
+        <div class="layui-col-sm6 layui-col-lg3">
+            <div class="metric-card">
+                <div class="metric-label">近7天活跃用户</div>
+                <div class="metric-value" id="weekActiveUsers">0</div>
+            </div>
+        </div>
     </div>
 
-    <div class="layui-row layui-col-space20 stat-grid">
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">系统运行状态</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">稳定运行</div>
-                    <div class="metric-meta">核心服务正常，任务调度在线</div>
-                </div>
+    <div class="content-card dashboard-summary">
+        <div class="section-title">系统概览</div>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span>登录日志总数</span>
+                <strong id="totalLogs">0</strong>
             </div>
-        </div>
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">今日检测数量</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">1,248</div>
-                    <div class="metric-meta">较昨日提升 12.6%</div>
-                </div>
+            <div class="summary-item">
+                <span>运行状态</span>
+                <strong class="text-success">正常</strong>
             </div>
-        </div>
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">风险事件数量</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">18</div>
-                    <div class="metric-meta">其中高优先级事件 3 条</div>
-                </div>
-            </div>
-        </div>
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">系统版本</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">v0.1.0</div>
-                    <div class="metric-meta">Spring Boot 3.x + MyBatis</div>
-                </div>
-            </div>
-        </div>
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">最近登录时间</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">2026-06-02 09:30</div>
-                    <div class="metric-meta">来自内网办公环境</div>
-                </div>
-            </div>
-        </div>
-        <div class="layui-col-md6 layui-col-lg4">
-            <div class="layui-card metric-card">
-                <div class="layui-card-header">风险概览</div>
-                <div class="layui-card-body">
-                    <div class="metric-value">中等</div>
-                    <div class="metric-meta">建议优先跟进异常访问行为</div>
-                </div>
+            <div class="summary-item">
+                <span>技术栈</span>
+                <strong>Spring Boot 3 + MyBatis</strong>
             </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/dashboard.js"></script>
 </body>
 </html>

@@ -3,12 +3,14 @@ package com.cd.service;
 import com.cd.common.PageResult;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
+import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserCurrentDTO;
 import com.cd.dto.UserLoginDTO;
 import com.cd.dto.UserLoginResponseDTO;
 import com.cd.dto.UserResponseDTO;
 import com.cd.dto.UserUpdateDTO;
 import com.cd.dto.UserUpdateSelfDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
 
@@ -19,6 +21,8 @@ public interface UserService {
     void logout(String token);
 
     UserCurrentDTO updateSelf(Long currentUserId, UserUpdateSelfDTO dto);
+
+    UserAvatarUploadResponseDTO uploadAvatar(Long currentUserId, MultipartFile file);
 
     void changePassword(Long currentUserId, UserChangePasswordDTO dto);
 
