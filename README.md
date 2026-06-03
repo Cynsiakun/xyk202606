@@ -181,6 +181,20 @@ GET /api/login-log/list?page=1&size=10&userName=admin&status=1
 - `1`：成功
 - `0`：失败
 
+### 主机管理
+
+```text
+GET    /api/host/list?page=1&size=10&keyword=renaissance
+POST   /api/host
+GET    /api/host/{id}
+PUT    /api/host/{id}
+DELETE /api/host/{id}
+```
+
+`keyword` 模糊匹配主机名 / IPv4 / MAC 地址。接口分别受 `host:view`、`host:create`、`host:update`、`host:delete` 权限控制。
+
+主机数据除前端手动维护外，主要由 RabbitMQ 自动入库（见“RabbitMQ 主机信息上报”章节）。`status` 字段：`1`=在线，`0`=离线；消息消费入库时置为在线。
+
 ### 后台主页统计
 
 ```text
@@ -317,6 +331,30 @@ src/main/resources/static/
 - `sys_permission`：权限表
 - `sys_user_role`：用户角色关联表
 - `sys_role_permission`：角色权限关联表
+- `hosts`：主机信息表（MAC 地址唯一）
+
+## RabbitMQ 主机信息上报
+
+服务启动即监听队列 `sysinfo_queue`，自动消费采集端上报的主机系统信息并入库。
+
+- 连接配置：见 `src/main/resources/application-dev.yml` 的 `spring.rabbitmq`
+- 交换机：`sysinfo_exchange`，路由键：`sysinfo`，队列：`sysinfo_queue`
+- 入库逻辑：按 `mac_address` 唯一性做“存在即更新、不存在即插入”（`INSERT ... ON DUPLICATE KEY UPDATE`）
+- 消息为中文键的嵌套 JSON，由 `com.cd.mq.SysInfoListener` 解析；缺少 MAC 地址的消息会被跳过
+- `hosts` 表、`host:*` 权限、主机管理菜单在应用启动时由 `HostRbacInitializer` 幂等创建
+
+上报消息示例：
+
+```json
+{
+  "主机名": { "主机名": "renaissance" },
+  "本机IPv4地址": { "本机IPv4": "10.135.48.158" },
+  "MAC地址": { "MAC地址": "CC:5E:F8:A1:31:B4" },
+  "操作系统信息": { "系统名称": "Windows", "系统版本": "10.0.26200", "系统架构": "64位", "具体版本": "Windows 11" },
+  "CPU信息": { "CPU型号": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD", "物理核心数": 8, "逻辑核心数": 16 },
+  "内存信息": { "总内存": "31.31 GB", "已使用内存": "27.08 GB", "可用内存": "4.23 GB", "使用率": "86.5%" }
+}
+```
 
 ## RBAC 权限模型
 

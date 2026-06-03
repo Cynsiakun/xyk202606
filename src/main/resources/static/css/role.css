@@ -1,19 +1,30 @@
 .permission-dialog {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
     padding: 18px 20px 10px;
 }
 
 .permission-toolbar {
+    flex: 0 0 auto;
     display: flex;
     gap: 10px;
     margin-bottom: 14px;
 }
 
 .permission-tree {
-    min-height: 260px;
-    max-height: 340px;
+    flex: 1 1 auto;
+    min-height: 120px;
     padding: 16px;
     overflow-y: auto;
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 14px;
     background: #fff;
+}
+
+.permission-dialog .popup-actions {
+    flex: 0 0 auto;
+    margin-top: 14px;
+    padding-top: 12px;
 }

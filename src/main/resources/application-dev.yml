@@ -4,6 +4,16 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+  rabbitmq:
+    host: 139.155.139.242
+    port: 15333
+    virtual-host: my_vhost
+    username: admin
+    password: admin
+    listener:
+      simple:
+        acknowledge-mode: auto
+        missing-queues-fatal: false
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

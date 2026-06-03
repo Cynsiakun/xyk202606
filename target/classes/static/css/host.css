@@ -1,0 +1,26 @@
+/* 主机管理页面样式 */
+#hostTable + .layui-table-view .layui-table-cell {
+    font-variant-numeric: tabular-nums;
+}
+
+/* 表单字段较多：字段区可滚动，"取消/保存"按钮始终固定在底部可见 */
+.host-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.host-form .host-form-fields {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.host-form .popup-actions {
+    flex: 0 0 auto;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #e6e8ef);
+    background: #fff;
+}

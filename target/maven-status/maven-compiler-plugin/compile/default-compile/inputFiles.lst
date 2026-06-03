@@ -1,3 +1,5 @@
+C:\DATA\2026实训\java\src\main\java\com\cd\common\config\HostRbacInitializer.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RabbitMQConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RbacMenuInitializer.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\WebMvcConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\constant\AuthConstants.java
@@ -19,12 +21,16 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUser.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUtils.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\CurrentUserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\LoginLogController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PageController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\UserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostCreateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostResponseDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\LoginLogResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\MenuItemDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\RolePermissionAssignDTO.java
@@ -47,6 +53,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserRoleAssignDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateSelfDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\LoginLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysMenuEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysPermissionEntity.java
@@ -55,6 +62,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysRolePermissionEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysUserRoleEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\TestEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\UserEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\RbacMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysMenuMapper.java
@@ -64,8 +72,11 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysRolePermissionMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysUserRoleMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\TestMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\UserMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mq\SysInfoListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashboardServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\HostServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\LoginLogServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RbacServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\TestServiceImpl.java

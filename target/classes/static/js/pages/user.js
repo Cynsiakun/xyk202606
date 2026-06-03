@@ -24,6 +24,14 @@ layui.use(["table", "form", "layer"], function () {
             }},
             {field: "userPhone", title: "手机号", minWidth: 140, templet: function (d) { return d.userPhone || "-"; }},
             {field: "userEmail", title: "邮箱", minWidth: 180, templet: function (d) { return d.userEmail || "-"; }},
+            {field: "roles", title: "角色", minWidth: 160, templet: function (d) {
+                if (!d.roles || !d.roles.length) {
+                    return '<span class="empty-text">-</span>';
+                }
+                return d.roles.map(function (roleName) {
+                    return '<span class="status-tag info">' + roleName + '</span>';
+                }).join(" ");
+            }},
             {field: "status", title: "状态", width: 90, templet: function (d) {
                 return d.status === 1
                         ? '<span class="status-tag success">启用</span>'
@@ -76,11 +84,11 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
-    form.on("submit(saveUserRoles)", async function (data) {
+    form.on("submit(saveUserRoles)", async function () {
         var roleIds = [];
-        Object.keys(data.field).forEach(function (key) {
-            if (key.indexOf("role_") === 0) {
-                roleIds.push(Number(data.field[key]));
+        document.querySelectorAll('#userRoleCheckboxGroup input[type="checkbox"]').forEach(function (checkbox) {
+            if (checkbox.checked) {
+                roleIds.push(Number(checkbox.value));
             }
         });
 
@@ -94,6 +102,7 @@ layui.use(["table", "form", "layer"], function () {
                 successMessage: "角色分配成功"
             });
             layer.closeAll("page");
+            table.reload(userTableId);
         } catch (error) {
             return false;
         }

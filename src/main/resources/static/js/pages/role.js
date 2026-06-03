@@ -93,10 +93,12 @@ layui.use(["table", "form", "layer", "tree"], function () {
 
     function openRoleDialog(role) {
         editingRoleId = role ? role.id : null;
+        var dialogHeight = Math.min(420, (window.innerHeight || 420) - 30);
+        var dialogWidth = Math.min(560, (window.innerWidth || 560) - 30);
         var index = layer.open({
             type: 1,
             title: editingRoleId ? "编辑角色" : "新增角色",
-            area: ["560px", "420px"],
+            area: [dialogWidth + "px", dialogHeight + "px"],
             content: AppUtils.getTemplateHtml("roleFormTemplate"),
             success: function (layero) {
                 form.render();
@@ -123,14 +125,16 @@ layui.use(["table", "form", "layer", "tree"], function () {
             var checkedIds = role.permissionIds || [];
             permissionTreeData = buildPermissionTreeData(permissions, checkedIds);
 
+            var dialogHeight = Math.min(560, (window.innerHeight || 560) - 30);
+            var dialogWidth = Math.min(680, (window.innerWidth || 680) - 30);
             var index = layer.open({
                 type: 1,
                 title: "分配权限 - " + role.roleName,
-                area: ["680px", "560px"],
+                area: [dialogWidth + "px", dialogHeight + "px"],
                 content: AppUtils.getTemplateHtml("rolePermissionTemplate"),
-                success: function (layero) {
+                success: function (layero, layerIndex) {
                     renderPermissionTree(permissionTreeData);
-                    bindPermissionToolbar(layero, index);
+                    bindPermissionToolbar(layero, layerIndex);
                 },
                 end: function () {
                     permissionAssignRoleId = null;
@@ -164,7 +168,7 @@ layui.use(["table", "form", "layer", "tree"], function () {
                 await AppRequest.request(api.assignPermissions.replace("{id}", permissionAssignRoleId), {
                     method: "POST",
                     body: {
-                        permissionIds: collectCheckedPermissionIds(permissionTreeData)
+                        permissionIds: collectCheckedPermissionIds()
                     }
                 }, {
                     successMessage: "权限分配成功"
@@ -189,10 +193,7 @@ layui.use(["table", "form", "layer", "tree"], function () {
             id: "permissionTreeId",
             data: treeData,
             showCheckbox: true,
-            onlyIconControl: false,
-            oncheck: function () {
-                permissionTreeData = tree.getChecked("permissionTreeId");
-            }
+            onlyIconControl: false
         });
     }
 
@@ -267,17 +268,21 @@ layui.use(["table", "form", "layer", "tree"], function () {
         });
     }
 
-    function collectCheckedPermissionIds(treeData) {
+    function collectCheckedPermissionIds() {
         var ids = [];
-        treeData.forEach(function (node) {
-            if (node.children && node.children.length) {
-                node.children.forEach(function (child) {
-                    if (child.checked) {
-                        ids.push(Number(child.id));
-                    }
-                });
-            }
-        });
+        var checkedNodes = tree.getChecked("permissionTreeId") || [];
+        (function walk(nodes) {
+            nodes.forEach(function (node) {
+                if (node.children && node.children.length) {
+                    walk(node.children);
+                    return;
+                }
+                var numericId = Number(node.id);
+                if (!Number.isNaN(numericId)) {
+                    ids.push(numericId);
+                }
+            });
+        })(checkedNodes);
         return ids;
     }
 });

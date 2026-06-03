@@ -251,3 +251,67 @@ SELECT 'permission', '权限管理', './pages/permission.html', 'layui-icon-auz'
 FROM sys_permission p
 WHERE p.permission_code = 'permission:view'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'permission');
+
+CREATE TABLE IF NOT EXISTS hosts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    hostname VARCHAR(255),
+    ipv4 VARCHAR(64),
+    mac_address VARCHAR(64) NOT NULL UNIQUE,
+    os_name VARCHAR(100),
+    os_version VARCHAR(100),
+    os_arch VARCHAR(50),
+    os_release VARCHAR(100),
+    cpu_model VARCHAR(255),
+    cpu_physical_cores INT,
+    cpu_logical_cores INT,
+    mem_total VARCHAR(50),
+    mem_used VARCHAR(50),
+    mem_available VARCHAR(50),
+    mem_usage VARCHAR(50),
+    status TINYINT DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'host:view', '查看主机', 'API', '/api/host/list', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'host:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'host:create', '新增主机', 'API', '/api/host', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'host:create'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'host:update', '修改主机', 'API', '/api/host/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'host:update'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'host:delete', '删除主机', 'API', '/api/host/{id}', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'host:delete'
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+WHERE r.role_code = 'SUPER_ADMIN'
+  AND p.permission_code IN ('host:view', 'host:create', 'host:update', 'host:delete')
+  AND NOT EXISTS (
+    SELECT 1
+    FROM sys_role_permission rp
+    WHERE rp.role_id = r.id
+      AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
+SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-screen', p.id, 7, 1
+FROM sys_permission p
+WHERE p.permission_code = 'host:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'host');

@@ -19,6 +19,7 @@ import com.cd.dto.UserResponseDTO;
 import com.cd.dto.UserUpdateDTO;
 import com.cd.dto.UserUpdateSelfDTO;
 import com.cd.entity.UserEntity;
+import com.cd.mapper.RbacMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.LoginLogService;
 import com.cd.service.UserService;
@@ -50,6 +51,7 @@ public class UserServiceImpl implements UserService {
     private static final long MAX_AVATAR_SIZE = 5L * 1024 * 1024;
 
     private final UserMapper userMapper;
+    private final RbacMapper rbacMapper;
     private final LoginLogService loginLogService;
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService customUserDetailsService;
@@ -273,6 +275,7 @@ public class UserServiceImpl implements UserService {
         dto.setUserPhone(entity.getUserPhone());
         dto.setUserEmail(entity.getUserEmail());
         dto.setStatus(entity.getStatus());
+        dto.setRoles(rbacMapper.selectRoleNamesByUserId(entity.getId()));
         dto.setCreateAt(entity.getCreateAt());
         dto.setUpdateAt(entity.getUpdateAt());
         dto.setLastLoginTime(entity.getLastLoginTime());

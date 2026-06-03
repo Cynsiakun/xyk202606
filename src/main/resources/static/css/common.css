@@ -344,6 +344,13 @@ body {
     color: #b42318;
 }
 
+.status-tag.info {
+    min-width: auto;
+    margin: 2px 0;
+    background: #eff4ff;
+    color: #1d4ed8;
+}
+
 .popup-form {
     padding: 18px 6px 4px 0;
 }

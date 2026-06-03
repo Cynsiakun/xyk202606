@@ -8,6 +8,8 @@ public interface RbacMapper {
 
     List<String> selectRoleCodesByUserId(@Param("userId") Long userId);
 
+    List<String> selectRoleNamesByUserId(@Param("userId") Long userId);
+
     List<String> selectPermissionCodesByUserId(@Param("userId") Long userId);
 
     List<String> selectAllPermissionCodes();
