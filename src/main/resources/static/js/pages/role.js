@@ -31,9 +31,17 @@ layui.use(["table", "form", "layer", "tree"], function () {
             }},
             {field: "createAt", title: "创建时间", minWidth: 180, templet: function (d) { return AppUtils.formatDateTime(d.createAt); }},
             {title: "操作", width: 250, fixed: "right", templet: function () {
-                return '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-                    + '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="assignPermission">分配权限</button>'
-                    + '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                var buttons = "";
+                if (AppAuth.hasPermission("role:update")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
+                }
+                if (AppAuth.hasPermission("role:permission:assign")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="assignPermission">分配权限</button>';
+                }
+                if (AppAuth.hasPermission("role:delete")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                }
+                return buttons || '<span class="empty-text">-</span>';
             }}
         ]]
     });
@@ -45,28 +53,31 @@ layui.use(["table", "form", "layer", "tree"], function () {
         return false;
     });
 
-    form.on("submit(saveRole)", async function (data) {
-        try {
-            if (editingRoleId) {
-                await AppRequest.request(api.update.replace("{id}", editingRoleId), {
-                    method: "PUT",
-                    body: normalizeRolePayload(data.field)
-                }, {
-                    successMessage: "保存成功"
-                });
-            } else {
-                await AppRequest.request(api.create, {
-                    method: "POST",
-                    body: normalizeRolePayload(data.field)
-                }, {
-                    successMessage: "保存成功"
-                });
+    form.on("submit(saveRole)", function (data) {
+        var payload = normalizeRolePayload(data.field);
+        (async function () {
+            try {
+                if (editingRoleId) {
+                    await AppRequest.request(api.update.replace("{id}", editingRoleId), {
+                        method: "PUT",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                } else {
+                    await AppRequest.request(api.create, {
+                        method: "POST",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                }
+                layer.closeAll("page");
+                table.reload(roleTableId);
+            } catch (error) {
+                return;
             }
-            layer.closeAll("page");
-            table.reload(roleTableId);
-        } catch (error) {
-            return false;
-        }
+        })();
         return false;
     });
 
@@ -82,9 +93,14 @@ layui.use(["table", "form", "layer", "tree"], function () {
         }
     });
 
-    document.getElementById("addRoleButton").addEventListener("click", function () {
-        openRoleDialog(null);
-    });
+    var addRoleButton = document.getElementById("addRoleButton");
+    if (AppAuth.hasPermission("role:create")) {
+        addRoleButton.addEventListener("click", function () {
+            openRoleDialog(null);
+        });
+    } else {
+        addRoleButton.style.display = "none";
+    }
 
     document.getElementById("resetButton").addEventListener("click", function () {
         form.val("roleSearchForm", {keyword: ""});

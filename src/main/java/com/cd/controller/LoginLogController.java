@@ -21,7 +21,7 @@ public class LoginLogController {
 
     private final LoginLogService loginLogService;
 
-    @PreAuthorize("hasAuthority('login-log:view')")
+    @PreAuthorize("@perm.has('login-log:view')")
     @GetMapping("/list")
     public Result<PageResult<LoginLogResponseDTO>> list(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,

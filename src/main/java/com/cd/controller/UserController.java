@@ -73,33 +73,33 @@ public class UserController {
         return Result.success();
     }
 
-    @PreAuthorize("hasAuthority('user:create')")
+    @PreAuthorize("@perm.has('user:create')")
     @PostMapping
     public Result<UserResponseDTO> create(@Valid @RequestBody UserCreateDTO dto) {
         return Result.success(userService.create(dto));
     }
 
-    @PreAuthorize("hasAuthority('user:delete')")
+    @PreAuthorize("@perm.has('user:delete')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         userService.deleteById(id);
         return Result.success();
     }
 
-    @PreAuthorize("hasAuthority('user:update')")
+    @PreAuthorize("@perm.has('user:update')")
     @PutMapping("/{id}")
     public Result<UserResponseDTO> update(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
                                           @Valid @RequestBody UserUpdateDTO dto) {
         return Result.success(userService.update(id, dto));
     }
 
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("@perm.has('user:view')")
     @GetMapping("/{id}")
     public Result<UserResponseDTO> getById(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         return Result.success(userService.getById(id));
     }
 
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("@perm.has('user:view')")
     @GetMapping("/list")
     public Result<PageResult<UserResponseDTO>> list(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,

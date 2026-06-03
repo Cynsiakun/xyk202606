@@ -14,7 +14,8 @@ layui.use(["element", "layer"], function () {
     var API_CONFIG = {
         currentUser: "/api/current-user",
         logout: "/api/user/logout",
-        currentMenus: "/api/rbac/menu/current"
+        currentMenus: "/api/rbac/menu/current",
+        currentPermissions: "/api/rbac/permission/current"
     };
 
     var menuDescriptions = {
@@ -39,8 +40,18 @@ layui.use(["element", "layer"], function () {
         bindLogout();
         fillCurrentUser();
         await syncCurrentUserFromApi();
+        await loadPermissions();
         await loadMenus();
         bindProfileButton();
+    }
+
+    async function loadPermissions() {
+        try {
+            var result = await AppRequest.request(API_CONFIG.currentPermissions, {method: "GET"});
+            AppAuth.setPermissions(result.data || []);
+        } catch (error) {
+            AppAuth.setPermissions([]);
+        }
     }
 
     function bindMenuEvents() {

@@ -1,6 +1,8 @@
+C:\DATA\2026实训\java\src\main\java\com\cd\common\config\CacheConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\HostRbacInitializer.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RabbitMQConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RbacMenuInitializer.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RoleMatrixInitializer.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\WebMvcConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\constant\AuthConstants.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\ResourceNotFoundException.java
@@ -16,6 +18,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\security\JwtProperties.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\JwtTokenBlacklistService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\JwtTokenProvider.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\Md5PasswordEncoder.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\security\PermissionChecker.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUser.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUtils.java

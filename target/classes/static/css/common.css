@@ -376,6 +376,24 @@ body {
     color: var(--text-secondary);
 }
 
+.field-error {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b42318;
+}
+
+.form-error {
+    margin: 0 0 14px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: #fef3f2;
+    border: 1px solid #fda29b;
+    color: #b42318;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 .page-heading {
     margin-bottom: 20px;
 }

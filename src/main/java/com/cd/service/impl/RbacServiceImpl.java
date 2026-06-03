@@ -14,7 +14,8 @@ import com.cd.dto.SysRoleUpdateDTO;
 import com.cd.entity.SysMenuEntity;
 import com.cd.entity.SysPermissionEntity;
 import com.cd.entity.SysRoleEntity;
-import com.cd.mapper.RbacMapper;
+import com.cd.common.config.CacheConfig;
+import com.cd.common.security.PermissionChecker;
 import com.cd.mapper.SysMenuMapper;
 import com.cd.mapper.SysPermissionMapper;
 import com.cd.mapper.SysRoleMapper;
@@ -23,6 +24,7 @@ import com.cd.mapper.SysUserRoleMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.RbacService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -32,15 +34,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RbacServiceImpl implements RbacService {
 
-    private static final String ROLE_SUPER_ADMIN = "SUPER_ADMIN";
-
     private final SysRoleMapper sysRoleMapper;
     private final SysMenuMapper sysMenuMapper;
     private final SysPermissionMapper sysPermissionMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRolePermissionMapper sysRolePermissionMapper;
-    private final RbacMapper rbacMapper;
     private final UserMapper userMapper;
+    private final PermissionChecker permissionChecker;
 
     @Override
     public PageResult<SysRoleResponseDTO> rolePage(int page, int size, String keyword) {
@@ -65,6 +65,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, allEntries = true)
     public SysRoleResponseDTO updateRole(Long id, SysRoleUpdateDTO dto) {
         SysRoleEntity entity = ensureRoleExists(id);
         validateRoleCodeUnique(id, dto.getRoleCode());
@@ -76,6 +77,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, allEntries = true)
     public void deleteRole(Long id) {
         ensureRoleExists(id);
         if (sysUserRoleMapper.countByRoleId(id) > 0) {
@@ -91,6 +93,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, allEntries = true)
     public void assignPermissions(Long roleId, List<Long> permissionIds) {
         ensureRoleExists(roleId);
         validatePermissionIds(permissionIds);
@@ -125,6 +128,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, allEntries = true)
     public SysPermissionResponseDTO updatePermission(Long id, SysPermissionUpdateDTO dto) {
         SysPermissionEntity entity = ensurePermissionExists(id);
         validatePermissionCodeUnique(id, dto.getPermissionCode());
@@ -138,6 +142,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, allEntries = true)
     public void deletePermission(Long id) {
         ensurePermissionExists(id);
         if (sysRolePermissionMapper.countByPermissionId(id) > 0) {
@@ -152,6 +157,7 @@ public class RbacServiceImpl implements RbacService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#userId")
     public void assignRolesToUser(Long userId, List<Long> roleIds) {
         if (userMapper.selectById(userId) == null) {
             throw new ResourceNotFoundException("用户不存在 id=" + userId);
@@ -175,11 +181,18 @@ public class RbacServiceImpl implements RbacService {
             throw new UnauthorizedException("未登录或登录状态已失效");
         }
 
-        List<String> roleCodes = rbacMapper.selectRoleCodesByUserId(userId);
-        if (roleCodes.contains(ROLE_SUPER_ADMIN)) {
-            return sysMenuMapper.selectAllEnabled().stream().map(this::toMenuItem).toList();
+        return sysMenuMapper.selectAllEnabled().stream()
+                .map(this::toMenuItem)
+                .filter(item -> item.getPermissionCode() == null || permissionChecker.has(item.getPermissionCode()))
+                .toList();
+    }
+
+    @Override
+    public List<String> currentUserPermissionCodes() {
+        if (SecurityUtils.getCurrentUserId() == null) {
+            throw new UnauthorizedException("未登录或登录状态已失效");
         }
-        return sysMenuMapper.selectEnabledByUserId(userId).stream().map(this::toMenuItem).toList();
+        return permissionChecker.currentPermissionCodes();
     }
 
     @Override

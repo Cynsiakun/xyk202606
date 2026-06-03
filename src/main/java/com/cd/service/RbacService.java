@@ -41,6 +41,8 @@ public interface RbacService {
 
     List<MenuItemDTO> currentUserMenus();
 
+    List<String> currentUserPermissionCodes();
+
     List<SysRoleResponseDTO> allRoles();
 
     List<SysPermissionResponseDTO> allPermissions();

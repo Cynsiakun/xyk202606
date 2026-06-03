@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.config.CacheConfig;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
 import com.cd.common.security.CustomUserDetailsService;
@@ -24,6 +25,7 @@ import com.cd.mapper.UserMapper;
 import com.cd.service.LoginLogService;
 import com.cd.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -187,12 +189,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#id")
     public void deleteById(Long id) {
         ensureExists(id);
         userMapper.deleteById(id);
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#id")
     public UserResponseDTO update(Long id, UserUpdateDTO dto) {
         UserEntity existing = ensureExists(id);
         validateUnique(id, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());

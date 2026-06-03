@@ -37,8 +37,14 @@ layui.use(["table", "form", "layer"], function () {
             }},
             {field: "updatedAt", title: "更新时间", minWidth: 170, templet: function (d) { return AppUtils.formatDateTime(d.updatedAt); }},
             {title: "操作", width: 160, fixed: "right", templet: function () {
-                return '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-                        + '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                var buttons = "";
+                if (AppAuth.hasPermission("host:update")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
+                }
+                if (AppAuth.hasPermission("host:delete")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                }
+                return buttons || '<span class="empty-text">-</span>';
             }}
         ]]
     });
@@ -50,29 +56,31 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
-    form.on("submit(saveHost)", async function (data) {
+    form.on("submit(saveHost)", function (data) {
         var payload = normalizePayload(data.field);
-        try {
-            if (editingHostId) {
-                await AppRequest.request("/api/host/" + editingHostId, {
-                    method: "PUT",
-                    body: payload
-                }, {
-                    successMessage: "保存成功"
-                });
-            } else {
-                await AppRequest.request("/api/host", {
-                    method: "POST",
-                    body: payload
-                }, {
-                    successMessage: "保存成功"
-                });
+        (async function () {
+            try {
+                if (editingHostId) {
+                    await AppRequest.request("/api/host/" + editingHostId, {
+                        method: "PUT",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                } else {
+                    await AppRequest.request("/api/host", {
+                        method: "POST",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                }
+                layer.closeAll("page");
+                table.reload(hostTableId);
+            } catch (error) {
+                return;
             }
-            layer.closeAll("page");
-            table.reload(hostTableId);
-        } catch (error) {
-            return false;
-        }
+        })();
         return false;
     });
 
@@ -85,9 +93,14 @@ layui.use(["table", "form", "layer"], function () {
         }
     });
 
-    document.getElementById("addHostButton").addEventListener("click", function () {
-        openHostDialog(null);
-    });
+    var addHostButton = document.getElementById("addHostButton");
+    if (AppAuth.hasPermission("host:create")) {
+        addHostButton.addEventListener("click", function () {
+            openHostDialog(null);
+        });
+    } else {
+        addHostButton.style.display = "none";
+    }
 
     document.getElementById("resetButton").addEventListener("click", function () {
         form.val("hostSearchForm", {keyword: ""});

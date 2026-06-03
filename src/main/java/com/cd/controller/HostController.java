@@ -29,33 +29,33 @@ public class HostController {
 
     private final HostService hostService;
 
-    @PreAuthorize("hasAuthority('host:create')")
+    @PreAuthorize("@perm.has('host:create')")
     @PostMapping
     public Result<HostResponseDTO> create(@Valid @RequestBody HostCreateDTO dto) {
         return Result.success(hostService.create(dto));
     }
 
-    @PreAuthorize("hasAuthority('host:update')")
+    @PreAuthorize("@perm.has('host:update')")
     @PutMapping("/{id}")
     public Result<HostResponseDTO> update(@PathVariable @Min(value = 1, message = "id必须大于0") Long id,
                                           @Valid @RequestBody HostUpdateDTO dto) {
         return Result.success(hostService.update(id, dto));
     }
 
-    @PreAuthorize("hasAuthority('host:delete')")
+    @PreAuthorize("@perm.has('host:delete')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable @Min(value = 1, message = "id必须大于0") Long id) {
         hostService.deleteById(id);
         return Result.success();
     }
 
-    @PreAuthorize("hasAuthority('host:view')")
+    @PreAuthorize("@perm.has('host:view')")
     @GetMapping("/{id}")
     public Result<HostResponseDTO> getById(@PathVariable @Min(value = 1, message = "id必须大于0") Long id) {
         return Result.success(hostService.getById(id));
     }
 
-    @PreAuthorize("hasAuthority('host:view')")
+    @PreAuthorize("@perm.has('host:view')")
     @GetMapping("/list")
     public Result<PageResult<HostResponseDTO>> list(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page必须大于0") Integer page,

@@ -39,9 +39,17 @@ layui.use(["table", "form", "layer"], function () {
             }},
             {field: "lastLoginTime", title: "最后登录时间", minWidth: 180, templet: function (d) { return AppUtils.formatDateTime(d.lastLoginTime); }},
             {title: "操作", width: 230, fixed: "right", templet: function () {
-                return '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-                        + '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="assignRole">分配角色</button>'
-                        + '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                var buttons = "";
+                if (AppAuth.hasPermission("user:update")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
+                }
+                if (AppAuth.hasPermission("user:role:assign")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="assignRole">分配角色</button>';
+                }
+                if (AppAuth.hasPermission("user:delete")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                }
+                return buttons || '<span class="empty-text">-</span>';
             }}
         ]]
     });
@@ -53,38 +61,44 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
-    form.on("submit(saveUser)", async function (data) {
+    form.on("submit(saveUser)", function (data) {
+        var formEl = document.querySelector('form[lay-filter="userForm"]');
+        AppUtils.clearFormError(formEl);
         var payload = normalizePayload(data.field);
-        try {
-            if (editingUserId) {
-                delete payload.userPwd;
-                await AppRequest.request("/api/user/" + editingUserId, {
-                    method: "PUT",
-                    body: payload
-                }, {
-                    successMessage: "保存成功"
-                });
-            } else {
-                if (!payload.userPwd) {
-                    AppDialog.error(layer, "新增用户时密码必填", 1600);
-                    return false;
-                }
-                await AppRequest.request("/api/user", {
-                    method: "POST",
-                    body: payload
-                }, {
-                    successMessage: "保存成功"
-                });
-            }
-            layer.closeAll("page");
-            table.reload(userTableId);
-        } catch (error) {
+        if (!editingUserId && !payload.userPwd) {
+            AppUtils.showFormError(formEl, "新增用户时密码必填");
             return false;
         }
+        (async function () {
+            try {
+                if (editingUserId) {
+                    delete payload.userPwd;
+                    await AppRequest.request("/api/user/" + editingUserId, {
+                        method: "PUT",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功",
+                        showErrorMessage: false
+                    });
+                } else {
+                    await AppRequest.request("/api/user", {
+                        method: "POST",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功",
+                        showErrorMessage: false
+                    });
+                }
+                layer.closeAll("page");
+                table.reload(userTableId);
+            } catch (error) {
+                AppUtils.showFormError(formEl, error.message);
+            }
+        })();
         return false;
     });
 
-    form.on("submit(saveUserRoles)", async function () {
+    form.on("submit(saveUserRoles)", function () {
         var roleIds = [];
         document.querySelectorAll('#userRoleCheckboxGroup input[type="checkbox"]').forEach(function (checkbox) {
             if (checkbox.checked) {
@@ -92,20 +106,22 @@ layui.use(["table", "form", "layer"], function () {
             }
         });
 
-        try {
-            await AppRequest.request(roleApi.assignUserRoles.replace("{userId}", roleAssignUserId), {
-                method: "POST",
-                body: {
-                    roleIds: roleIds
-                }
-            }, {
-                successMessage: "角色分配成功"
-            });
-            layer.closeAll("page");
-            table.reload(userTableId);
-        } catch (error) {
-            return false;
-        }
+        (async function () {
+            try {
+                await AppRequest.request(roleApi.assignUserRoles.replace("{userId}", roleAssignUserId), {
+                    method: "POST",
+                    body: {
+                        roleIds: roleIds
+                    }
+                }, {
+                    successMessage: "角色分配成功"
+                });
+                layer.closeAll("page");
+                table.reload(userTableId);
+            } catch (error) {
+                return;
+            }
+        })();
         return false;
     });
 
@@ -121,9 +137,14 @@ layui.use(["table", "form", "layer"], function () {
         }
     });
 
-    document.getElementById("addUserButton").addEventListener("click", function () {
-        openUserDialog(null);
-    });
+    var addUserButton = document.getElementById("addUserButton");
+    if (AppAuth.hasPermission("user:create")) {
+        addUserButton.addEventListener("click", function () {
+            openUserDialog(null);
+        });
+    } else {
+        addUserButton.style.display = "none";
+    }
 
     document.getElementById("resetButton").addEventListener("click", function () {
         form.val("userSearchForm", {userName: ""});
@@ -152,6 +173,13 @@ layui.use(["table", "form", "layer"], function () {
                     userEmail: user ? user.userEmail || "" : "",
                     userAvatar: user ? user.userAvatar || "" : "",
                     status: user && user.status === 0 ? "0" : "1"
+                });
+                AppUtils.bindLiveValidation(layero[0], {
+                    saveButton: 'button[lay-filter="saveUser"]',
+                    fields: [
+                        {selector: 'input[name="userPhone"]', type: "phone", message: "手机号格式不正确"},
+                        {selector: 'input[name="userEmail"]', type: "email", message: "邮箱格式不正确"}
+                    ]
                 });
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);

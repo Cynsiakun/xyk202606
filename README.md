@@ -2,7 +2,7 @@
 
 Threat Awareness Platform
 
-基于 Spring Boot 3、MyBatis、Spring Security、JWT 与 Layui 的后台管理项目。当前版本已包含登录、后台框架、仪表盘、用户管理、个人信息、系统日志，以及 RBAC 权限基础设施。
+基于 Spring Boot 3、MyBatis、Spring Security、JWT 与 Layui 的后台管理项目。当前版本已包含登录、后台框架、仪表盘、用户管理、个人信息、系统日志、角色与权限管理、主机管理（含 RabbitMQ 自动上报入库），以及完整的 RBAC 权限控制（菜单级 / 接口级 / 按钮级）。
 
 ## 环境要求
 
@@ -49,13 +49,17 @@ mvn spring-boot:run
 
 - 登录、退出登录、JWT 登录状态维护
 - Spring Security + JWT 鉴权
-- RBAC 权限模型：用户、角色、权限、用户角色关联、角色权限关联
+- RBAC 权限模型：用户、角色、权限、用户角色关联、角色权限关联、菜单
+- 完整 RBAC 权限控制：超管通配放行、实时查库 + Caffeine 缓存、菜单级 / 接口级（`@perm.has`）/ 按钮级三级粒度
+- 角色与权限管理：角色/权限的增删改查、给角色分配权限、给用户分配角色
+- 内置角色矩阵与演示账号，启动时由初始化器幂等种入
 - 登录拦截：除 `POST /api/user/login` 外，受保护接口需携带 `Authorization: Bearer <token>`
 - 用户管理：新增、编辑、删除、单个查询、分页列表、用户名模糊搜索、用户名/手机号/邮箱唯一性校验
+- 主机管理：增删改查 + 关键字搜索，并通过 RabbitMQ 监听 `sysinfo_queue` 自动上报入库
 - 个人信息：查看当前用户信息、修改手机号/邮箱、上传头像、修改密码
 - 登录日志：记录登录成功和失败日志，支持分页、用户名搜索和状态筛选
 - 后台主页统计：用户总数、今日登录次数、今日新增用户、近 7 天活跃用户、日志总数
-- Layui 后台框架：左侧菜单通过 iframe 加载独立页面，便于后续权限控制
+- Layui 后台框架：左侧菜单通过 iframe 加载独立页面，菜单由后端按权限动态下发
 
 ## 登录功能说明
 
@@ -86,8 +90,8 @@ mvn spring-boot:run
 - `roles`
 - `authorities`
 5. 前端将 JWT 保存到 `localStorage`
-6. JWT 过滤器解析令牌并恢复认证信息到 SecurityContext
-7. `@PreAuthorize` 基于权限表达式控制访问
+6. JWT 过滤器解析令牌，根据 `userId` **从数据库实时加载**用户的角色与权限并恢复认证信息到 SecurityContext（载荷中的 `roles`/`authorities` 仅供参考，不用于鉴权；加载结果带 Caffeine 缓存）
+7. `@PreAuthorize("@perm.has('xxx')")` 基于权限码控制访问，超级管理员通配放行
 
 ## 后端接口
 
@@ -331,6 +335,7 @@ src/main/resources/static/
 - `sys_permission`：权限表
 - `sys_user_role`：用户角色关联表
 - `sys_role_permission`：角色权限关联表
+- `sys_menu`：菜单表（可绑定权限，决定菜单可见性）
 - `hosts`：主机信息表（MAC 地址唯一）
 
 ## RabbitMQ 主机信息上报
@@ -362,15 +367,70 @@ src/main/resources/static/
 - 角色 ←→ 权限：`sys_role_permission`
 - 角色定义：`sys_role`
 - 权限定义：`sys_permission`
-- 接口权限控制：`@PreAuthorize("hasAuthority('xxx')")`
+- 菜单定义：`sys_menu`（每个菜单可绑定一个 `permission_id`，决定该菜单是否对当前用户可见）
+- 接口权限控制：`@PreAuthorize("@perm.has('xxx')")`
 
-## 默认角色说明
+### 鉴权机制
 
-- `SUPER_ADMIN`：超级管理员，拥有全部权限
-- `SECURITY_ADMIN`：安全管理员
-- `ANALYST`：分析员
-- `AUDITOR`：审计员
-- 默认账号 `admin` 自动拥有 `SUPER_ADMIN`
+- **实时查库 + 缓存**：每次请求由 JWT 过滤器根据 `userId` 从数据库重新加载用户的角色与权限（`loadUserById`），JWT 载荷中的 `roles`/`authorities` 不直接用于鉴权，因此后台改了权限即时生效。加载结果用 Caffeine 缓存（`userAuth`，写后 5 分钟过期）；角色/权限/用户角色发生写操作时会 `@CacheEvict` 主动失效。
+- **超管通配放行**：超级管理员逻辑只存在一处——`PermissionChecker`（`@perm`）。凡持有 `ROLE_SUPER_ADMIN` 权限（或通配权限 `*`）即对所有 `@perm.has(...)` 放行，无需在 `sys_role_permission` 里逐条授予。
+- **三级权限粒度**：
+  - 菜单级：`GET /api/rbac/menu/current` 只返回当前用户有权访问的菜单。
+  - 接口级：所有写接口与查询接口由 `@PreAuthorize("@perm.has('code')")` 守卫，是真正的闸口。
+  - 按钮级：`GET /api/rbac/permission/current` 返回当前用户权限码（超管返回 `["*"]`），前端 `AppAuth.hasPermission(code)` 据此决定"新增/编辑/删除/分配"等按钮是否渲染。按钮级仅为体验优化，越权请求仍由后端接口级拦截返回 403。
+- `sys_permission.path` 字段降级为备注用途（记录该权限对应的接口路径），不参与鉴权判断。
+
+## 默认角色与权限矩阵
+
+`SUPER_ADMIN` 走通配放行，不在矩阵内逐条授权；其余角色由 `RoleMatrixInitializer` 在应用启动时幂等授予下表权限：
+
+| 角色 | 中文名 | 权限 |
+|---|---|---|
+| `SUPER_ADMIN` | 超级管理员 | 全部（通配 `*`） |
+| `SECURITY_ADMIN` | 安全管理员 | `dashboard:view`；`user` 增删改查；`host` 增删改查；`role:view`、`permission:view`、`login-log:view` |
+| `ANALYST` | 分析员 | `dashboard:view`；`host:view`、`host:update`；`login-log:view` |
+| `AUDITOR` | 审计员 | 只读：`dashboard:view`、`user:view`、`host:view`、`role:view`、`permission:view`、`login-log:view` |
+
+默认账号 `admin / admin` 自动拥有 `SUPER_ADMIN`。
+
+### 演示账号
+
+`RoleMatrixInitializer` 启动时还会幂等创建以下演示账号，便于验证非超管的受限视图（密码均为 `123456`）：
+
+| 用户名 | 密码 | 角色 |
+|---|---|---|
+| `security` | `123456` | `SECURITY_ADMIN` |
+| `analyst` | `123456` | `ANALYST` |
+| `auditor` | `123456` | `AUDITOR` |
+
+> 角色矩阵与演示账号的运行期种子由 `com.cd.common.config.RoleMatrixInitializer`（`ApplicationRunner`）幂等写入；`schema.sql` 中保留同样内容仅供手动初始化时保持一致。
+
+## RBAC 管理与查询接口
+
+角色 / 权限管理（受对应 `*:view`、`*:create`、`*:update`、`*:delete`、`role:permission:assign`、`user:role:assign` 权限控制）：
+
+```text
+GET    /api/rbac/role/list?page=1&size=10&keyword=
+GET    /api/rbac/role/all
+POST   /api/rbac/role
+PUT    /api/rbac/role/{id}
+DELETE /api/rbac/role/{id}
+POST   /api/rbac/role/{id}/permissions      # 分配角色权限
+GET    /api/rbac/permission/list?page=1&size=10&keyword=
+GET    /api/rbac/permission/all
+POST   /api/rbac/permission
+PUT    /api/rbac/permission/{id}
+DELETE /api/rbac/permission/{id}
+GET    /api/rbac/user/{userId}/roles         # 查询用户已分配角色
+POST   /api/rbac/user/{userId}/roles         # 分配用户角色
+```
+
+当前用户的菜单与权限（任意已登录用户可访问，用于前端动态菜单与按钮控制）：
+
+```text
+GET /api/rbac/menu/current          # 当前用户可见菜单
+GET /api/rbac/permission/current    # 当前用户权限码（超管返回 ["*"]）
+```
 
 ## 数据库设计说明
 

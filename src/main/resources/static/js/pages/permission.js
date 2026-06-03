@@ -27,8 +27,14 @@ layui.use(["table", "form", "layer"], function () {
                     : '<span class="status-tag fail">禁用</span>';
             }},
             {title: "操作", width: 150, fixed: "right", templet: function () {
-                return '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>'
-                    + '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                var buttons = "";
+                if (AppAuth.hasPermission("permission:update")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
+                }
+                if (AppAuth.hasPermission("permission:delete")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
+                }
+                return buttons || '<span class="empty-text">-</span>';
             }}
         ]]
     });
@@ -40,28 +46,31 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
-    form.on("submit(savePermission)", async function (data) {
-        try {
-            if (editingPermissionId) {
-                await AppRequest.request(api.update.replace("{id}", editingPermissionId), {
-                    method: "PUT",
-                    body: normalizePayload(data.field)
-                }, {
-                    successMessage: "保存成功"
-                });
-            } else {
-                await AppRequest.request(api.create, {
-                    method: "POST",
-                    body: normalizePayload(data.field)
-                }, {
-                    successMessage: "保存成功"
-                });
+    form.on("submit(savePermission)", function (data) {
+        var payload = normalizePayload(data.field);
+        (async function () {
+            try {
+                if (editingPermissionId) {
+                    await AppRequest.request(api.update.replace("{id}", editingPermissionId), {
+                        method: "PUT",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                } else {
+                    await AppRequest.request(api.create, {
+                        method: "POST",
+                        body: payload
+                    }, {
+                        successMessage: "保存成功"
+                    });
+                }
+                layer.closeAll("page");
+                table.reload(permissionTableId);
+            } catch (error) {
+                return;
             }
-            layer.closeAll("page");
-            table.reload(permissionTableId);
-        } catch (error) {
-            return false;
-        }
+        })();
         return false;
     });
 
@@ -74,9 +83,14 @@ layui.use(["table", "form", "layer"], function () {
         }
     });
 
-    document.getElementById("addPermissionButton").addEventListener("click", function () {
-        openPermissionDialog(null);
-    });
+    var addPermissionButton = document.getElementById("addPermissionButton");
+    if (AppAuth.hasPermission("permission:create")) {
+        addPermissionButton.addEventListener("click", function () {
+            openPermissionDialog(null);
+        });
+    } else {
+        addPermissionButton.style.display = "none";
+    }
 
     document.getElementById("resetButton").addEventListener("click", function () {
         form.val("permissionSearchForm", {keyword: ""});

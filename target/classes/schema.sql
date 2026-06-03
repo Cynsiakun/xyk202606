@@ -206,17 +206,8 @@ WHERE u.user_name = 'admin'
     SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id
 );
 
-INSERT INTO sys_role_permission (role_id, permission_id)
-SELECT r.id, p.id
-FROM sys_role r
-         JOIN sys_permission p
-WHERE r.role_code = 'SUPER_ADMIN'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM sys_role_permission rp
-    WHERE rp.role_id = r.id
-      AND rp.permission_id = p.id
-);
+-- 注：SUPER_ADMIN 采用“通配放行”（拥有 ROLE_SUPER_ADMIN 即视为全部权限），
+-- 不再向 sys_role_permission 批量授予全部权限。鉴权统一走 @perm.has(...)。
 
 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
 SELECT 'dashboard', '后台主页', './pages/dashboard.html', 'layui-icon-home', p.id, 1, 1
@@ -315,3 +306,90 @@ SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-screen', p.id, 7
 FROM sys_permission p
 WHERE p.permission_code = 'host:view'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'host');
+
+-- ============================================================
+-- 角色 → 权限矩阵（幂等授予）。SUPER_ADMIN 走通配放行，不在此列。
+-- SECURITY_ADMIN 安全管理员：用户/主机增删改查 + 角色/权限/日志查看
+-- ANALYST       分析员：仪表盘 + 主机查看与更新 + 日志查看
+-- AUDITOR       审计员：只读（仪表盘/用户/主机/角色/权限/日志查看）
+-- ============================================================
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+              ON p.permission_code IN (
+                  'dashboard:view',
+                  'user:view', 'user:create', 'user:update', 'user:delete',
+                  'host:view', 'host:create', 'host:update', 'host:delete',
+                  'role:view', 'permission:view', 'login-log:view'
+              )
+WHERE r.role_code = 'SECURITY_ADMIN'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+              ON p.permission_code IN (
+                  'dashboard:view',
+                  'host:view', 'host:update',
+                  'login-log:view'
+              )
+WHERE r.role_code = 'ANALYST'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+              ON p.permission_code IN (
+                  'dashboard:view',
+                  'user:view', 'host:view',
+                  'role:view', 'permission:view', 'login-log:view'
+              )
+WHERE r.role_code = 'AUDITOR'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+-- ============================================================
+-- 演示账号（密码均为 123456 的 MD5），用于验证非超管的受限视图。
+-- ============================================================
+
+INSERT INTO user (user_name, user_pwd, status)
+SELECT 'security', 'e10adc3949ba59abbe56e057f20f883e', 1
+WHERE NOT EXISTS (SELECT 1 FROM user WHERE user_name = 'security');
+
+INSERT INTO user (user_name, user_pwd, status)
+SELECT 'analyst', 'e10adc3949ba59abbe56e057f20f883e', 1
+WHERE NOT EXISTS (SELECT 1 FROM user WHERE user_name = 'analyst');
+
+INSERT INTO user (user_name, user_pwd, status)
+SELECT 'auditor', 'e10adc3949ba59abbe56e057f20f883e', 1
+WHERE NOT EXISTS (SELECT 1 FROM user WHERE user_name = 'auditor');
+
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM user u
+         JOIN sys_role r ON r.role_code = 'SECURITY_ADMIN'
+WHERE u.user_name = 'security'
+  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id);
+
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM user u
+         JOIN sys_role r ON r.role_code = 'ANALYST'
+WHERE u.user_name = 'analyst'
+  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id);
+
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM user u
+         JOIN sys_role r ON r.role_code = 'AUDITOR'
+WHERE u.user_name = 'auditor'
+  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id);

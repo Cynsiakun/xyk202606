@@ -16,7 +16,7 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-    @PreAuthorize("hasAuthority('dashboard:view')")
+    @PreAuthorize("@perm.has('dashboard:view')")
     @GetMapping("/statistics")
     public Result<DashboardStatisticsDTO> statistics() {
         return Result.success(dashboardService.statistics());

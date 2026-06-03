@@ -8,11 +8,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 主机管理初始化：启动时幂等地创建 {@code hosts} 表、注册 host:* 权限、
- * 将权限补授给 SUPER_ADMIN，并注册"主机管理"菜单。
+ * 主机管理初始化：启动时幂等地创建 {@code hosts} 表、注册 host:* 权限，并注册"主机管理"菜单。
  *
- * <p>Order 设为较小值，确保在 {@link RbacMenuInitializer} 之前完成，使得权限/角色授权
- * 在菜单初始化前就绪。</p>
+ * <p>超级管理员通过通配放行（{@code ROLE_SUPER_ADMIN}）自动拥有这些权限，无需逐条授予。</p>
  */
 @Configuration
 @RequiredArgsConstructor
@@ -52,8 +50,6 @@ public class HostRbacInitializer {
             insertPermission("host:update", "修改主机", "/api/host/{id}");
             insertPermission("host:delete", "删除主机", "/api/host/{id}");
 
-            grantAllPermissionsToSuperAdmin();
-
             insertHostMenu();
         };
     }
@@ -64,20 +60,6 @@ public class HostRbacInitializer {
                 SELECT ?, ?, 'API', ?, 1
                 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = ?)
                 """, permissionCode, permissionName, path, permissionCode);
-    }
-
-    private void grantAllPermissionsToSuperAdmin() {
-        jdbcTemplate.update("""
-                INSERT INTO sys_role_permission (role_id, permission_id)
-                SELECT r.id, p.id
-                FROM sys_role r
-                JOIN sys_permission p
-                WHERE r.role_code = 'SUPER_ADMIN'
-                  AND NOT EXISTS (
-                    SELECT 1 FROM sys_role_permission rp
-                    WHERE rp.role_id = r.id AND rp.permission_id = p.id
-                  )
-                """);
     }
 
     private void insertHostMenu() {

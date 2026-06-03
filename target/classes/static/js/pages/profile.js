@@ -18,35 +18,45 @@ layui.use(["layer", "form"], function () {
     document.getElementById("uploadAvatarButton").addEventListener("click", uploadAvatar);
     avatarFileInput.addEventListener("change", handleAvatarFileChange);
 
-    form.on("submit(saveProfile)", async function (data) {
-        try {
-            var result = await AppRequest.request("/api/user/updateSelf", {
-                method: "PUT",
-                body: data.field
-            }, {
-                successMessage: "保存成功"
-            });
-            currentUser = result.data || {};
-            renderProfile(currentUser);
-            layer.closeAll("page");
-        } catch (error) {
-            return false;
-        }
+    form.on("submit(saveProfile)", function (data) {
+        var formEl = document.querySelector('form[lay-filter="profileForm"]');
+        AppUtils.clearFormError(formEl);
+        (async function () {
+            try {
+                var result = await AppRequest.request("/api/user/updateSelf", {
+                    method: "PUT",
+                    body: data.field
+                }, {
+                    successMessage: "保存成功",
+                    showErrorMessage: false
+                });
+                currentUser = result.data || {};
+                renderProfile(currentUser);
+                layer.closeAll("page");
+            } catch (error) {
+                AppUtils.showFormError(formEl, error.message);
+            }
+        })();
         return false;
     });
 
-    form.on("submit(savePassword)", async function (data) {
-        try {
-            await AppRequest.request("/api/user/changePassword", {
-                method: "POST",
-                body: data.field
-            }, {
-                successMessage: "密码修改成功"
-            });
-            layer.closeAll("page");
-        } catch (error) {
-            return false;
-        }
+    form.on("submit(savePassword)", function (data) {
+        var formEl = document.querySelector('form[lay-filter="passwordForm"]');
+        AppUtils.clearFormError(formEl);
+        (async function () {
+            try {
+                await AppRequest.request("/api/user/changePassword", {
+                    method: "POST",
+                    body: data.field
+                }, {
+                    successMessage: "密码修改成功",
+                    showErrorMessage: false
+                });
+                layer.closeAll("page");
+            } catch (error) {
+                AppUtils.showFormError(formEl, error.message);
+            }
+        })();
         return false;
     });
 
@@ -81,6 +91,13 @@ layui.use(["layer", "form"], function () {
                 form.val("profileForm", {
                     userPhone: currentUser.userPhone || "",
                     userEmail: currentUser.userEmail || ""
+                });
+                AppUtils.bindLiveValidation(layero[0], {
+                    saveButton: 'button[lay-filter="saveProfile"]',
+                    fields: [
+                        {selector: 'input[name="userPhone"]', type: "phone", message: "手机号格式不正确"},
+                        {selector: 'input[name="userEmail"]', type: "email", message: "邮箱格式不正确"}
+                    ]
                 });
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);
