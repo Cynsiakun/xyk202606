@@ -26,6 +26,16 @@ public class RabbitMQConfig {
     public static final String STATUS_QUEUE = "status_queue";
     public static final String STATUS_ROUTING_KEY = "status";
 
+    /** 客户端专属消息的 Direct 交换机，按 MAC 地址路由到各自的 {@code agent_<mac>_queue}。 */
+    public static final String AGENT_EXCHANGE = "agent_exchange";
+    /** 客户端专属队列名前缀，完整格式为 {@code agent_<mac>_queue}。 */
+    public static final String AGENT_QUEUE_PREFIX = "agent_";
+    public static final String AGENT_QUEUE_SUFFIX = "_queue";
+    /** 队列 3 天（259200000ms）未被访问自动删除。 */
+    public static final long AGENT_QUEUE_EXPIRES = 259_200_000L;
+    /** 队列内消息最大存活 3 小时（10800000ms）。 */
+    public static final long AGENT_MESSAGE_TTL = 10_800_000L;
+
     @Bean
     public Queue sysinfoQueue() {
         return new Queue(SYSINFO_QUEUE, true);

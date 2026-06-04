@@ -1,19 +1,30 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
 import com.cd.entity.HostEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.service.HostService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HostServiceImpl implements HostService {
@@ -21,7 +32,16 @@ public class HostServiceImpl implements HostService {
     /** 读取列表时的在线判定阈值（秒）：updated_at 在该时间内视为在线，否则离线。 */
     private static final int ONLINE_THRESHOLD_SECONDS = 4;
 
+    /** 资产探测任务的类型标识，后续可扩展其他类型任务。 */
+    private static final String PROBE_TYPE_ASSETS = "assets";
+
+    /** 资产探测前的在线判定阈值（秒）：updated_at 距当前超过该值视为离线。 */
+    private static final int PROBE_ONLINE_THRESHOLD_SECONDS = 15;
+
     private final HostMapper hostMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
+    private final AmqpAdmin amqpAdmin;
 
     @Override
     public HostResponseDTO create(HostCreateDTO dto) {
@@ -110,6 +130,56 @@ public class HostServiceImpl implements HostService {
     @Override
     public int markOfflineHosts(int offlineThresholdSeconds) {
         return hostMapper.markOffline(offlineThresholdSeconds);
+    }
+
+    @Override
+    public void sendAssetProbe(AssetProbeDTO dto) {
+        String macAddress = dto.getMacAddress();
+        if (!StringUtils.hasText(macAddress)) {
+            throw new IllegalArgumentException("MAC地址不能为空");
+        }
+
+        // 校验一：主机在线。以服务端当前时间与 hosts.updated_at 比较，超过阈值视为离线。
+        HostEntity host = hostMapper.selectByMac(macAddress);
+        LocalDateTime updatedAt = host == null ? null : host.getUpdatedAt();
+        if (updatedAt == null
+                || Duration.between(updatedAt, LocalDateTime.now()).getSeconds() > PROBE_ONLINE_THRESHOLD_SECONDS) {
+            throw new IllegalArgumentException("主机已下线，无法执行资产探测");
+        }
+
+        // 校验二：客户端专属队列存在。队列名与绑定时一致：agent_{标准化mac}_queue。
+        String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX + normalizeMac(macAddress) + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
+        if (amqpAdmin.getQueueProperties(queueName) == null) {
+            throw new IllegalArgumentException("客户端队列不存在，无法发送探测指令");
+        }
+
+        // 严格按约定的字段名与顺序组装消息：布尔转 1/0，type 固定为 assets。
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("account", dto.isAccount() ? 1 : 0);
+        message.put("service", dto.isService() ? 1 : 0);
+        message.put("process", dto.isProcess() ? 1 : 0);
+        message.put("app", dto.isApp() ? 1 : 0);
+        message.put("macAddress", macAddress);
+        message.put("type", PROBE_TYPE_ASSETS);
+
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            throw new IllegalStateException("组装资产探测消息失败", e);
+        }
+
+        // 路由键为 MAC 地址，与客户端专属队列绑定时使用的 MAC 保持一致。
+        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, macAddress, payload);
+        log.info("资产探测任务已下发: routingKey={}, payload={}", macAddress, payload);
+    }
+
+    /** 标准化 MAC：转小写并去除冒号、横杠、空格等分隔符，与队列声明时保持一致。 */
+    private String normalizeMac(String mac) {
+        if (mac == null) {
+            return "";
+        }
+        return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
     private HostEntity ensureExists(Long id) {

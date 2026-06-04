@@ -23,8 +23,11 @@ layui.use(["table", "form", "layer"], function () {
                         ? '<span class="status-tag success">在线</span>'
                         : '<span class="status-tag fail">离线</span>';
             }},
-            {title: "操作", width: 220, fixed: "right", templet: function () {
+            {title: "操作", width: 300, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
+                if (AppAuth.hasPermission("host:probe")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="probe">资产探测</button>';
+                }
                 if (AppAuth.hasPermission("host:update")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
                 }
@@ -75,12 +78,39 @@ layui.use(["table", "form", "layer"], function () {
         if (obj.event === "detail") {
             openDetailDialog(obj.data);
         }
+        if (obj.event === "probe") {
+            openProbeDialog(obj.data);
+        }
         if (obj.event === "edit") {
             openHostDialog(obj.data);
         }
         if (obj.event === "delete") {
             confirmDelete(obj.data);
         }
+    });
+
+    form.on("submit(startProbe)", function (data) {
+        var payload = {
+            account: data.field.account === "on",
+            service: data.field.service === "on",
+            process: data.field.process === "on",
+            app: data.field.app === "on",
+            macAddress: data.field.macAddress
+        };
+        (async function () {
+            try {
+                await AppRequest.request("/api/host/probe", {
+                    method: "POST",
+                    body: payload
+                }, {
+                    successMessage: "探测任务已下发"
+                });
+                layer.closeAll("page");
+            } catch (error) {
+                return;
+            }
+        })();
+        return false;
     });
 
     var addHostButton = document.getElementById("addHostButton");
@@ -152,6 +182,33 @@ layui.use(["table", "form", "layer"], function () {
             },
             end: function () {
                 editingHostId = null;
+            }
+        });
+    }
+
+    function openProbeDialog(host) {
+        var viewportHeight = window.innerHeight || 480;
+        var viewportWidth = window.innerWidth || 460;
+        var dialogHeight = Math.min(360, viewportHeight - 30);
+        var dialogWidth = Math.min(460, viewportWidth - 30);
+        var index = layer.open({
+            type: 1,
+            title: "资产探测",
+            area: [dialogWidth + "px", dialogHeight + "px"],
+            content: AppUtils.getTemplateHtml("assetProbeTemplate"),
+            success: function (layero) {
+                // 默认仅勾选「探测账号」，自动带入当前主机 MAC。
+                form.val("assetProbeForm", {
+                    macAddress: host ? host.macAddress || "" : "",
+                    account: true,
+                    service: false,
+                    process: false,
+                    app: false
+                });
+                form.render(null, "assetProbeForm");
+                layero.find('[data-action="close"]').on("click", function () {
+                    layer.close(index);
+                });
             }
         });
     }

@@ -7,7 +7,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -25,6 +31,8 @@ public class SysInfoListener {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final HostService hostService;
+    private final AmqpAdmin amqpAdmin;
+    private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(queues = RabbitMQConfig.SYSINFO_QUEUE)
     public void onMessage(String message) {
@@ -61,9 +69,49 @@ public class SysInfoListener {
             host.setStatus(1);
             hostService.saveOrUpdateFromMessage(host);
             log.info("主机信息已入库: mac={}, hostname={}", host.getMacAddress(), host.getHostname());
+
+            routeToAgentQueue(host.getMacAddress(), message);
         } catch (Exception e) {
             log.error("处理主机信息消息失败，已丢弃该消息: {}", message, e);
         }
+    }
+
+    /**
+     * 为指定 MAC 客户端声明专属队列并将消息转发到 {@code agent_exchange}。
+     *
+     * <p>交换机、队列、绑定的声明均为幂等操作，已存在时不会报错。声明完成后将原始消息
+     * 以 MAC 地址为 routingKey 重新发布，使其进入对应的 {@code agent_<mac>_queue}。</p>
+     */
+    private void routeToAgentQueue(String rawMac, String message) {
+        String normalizedMac = normalizeMac(rawMac);
+        if (!StringUtils.hasText(normalizedMac)) {
+            log.warn("MAC 地址标准化后为空，跳过转发: {}", rawMac);
+            return;
+        }
+
+        String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX + normalizedMac + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
+
+        DirectExchange exchange = new DirectExchange(RabbitMQConfig.AGENT_EXCHANGE, true, false);
+        amqpAdmin.declareExchange(exchange);
+
+        Queue queue = QueueBuilder.durable(queueName)
+                .withArgument("x-expires", RabbitMQConfig.AGENT_QUEUE_EXPIRES)
+                .withArgument("x-message-ttl", RabbitMQConfig.AGENT_MESSAGE_TTL)
+                .build();
+        amqpAdmin.declareQueue(queue);
+
+        amqpAdmin.declareBinding(BindingBuilder.bind(queue).to(exchange).with(rawMac));
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, rawMac, message);
+        log.info("消息已转发至客户端专属队列: queue={}, routingKey={}", queueName, rawMac);
+    }
+
+    /** 标准化 MAC：转小写并去除冒号、横杠、空格等分隔符。 */
+    private String normalizeMac(String mac) {
+        if (mac == null) {
+            return null;
+        }
+        return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
     private String text(JsonNode parent, String... path) {

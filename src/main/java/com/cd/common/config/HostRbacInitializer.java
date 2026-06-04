@@ -49,6 +49,7 @@ public class HostRbacInitializer {
             insertPermission("host:create", "新增主机", "/api/host");
             insertPermission("host:update", "修改主机", "/api/host/{id}");
             insertPermission("host:delete", "删除主机", "/api/host/{id}");
+            insertPermission("host:probe", "资产探测", "/api/host/probe");
 
             insertHostMenu();
         };

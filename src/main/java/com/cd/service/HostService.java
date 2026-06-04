@@ -1,6 +1,7 @@
 package com.cd.service;
 
 import com.cd.common.PageResult;
+import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
@@ -35,4 +36,10 @@ public interface HostService {
      * @return 本次被置为离线的主机数量
      */
     int markOfflineHosts(int offlineThresholdSeconds);
+
+    /**
+     * 下发资产探测任务：按勾选项组装消息并发送到 {@code agent_exchange}，
+     * 路由键为目标主机的 MAC 地址（与客户端专属队列绑定时一致）。
+     */
+    void sendAssetProbe(AssetProbeDTO dto);
 }

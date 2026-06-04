@@ -2,6 +2,7 @@ package com.cd.controller;
 
 import com.cd.common.PageResult;
 import com.cd.common.Result;
+import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
@@ -62,5 +63,12 @@ public class HostController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "size必须大于0") Integer size,
             @RequestParam(required = false) String keyword) {
         return Result.success(hostService.list(page, size, keyword));
+    }
+
+    @PreAuthorize("@perm.has('host:probe')")
+    @PostMapping("/probe")
+    public Result<Void> probe(@Valid @RequestBody AssetProbeDTO dto) {
+        hostService.sendAssetProbe(dto);
+        return Result.success();
     }
 }
