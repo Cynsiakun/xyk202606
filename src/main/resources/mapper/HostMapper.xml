@@ -110,6 +110,29 @@
             updated_at = CURRENT_TIMESTAMP
     </insert>
 
+    <insert id="heartbeatByMac">
+        INSERT INTO hosts (mac_address, status, updated_at)
+        VALUES (#{macAddress}, 1, NOW())
+        ON DUPLICATE KEY UPDATE
+            status = 1,
+            updated_at = NOW()
+    </insert>
+
+    <update id="markOffline">
+        UPDATE hosts
+        SET status = 0,
+            updated_at = updated_at
+        WHERE status = 1
+          AND updated_at &lt; DATE_SUB(NOW(), INTERVAL #{seconds} SECOND)
+    </update>
+
+    <update id="reconcileStatusByHeartbeat">
+        UPDATE hosts
+        SET status = CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL #{seconds} SECOND) THEN 1 ELSE 0 END,
+            updated_at = updated_at
+        WHERE status &lt;&gt; CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL #{seconds} SECOND) THEN 1 ELSE 0 END
+    </update>
+
     <select id="selectPage" resultMap="HostEntityResultMap">
         SELECT <include refid="baseColumns"/>
         FROM hosts

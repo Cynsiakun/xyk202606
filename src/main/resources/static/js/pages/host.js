@@ -11,40 +11,27 @@ layui.use(["table", "form", "layer"], function () {
         cols: [[
             {field: "id", title: "ID", width: 70, sort: true},
             {field: "hostname", title: "主机名", minWidth: 140, templet: function (d) { return d.hostname || "-"; }},
-            {field: "ipv4", title: "IPv4", minWidth: 130, templet: function (d) { return d.ipv4 || "-"; }},
+            {field: "ipv4", title: "主IP", minWidth: 130, templet: function (d) { return d.ipv4 || "-"; }},
             {field: "macAddress", title: "MAC地址", minWidth: 160},
             {field: "osName", title: "操作系统", minWidth: 160, templet: function (d) {
                 var parts = [d.osName, d.osRelease].filter(Boolean).join(" ");
                 return parts || "-";
             }},
-            {field: "cpuModel", title: "CPU", minWidth: 200, templet: function (d) {
-                if (!d.cpuModel) { return "-"; }
-                var cores = "";
-                if (d.cpuPhysicalCores != null || d.cpuLogicalCores != null) {
-                    cores = " (" + (d.cpuPhysicalCores != null ? d.cpuPhysicalCores : "?") + "核/"
-                            + (d.cpuLogicalCores != null ? d.cpuLogicalCores : "?") + "线程)";
-                }
-                return d.cpuModel + cores;
-            }},
-            {field: "memUsage", title: "内存", minWidth: 150, templet: function (d) {
-                if (!d.memTotal && !d.memUsage) { return "-"; }
-                return (d.memTotal || "-") + (d.memUsage ? " / " + d.memUsage : "");
-            }},
+            {field: "memUsage", title: "内存占用", width: 110, templet: function (d) { return d.memUsage || "-"; }},
             {field: "status", title: "状态", width: 90, templet: function (d) {
                 return d.status === 1
                         ? '<span class="status-tag success">在线</span>'
                         : '<span class="status-tag fail">离线</span>';
             }},
-            {field: "updatedAt", title: "更新时间", minWidth: 170, templet: function (d) { return AppUtils.formatDateTime(d.updatedAt); }},
-            {title: "操作", width: 160, fixed: "right", templet: function () {
-                var buttons = "";
+            {title: "操作", width: 220, fixed: "right", templet: function () {
+                var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
                 if (AppAuth.hasPermission("host:update")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
                 }
                 if (AppAuth.hasPermission("host:delete")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
                 }
-                return buttons || '<span class="empty-text">-</span>';
+                return buttons;
             }}
         ]]
     });
@@ -85,6 +72,9 @@ layui.use(["table", "form", "layer"], function () {
     });
 
     table.on("tool(hostTable)", function (obj) {
+        if (obj.event === "detail") {
+            openDetailDialog(obj.data);
+        }
         if (obj.event === "edit") {
             openHostDialog(obj.data);
         }
@@ -105,6 +95,25 @@ layui.use(["table", "form", "layer"], function () {
     document.getElementById("resetButton").addEventListener("click", function () {
         form.val("hostSearchForm", {keyword: ""});
         AppTable.reload(table, hostTableId, {keyword: ""});
+    });
+
+    // 仅刷新数据、保留当前页码与滚动位置，避免整表重渲染导致的页面跳动。
+    function refreshData() {
+        table.reloadData(hostTableId, {scrollPos: "fixed"});
+    }
+
+    document.getElementById("refreshButton").addEventListener("click", refreshData);
+
+    var autoRefreshTimer = null;
+    form.on("select(autoRefreshSelect)", function (data) {
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = null;
+        }
+        var seconds = Number(data.value);
+        if (seconds > 0) {
+            autoRefreshTimer = setInterval(refreshData, seconds * 1000);
+        }
     });
 
     function openHostDialog(host) {
@@ -145,6 +154,93 @@ layui.use(["table", "form", "layer"], function () {
                 editingHostId = null;
             }
         });
+    }
+
+    function openDetailDialog(host) {
+        var viewportHeight = window.innerHeight || 640;
+        var viewportWidth = window.innerWidth || 640;
+        var dialogHeight = Math.min(640, viewportHeight - 30);
+        var dialogWidth = Math.min(680, viewportWidth - 30);
+        layer.open({
+            type: 1,
+            title: "主机详情",
+            area: [dialogWidth + "px", dialogHeight + "px"],
+            content: buildDetailHtml(host)
+        });
+    }
+
+    function buildDetailHtml(host) {
+        var h = host || {};
+        var statusTag = h.status === 1
+                ? '<span class="status-tag success">在线</span>'
+                : '<span class="status-tag fail">离线</span>';
+        var cores = "";
+        if (h.cpuPhysicalCores != null || h.cpuLogicalCores != null) {
+            cores = (h.cpuPhysicalCores != null ? h.cpuPhysicalCores : "?") + " 物理核 / "
+                    + (h.cpuLogicalCores != null ? h.cpuLogicalCores : "?") + " 逻辑核";
+        }
+        var sections = [
+            {title: "基本信息", items: [
+                {label: "ID", value: h.id, full: false},
+                {label: "主机名", value: h.hostname, full: false},
+                {label: "主IP", value: h.ipv4, full: false},
+                {label: "MAC地址", value: h.macAddress, full: false},
+                {label: "状态", value: statusTag, raw: true, full: true}
+            ]},
+            {title: "操作系统", items: [
+                {label: "系统名称", value: h.osName},
+                {label: "系统版本", value: h.osVersion},
+                {label: "系统架构", value: h.osArch},
+                {label: "具体版本", value: h.osRelease}
+            ]},
+            {title: "CPU", items: [
+                {label: "CPU型号", value: h.cpuModel, full: true},
+                {label: "核心数", value: cores, full: true}
+            ]},
+            {title: "内存", items: [
+                {label: "总内存", value: h.memTotal},
+                {label: "使用率", value: h.memUsage},
+                {label: "已使用", value: h.memUsed},
+                {label: "可用内存", value: h.memAvailable}
+            ]},
+            {title: "时间", items: [
+                {label: "创建时间", value: AppUtils.formatDateTime(h.createdAt)},
+                {label: "更新时间", value: AppUtils.formatDateTime(h.updatedAt)}
+            ]}
+        ];
+
+        var html = '<div class="host-detail">';
+        sections.forEach(function (section) {
+            html += '<div class="host-detail-section">';
+            html += '<div class="host-detail-section-title">' + section.title + '</div>';
+            html += '<div class="host-detail-grid">';
+            section.items.forEach(function (item) {
+                var value = item.raw ? item.value : formatValue(item.value);
+                html += '<div class="host-detail-item' + (item.full ? ' full' : '') + '">';
+                html += '<span class="host-detail-label">' + item.label + '</span>';
+                html += '<span class="host-detail-value">' + value + '</span>';
+                html += '</div>';
+            });
+            html += '</div></div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function formatValue(value) {
+        if (value == null || value === "" || value === "-") {
+            return "-";
+        }
+        return escapeHtml(String(value));
+    }
+
+    function escapeHtml(text) {
+        return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
     }
 
     function confirmDelete(host) {

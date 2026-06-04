@@ -18,6 +18,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HostServiceImpl implements HostService {
 
+    /** 读取列表时的在线判定阈值（秒）：updated_at 在该时间内视为在线，否则离线。 */
+    private static final int ONLINE_THRESHOLD_SECONDS = 4;
+
     private final HostMapper hostMapper;
 
     @Override
@@ -79,6 +82,8 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public PageResult<HostResponseDTO> list(int page, int size, String keyword) {
+        // 读取前先按心跳时间校正在线状态：超过阈值未上报的主机置为离线，阈值内的置为在线。
+        hostMapper.reconcileStatusByHeartbeat(ONLINE_THRESHOLD_SECONDS);
         int offset = (page - 1) * size;
         String normalizedKeyword = emptyToNull(keyword);
         long total = hostMapper.countAll(normalizedKeyword);
@@ -95,6 +100,16 @@ public class HostServiceImpl implements HostService {
             entity.setStatus(1);
         }
         hostMapper.upsertByMac(entity);
+    }
+
+    @Override
+    public void heartbeat(String macAddress) {
+        hostMapper.heartbeatByMac(macAddress);
+    }
+
+    @Override
+    public int markOfflineHosts(int offlineThresholdSeconds) {
+        return hostMapper.markOffline(offlineThresholdSeconds);
     }
 
     private HostEntity ensureExists(Long id) {

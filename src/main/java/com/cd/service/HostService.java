@@ -22,4 +22,17 @@ public interface HostService {
      * 供 RabbitMQ 监听器使用：按 MAC 唯一性做存在即更新、不存在即插入。
      */
     void saveOrUpdateFromMessage(HostEntity entity);
+
+    /**
+     * 心跳处理：按 MAC 将主机置为在线并刷新最后活跃时间，不存在则新建。
+     */
+    void heartbeat(String macAddress);
+
+    /**
+     * 离线检测：将最后活跃时间超过阈值的在线主机置为离线。
+     *
+     * @param offlineThresholdSeconds 离线阈值（秒）
+     * @return 本次被置为离线的主机数量
+     */
+    int markOfflineHosts(int offlineThresholdSeconds);
 }

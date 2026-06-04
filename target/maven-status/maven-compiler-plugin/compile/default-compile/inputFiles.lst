@@ -75,6 +75,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysRolePermissionMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysUserRoleMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\TestMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\UserMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mq\HostStatusListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\SysInfoListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
@@ -88,4 +89,5 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\LoginLogService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\RbacService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\TestService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\task\HostStatusScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\ThreatPlatformApplication.java

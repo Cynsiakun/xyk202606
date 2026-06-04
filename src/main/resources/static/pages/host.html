@@ -17,9 +17,22 @@
                 <button type="submit" class="layui-btn" lay-submit lay-filter="hostSearchSubmit">搜索</button>
                 <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
             </div>
-            <button type="button" class="layui-btn" id="addHostButton">
-                <i class="layui-icon layui-icon-add-1"></i> 新增主机
-            </button>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <div class="auto-refresh-select">
+                    <select name="autoRefresh" lay-filter="autoRefreshSelect">
+                        <option value="0">不刷新</option>
+                        <option value="1">每 1 秒刷新</option>
+                        <option value="3">每 3 秒刷新</option>
+                        <option value="5">每 5 秒刷新</option>
+                    </select>
+                </div>
+                <button type="button" class="layui-btn" id="addHostButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增主机
+                </button>
+            </div>
         </form>
     </div>
 
