@@ -23,10 +23,18 @@ public class RbacMenuInitializer {
                         menu_path VARCHAR(255) NOT NULL,
                         menu_icon VARCHAR(100),
                         permission_id BIGINT,
+                        parent_id BIGINT DEFAULT NULL,
                         sort_order INT DEFAULT 0,
                         status TINYINT DEFAULT 1
                     )
                     """);
+
+            // 兼容旧表：补建 parent_id 列（幂等，列已存在时报错静默忽略）
+            try {
+                jdbcTemplate.execute("ALTER TABLE sys_menu ADD COLUMN parent_id BIGINT DEFAULT NULL");
+            } catch (Exception ignored) {
+                // 列已存在时忽略
+            }
 
             insertMenu("dashboard", "后台主页", "./pages/dashboard.html", "layui-icon-home", "dashboard:view", 1);
             insertMenu("user", "用户管理", "./pages/user.html", "layui-icon-user", "user:view", 2);

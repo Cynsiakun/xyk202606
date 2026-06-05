@@ -149,9 +149,60 @@ body {
 }
 
 .app-nav .layui-this > a,
-.app-nav .layui-nav-item a:hover {
+.app-nav .layui-nav-item > a:hover {
     background: var(--accent-soft);
     color: var(--accent-color);
+}
+
+/* 展开的父菜单：保持深色文字，避免 layui 默认把它变白看不清 */
+.app-nav.layui-nav-tree .layui-nav-itemed > a,
+.app-nav.layui-nav-tree .layui-nav-itemed > a:hover {
+    background: var(--accent-soft) !important;
+    color: var(--accent-color) !important;
+}
+
+/* 子菜单容器：用浅色背景替换 layui 默认的深灰，贴合整体风格 */
+.app-nav.layui-nav-tree .layui-nav-child {
+    margin-top: 6px;
+    padding: 6px;
+    border-radius: 14px;
+    background: var(--surface-muted);
+}
+
+.app-nav.layui-nav-tree .layui-nav-child dd {
+    margin-bottom: 4px;
+}
+
+.app-nav.layui-nav-tree .layui-nav-child dd:last-child {
+    margin-bottom: 0;
+}
+
+.app-nav.layui-nav-tree .layui-nav-child dd a {
+    height: 42px;
+    line-height: 42px;
+    padding-left: 38px;
+    border-radius: 12px;
+    color: var(--text-secondary);
+    background: transparent;
+}
+
+.app-nav.layui-nav-tree .layui-nav-child dd a:hover {
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--accent-color);
+}
+
+/* 选中的子菜单项：白底深字高亮 */
+.app-nav.layui-nav-tree .layui-nav-child dd.layui-this a,
+.app-nav.layui-nav-tree .layui-nav-child dd.layui-this a:hover {
+    background: var(--surface-background) !important;
+    color: var(--accent-color) !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* 折叠态下隐藏子菜单文字与缩进 */
+.app-sidebar.is-collapsed .app-nav.layui-nav-tree .layui-nav-child dd a {
+    padding-left: 12px;
+    text-align: center;
 }
 
 .app-sidebar.is-collapsed .app-nav .layui-nav-item a {

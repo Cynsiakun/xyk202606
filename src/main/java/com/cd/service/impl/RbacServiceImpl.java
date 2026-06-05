@@ -28,7 +28,10 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -181,10 +184,47 @@ public class RbacServiceImpl implements RbacService {
             throw new UnauthorizedException("未登录或登录状态已失效");
         }
 
-        return sysMenuMapper.selectAllEnabled().stream()
-                .map(this::toMenuItem)
-                .filter(item -> item.getPermissionCode() == null || permissionChecker.has(item.getPermissionCode()))
-                .toList();
+        List<SysMenuEntity> allMenus = sysMenuMapper.selectAllEnabled();
+
+        // 1. 扁平实体转 DTO（携带权限码）并构建 id→DTO 映射
+        Map<Long, MenuItemDTO> dtoMap = new LinkedHashMap<>();
+        for (SysMenuEntity entity : allMenus) {
+            dtoMap.put(entity.getId(), toMenuItem(entity));
+        }
+
+        // 2. 构建父子关系树
+        List<MenuItemDTO> roots = new ArrayList<>();
+        for (SysMenuEntity entity : allMenus) {
+            MenuItemDTO dto = dtoMap.get(entity.getId());
+            if (entity.getParentId() == null || !dtoMap.containsKey(entity.getParentId())) {
+                roots.add(dto);
+            } else {
+                dtoMap.get(entity.getParentId()).getChildren().add(dto);
+            }
+        }
+
+        // 3. 递归过滤：无权限的叶子移除，父节点若无剩余子节点也移除
+        return filterMenuTreeByPermission(roots);
+    }
+
+    /**
+     * 递归按权限过滤菜单树：保留有权限的节点，以及尚有可见子节点的父节点。
+     */
+    private List<MenuItemDTO> filterMenuTreeByPermission(List<MenuItemDTO> nodes) {
+        List<MenuItemDTO> result = new ArrayList<>();
+        for (MenuItemDTO node : nodes) {
+            List<MenuItemDTO> filteredChildren = filterMenuTreeByPermission(node.getChildren());
+            node.setChildren(filteredChildren);
+
+            boolean hasAccess = node.getPermissionCode() == null
+                    || permissionChecker.has(node.getPermissionCode());
+            boolean hasVisibleChildren = !filteredChildren.isEmpty();
+
+            if (hasAccess || hasVisibleChildren) {
+                result.add(node);
+            }
+        }
+        return result;
     }
 
     @Override

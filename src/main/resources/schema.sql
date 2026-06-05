@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS sys_menu (
     menu_path VARCHAR(255) NOT NULL,
     menu_icon VARCHAR(100),
     permission_id BIGINT,
+    parent_id BIGINT DEFAULT NULL,
     sort_order INT DEFAULT 0,
     status TINYINT DEFAULT 1
 );
@@ -288,6 +289,12 @@ WHERE NOT EXISTS (
     SELECT 1 FROM sys_permission WHERE permission_code = 'host:delete'
 );
 
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'host:asset:view', '查看主机资产', 'API', '/api/assets/host-latest', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'host:asset:view'
+);
+
 INSERT INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id
 FROM sys_role r
@@ -335,7 +342,7 @@ FROM sys_role r
          JOIN sys_permission p
               ON p.permission_code IN (
                   'dashboard:view',
-                  'host:view', 'host:update',
+                  'host:view', 'host:update', 'host:asset:view',
                   'login-log:view'
               )
 WHERE r.role_code = 'ANALYST'
@@ -349,7 +356,7 @@ FROM sys_role r
          JOIN sys_permission p
               ON p.permission_code IN (
                   'dashboard:view',
-                  'user:view', 'host:view',
+                  'user:view', 'host:view', 'host:asset:view',
                   'role:view', 'permission:view', 'login-log:view'
               )
 WHERE r.role_code = 'AUDITOR'

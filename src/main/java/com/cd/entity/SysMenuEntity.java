@@ -11,6 +11,7 @@ public class SysMenuEntity {
     private String menuPath;
     private String menuIcon;
     private Long permissionId;
+    private Long parentId;
     private Integer sortOrder;
     private Integer status;
 }

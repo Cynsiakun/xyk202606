@@ -84,3 +84,79 @@
     color: #1f2329;
     word-break: break-all;
 }
+
+/* ===== 主机资产弹窗：四 Tab ===== */
+.host-asset-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.host-asset-tab-head {
+    display: flex;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid #e6e8ef;
+}
+
+.host-asset-tab {
+    padding: 8px 18px;
+    font-size: 14px;
+    color: #5a6170;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    margin-bottom: -1px;
+    transition: color .15s, background .15s;
+}
+
+.host-asset-tab:hover {
+    color: #1e6fff;
+}
+
+.host-asset-tab.is-active {
+    color: #1e6fff;
+    font-weight: 600;
+    background: #fff;
+    border-color: #e6e8ef;
+}
+
+.host-asset-tab-body {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 14px 18px;
+}
+
+.host-asset-pane {
+    display: none;
+}
+
+.host-asset-pane.is-active {
+    display: block;
+}
+
+.host-asset-state {
+    padding: 40px 0;
+    text-align: center;
+    color: #9aa0ac;
+    font-size: 13px;
+}
+
+/* ===== 资产详情通用渲染（信息表 + 分页表格 + 原始JSON），主机弹窗与资产页共用 ===== */
+.asset-detail-wrap { padding: 0; }
+.asset-detail-info { margin-bottom: 10px; }
+.asset-info-table td { padding: 6px 12px; }
+.asset-info-table .detail-label { width: 90px; font-weight: 600; color: #555; }
+.asset-detail-actions { margin-bottom: 8px; }
+.asset-detail-array { margin-bottom: 8px; }
+.asset-table-scroll { max-height: 320px; overflow: auto; }
+.asset-data-table { margin: 0; font-size: 12px; }
+.asset-data-table th, .asset-data-table td { white-space: nowrap; padding: 4px 8px; }
+.asset-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.asset-pager-info { font-size: 12px; color: #888; }
+.asset-pager-controls { display: flex; gap: 8px; }
+.asset-detail-json { max-height: 400px; overflow: auto; }
+.asset-detail-json .json-block { margin: 0; padding: 12px; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }

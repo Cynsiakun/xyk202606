@@ -11,19 +11,20 @@
         <result column="menu_path" property="menuPath"/>
         <result column="menu_icon" property="menuIcon"/>
         <result column="permission_id" property="permissionId"/>
+        <result column="parent_id" property="parentId"/>
         <result column="sort_order" property="sortOrder"/>
         <result column="status" property="status"/>
     </resultMap>
 
     <select id="selectAllEnabled" resultMap="SysMenuResultMap">
-        SELECT id, menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status
+        SELECT id, menu_code, menu_name, menu_path, menu_icon, permission_id, parent_id, sort_order, status
         FROM sys_menu
         WHERE status = 1
         ORDER BY sort_order ASC, id ASC
     </select>
 
     <select id="selectEnabledByUserId" resultMap="SysMenuResultMap">
-        SELECT DISTINCT m.id, m.menu_code, m.menu_name, m.menu_path, m.menu_icon, m.permission_id, m.sort_order, m.status
+        SELECT DISTINCT m.id, m.menu_code, m.menu_name, m.menu_path, m.menu_icon, m.permission_id, m.parent_id, m.sort_order, m.status
         FROM sys_menu m
                  LEFT JOIN sys_permission p ON m.permission_id = p.id
                  LEFT JOIN sys_role_permission rp ON p.id = rp.permission_id

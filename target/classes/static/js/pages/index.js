@@ -25,7 +25,12 @@ layui.use(["element", "layer"], function () {
         "个人信息": "查看并维护当前登录账号的基础资料和密码。",
         "角色管理": "角色管理模块。",
         "权限管理": "权限管理模块。",
-        "主机管理": "查看与维护上报的主机系统信息，支持搜索、新增、编辑和删除。"
+        "主机管理": "查看与维护上报的主机系统信息，支持搜索、新增、编辑和删除。",
+        "资产管理": "查看各主机资产探测记录，包括账号、服务、进程、APP。",
+        "账号资产": "浏览与搜索主机账号探测记录，支持详情与删除。",
+        "服务资产": "浏览与搜索主机服务探测记录，支持详情与删除。",
+        "进程资产": "浏览与搜索主机进程探测记录，支持详情与删除。",
+        "APP资产": "浏览与搜索主机安装软件探测记录，支持详情与删除。"
     };
 
     init();
@@ -135,13 +140,40 @@ layui.use(["element", "layer"], function () {
     }
 
     function renderMenus(menus) {
-        sideNav.innerHTML = menus.map(function (menu, index) {
-            return ''
-                + '<li class="layui-nav-item ' + (index === 0 ? 'layui-this' : '') + '">'
-                + '    <a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
-                + '        <i class="layui-icon ' + menu.icon + '"></i><span>' + menu.title + '</span>'
-                + '    </a>'
-                + '</li>';
+        sideNav.innerHTML = buildMenuHtml(menus);
+    }
+
+    function buildMenuHtml(menus) {
+        return menus.map(function (menu) {
+            var hasChildren = menu.children && menu.children.length > 0;
+
+            if (hasChildren) {
+                var childHtml = '<dl class="layui-nav-child">'
+                    + menu.children.map(function (child) {
+                        return '<dd>'
+                            + '<a href="javascript:;" data-title="' + child.title + '" data-page="' + child.page + '">'
+                            + (child.icon ? '<i class="layui-icon ' + child.icon + '"></i>' : '')
+                            + '<span>' + child.title + '</span>'
+                            + '</a>'
+                            + '</dd>';
+                    }).join("")
+                    + '</dl>';
+
+                return '<li class="layui-nav-item">'
+                    + '<a href="javascript:;">'
+                    + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
+                    + '<span>' + menu.title + '</span>'
+                    + '</a>'
+                    + childHtml
+                    + '</li>';
+            } else {
+                return '<li class="layui-nav-item">'
+                    + '<a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
+                    + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
+                    + '<span>' + menu.title + '</span>'
+                    + '</a>'
+                    + '</li>';
+            }
         }).join("");
     }
 
@@ -162,10 +194,21 @@ layui.use(["element", "layer"], function () {
     }
 
     function setActiveMenu(link) {
-        sideNav.querySelectorAll(".layui-nav-item").forEach(function (item) {
+        sideNav.querySelectorAll(".layui-nav-item, .layui-nav-child dd").forEach(function (item) {
             item.classList.remove("layui-this");
         });
-        link.parentElement.classList.add("layui-this");
+
+        var parent = link.parentElement;
+        if (parent.tagName === 'DD') {
+            parent.classList.add("layui-this");
+            var navItem = parent.closest('.layui-nav-item');
+            if (navItem) {
+                navItem.classList.add("layui-nav-itemed");
+            }
+        } else {
+            parent.classList.add("layui-this");
+        }
+
         element.render("nav");
     }
 });

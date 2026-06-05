@@ -23,8 +23,11 @@ layui.use(["table", "form", "layer"], function () {
                         ? '<span class="status-tag success">在线</span>'
                         : '<span class="status-tag fail">离线</span>';
             }},
-            {title: "操作", width: 300, fixed: "right", templet: function () {
+            {title: "操作", width: 360, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
+                if (AppAuth.hasPermission("host:asset:view")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="asset">查看资产</button>';
+                }
                 if (AppAuth.hasPermission("host:probe")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="probe">资产探测</button>';
                 }
@@ -77,6 +80,9 @@ layui.use(["table", "form", "layer"], function () {
     table.on("tool(hostTable)", function (obj) {
         if (obj.event === "detail") {
             openDetailDialog(obj.data);
+        }
+        if (obj.event === "asset") {
+            AssetUtils.openHostAssetTabs(layer, obj.data);
         }
         if (obj.event === "probe") {
             openProbeDialog(obj.data);

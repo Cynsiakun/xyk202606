@@ -10,8 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * 角色 → 权限矩阵初始化：启动时幂等地补齐内置角色、按矩阵授予权限，并创建演示账号。
  *
- * <p>在 {@link HostRbacInitializer}（{@code @Order(0)}）之后执行，确保 host:* 权限已注册，
- * SECURITY_ADMIN 等角色才能正确授予主机相关权限。</p>
+ * <p>在 {@link HostRbacInitializer}（{@code @Order(0)}）与资产/角色权限注册（{@code @Order(1)}）
+ * 之后执行（{@code @Order(2)}），确保 host:*、asset:* 权限均已注册，授权才不会被静默跳过。</p>
  *
  * <p>超级管理员（{@code SUPER_ADMIN}）走通配放行，不在此矩阵内逐条授权。</p>
  */
@@ -24,7 +24,7 @@ public class RoleMatrixInitializer {
     private static final String DEMO_PWD_MD5 = "e10adc3949ba59abbe56e057f20f883e"; // 123456
 
     @Bean
-    @Order(1)
+    @Order(2)
     public ApplicationRunner initRoleMatrix() {
         return args -> {
             insertRole("SECURITY_ADMIN", "安全管理员");
@@ -35,16 +35,17 @@ public class RoleMatrixInitializer {
                     "dashboard:view",
                     "user:view", "user:create", "user:update", "user:delete",
                     "host:view", "host:create", "host:update", "host:delete",
+                    "asset:view", "asset:delete",
                     "role:view", "permission:view", "login-log:view");
 
             grant("ANALYST",
                     "dashboard:view",
-                    "host:view", "host:update",
+                    "host:view", "host:update", "host:asset:view",
                     "login-log:view");
 
             grant("AUDITOR",
                     "dashboard:view",
-                    "user:view", "host:view",
+                    "user:view", "host:view", "host:asset:view",
                     "role:view", "permission:view", "login-log:view");
 
             insertDemoUser("security", "SECURITY_ADMIN");

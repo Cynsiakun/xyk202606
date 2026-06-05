@@ -19,6 +19,7 @@ public class AccountEntity {
     private String macAddress;
     private Integer assetCount;
     private String assetJson;
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

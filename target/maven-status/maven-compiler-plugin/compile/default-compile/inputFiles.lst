@@ -23,6 +23,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\security\PermissionChecker.j
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUser.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUtils.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\CurrentUserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostController.java
@@ -31,7 +32,9 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\PageController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\UserController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetOverviewDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetProbeDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRecordDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostResponseDTO.java
@@ -91,9 +94,11 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mq\AssetDataListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\HostStatusListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\SysInfoListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetDataService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetQueryService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetDataServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetQueryServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashboardServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\HostServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\LoginLogServiceImpl.java
