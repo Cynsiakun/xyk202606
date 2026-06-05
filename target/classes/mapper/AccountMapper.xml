@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.AccountMapper">
+
+    <insert id="insert" parameterType="com.cd.entity.AccountEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO accounts (task_id, host_name, mac_address, asset_count, asset_json)
+        VALUES (#{taskId}, #{hostName}, #{macAddress}, #{assetCount}, #{assetJson})
+    </insert>
+</mapper>

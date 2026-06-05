@@ -36,6 +36,15 @@ public class RabbitMQConfig {
     /** 队列内消息最大存活 3 小时（10800000ms）。 */
     public static final long AGENT_MESSAGE_TTL = 10_800_000L;
 
+    /** 资产探测结果队列：账户。 */
+    public static final String ACCOUNT_QUEUE = "account_queue";
+    /** 资产探测结果队列：服务。 */
+    public static final String SERVICE_QUEUE = "service_queue";
+    /** 资产探测结果队列：进程。 */
+    public static final String PROCESS_QUEUE = "process_queue";
+    /** 资产探测结果队列：安装软件。 */
+    public static final String APP_QUEUE = "app_queue";
+
     @Bean
     public Queue sysinfoQueue() {
         return new Queue(SYSINFO_QUEUE, true);
@@ -66,6 +75,26 @@ public class RabbitMQConfig {
                 STATUS_ROUTING_KEY,
                 null
         );
+    }
+
+    @Bean
+    public Queue accountQueue() {
+        return new Queue(ACCOUNT_QUEUE, true);
+    }
+
+    @Bean
+    public Queue serviceQueue() {
+        return new Queue(SERVICE_QUEUE, true);
+    }
+
+    @Bean
+    public Queue processQueue() {
+        return new Queue(PROCESS_QUEUE, true);
+    }
+
+    @Bean
+    public Queue appQueue() {
+        return new Queue(APP_QUEUE, true);
     }
 
     /**
