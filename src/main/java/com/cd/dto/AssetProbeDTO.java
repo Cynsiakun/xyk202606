@@ -28,4 +28,6 @@ public class AssetProbeDTO {
     @NotBlank(message = "MAC地址不能为空")
     @Size(max = 64, message = "macAddress 长度不能超过64")
     private String macAddress;
+
+    private boolean force;
 }

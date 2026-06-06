@@ -7,10 +7,13 @@ import lombok.Data;
 @Data
 public class UserChangePasswordDTO {
 
-    @NotBlank(message = "oldPwd must not be blank")
+    @NotBlank(message = "原密码不能为空")
     private String oldPwd;
 
-    @NotBlank(message = "newPwd must not be blank")
-    @Size(min = 1, max = 64, message = "newPwd length must be between 1 and 64")
+    @NotBlank(message = "新密码不能为空")
+    @Size(min = 8, max = 64, message = "新密码长度不少于8位，最长不超过64位")
     private String newPwd;
+
+    @NotBlank(message = "确认密码不能为空")
+    private String confirmPwd;
 }

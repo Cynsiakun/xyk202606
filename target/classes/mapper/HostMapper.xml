@@ -21,6 +21,7 @@
         <result column="mem_available" property="memAvailable"/>
         <result column="mem_usage" property="memUsage"/>
         <result column="status" property="status"/>
+        <result column="last_scan_time" property="lastScanTime"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
@@ -29,7 +30,7 @@
         id, hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
         cpu_model, cpu_physical_cores, cpu_logical_cores,
         mem_total, mem_used, mem_available, mem_usage,
-        status, created_at, updated_at
+        status, last_scan_time, created_at, updated_at
     </sql>
 
     <sql id="keywordWhere">
@@ -43,10 +44,10 @@
     <insert id="insert" parameterType="com.cd.entity.HostEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO hosts (hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
                            cpu_model, cpu_physical_cores, cpu_logical_cores,
-                           mem_total, mem_used, mem_available, mem_usage, status)
+                           mem_total, mem_used, mem_available, mem_usage, status, last_scan_time)
         VALUES (#{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
                 #{cpuModel}, #{cpuPhysicalCores}, #{cpuLogicalCores},
-                #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status})
+                #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status}, #{lastScanTime})
     </insert>
 
     <update id="updateById" parameterType="com.cd.entity.HostEntity">
@@ -65,7 +66,8 @@
             mem_used = #{memUsed},
             mem_available = #{memAvailable},
             mem_usage = #{memUsage},
-            status = #{status}
+            status = #{status},
+            last_scan_time = #{lastScanTime}
         WHERE id = #{id}
     </update>
 
@@ -88,10 +90,10 @@
     <insert id="upsertByMac" parameterType="com.cd.entity.HostEntity">
         INSERT INTO hosts (hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
                            cpu_model, cpu_physical_cores, cpu_logical_cores,
-                           mem_total, mem_used, mem_available, mem_usage, status)
+                           mem_total, mem_used, mem_available, mem_usage, status, last_scan_time)
         VALUES (#{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
                 #{cpuModel}, #{cpuPhysicalCores}, #{cpuLogicalCores},
-                #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status})
+                #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status}, #{lastScanTime})
         ON DUPLICATE KEY UPDATE
             hostname = VALUES(hostname),
             ipv4 = VALUES(ipv4),
@@ -107,6 +109,7 @@
             mem_available = VALUES(mem_available),
             mem_usage = VALUES(mem_usage),
             status = VALUES(status),
+            last_scan_time = COALESCE(VALUES(last_scan_time), last_scan_time),
             updated_at = CURRENT_TIMESTAMP
     </insert>
 
@@ -132,6 +135,21 @@
             updated_at = updated_at
         WHERE status &lt;&gt; CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL #{seconds} SECOND) THEN 1 ELSE 0 END
     </update>
+
+    <update id="updateLastScanTimeByMac">
+        UPDATE hosts
+        SET last_scan_time = #{lastScanTime},
+            updated_at = updated_at
+        WHERE mac_address = #{macAddress}
+    </update>
+
+    <select id="selectAutoProbeCandidates" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE status = 1
+        ORDER BY COALESCE(last_scan_time, '1970-01-01') ASC, id ASC
+        LIMIT #{limit}
+    </select>
 
     <select id="selectPage" resultMap="HostEntityResultMap">
         SELECT <include refid="baseColumns"/>

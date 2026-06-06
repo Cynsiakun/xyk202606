@@ -29,10 +29,13 @@ layui.use(["table", "form", "layer"], function () {
                         ? '<span class="status-tag success">在线</span>'
                         : '<span class="status-tag fail">离线</span>';
             }},
-            {title: "操作", width: 320, fixed: "right", templet: function () {
+            {title: "操作", width: 360, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
                 if (AppAuth.hasPermission("host:asset:view")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="asset">查看资产</button>';
+                }
+                if (AppAuth.hasPermission("asset:export")) {
+                    buttons += '<button type="button" class="layui-btn layui-btn-warm layui-btn-xs" lay-event="export">导出</button>';
                 }
                 if (AppAuth.hasPermission("host:probe")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="probe">资产探测</button>';
@@ -90,6 +93,9 @@ layui.use(["table", "form", "layer"], function () {
         if (obj.event === "asset") {
             AssetUtils.openHostAssetTabs(layer, obj.data);
         }
+        if (obj.event === "export") {
+            openExportDialog(obj.data);
+        }
         if (obj.event === "probe") {
             openProbeDialog(obj.data);
         }
@@ -110,20 +116,34 @@ layui.use(["table", "form", "layer"], function () {
             macAddress: data.field.macAddress
         };
         (async function () {
-            try {
-                await AppRequest.request("/api/host/probe", {
-                    method: "POST",
-                    body: payload
-                }, {
-                    successMessage: "探测任务已下发"
-                });
-                layer.closeAll("page");
-            } catch (error) {
-                return;
-            }
+            await submitProbe(payload, false);
         })();
         return false;
     });
+
+    async function submitProbe(payload, force) {
+        var requestPayload = Object.assign({}, payload, {force: !!force});
+        try {
+            await AppRequest.request("/api/host/probe", {
+                method: "POST",
+                body: requestPayload
+            }, {
+                successMessage: "探测任务已下发"
+            });
+            layer.closeAll("page");
+            table.reload(hostTableId);
+        } catch (error) {
+            if (error && error.code === 409 && !force) {
+                layer.confirm(error.message || "该主机资产数据仍在有效期内，是否继续探测？", {
+                    icon: 3,
+                    title: "确认探测"
+                }, function (index) {
+                    layer.close(index);
+                    submitProbe(payload, true);
+                });
+            }
+        }
+    }
 
     var addHostButton = document.getElementById("addHostButton");
     if (AppAuth.hasPermission("host:create")) {
@@ -139,7 +159,6 @@ layui.use(["table", "form", "layer"], function () {
         AppTable.reload(table, hostTableId, {keyword: ""});
     });
 
-    // 仅刷新数据、保留当前页码与滚动位置，避免整表重渲染导致的页面跳动。
     function refreshData() {
         table.reloadData(hostTableId, {scrollPos: "fixed"});
     }
@@ -209,7 +228,6 @@ layui.use(["table", "form", "layer"], function () {
             area: [dialogWidth + "px", dialogHeight + "px"],
             content: AppUtils.getTemplateHtml("assetProbeTemplate"),
             success: function (layero) {
-                // 默认仅勾选「探测账号」，自动带入当前主机 MAC。
                 form.val("assetProbeForm", {
                     macAddress: host ? host.macAddress || "" : "",
                     account: true,
@@ -236,6 +254,116 @@ layui.use(["table", "form", "layer"], function () {
             area: [dialogWidth + "px", dialogHeight + "px"],
             content: buildDetailHtml(host)
         });
+    }
+
+    function openExportDialog(host) {
+        layer.open({
+            type: 1,
+            title: "导出资产清单",
+            area: ["320px", "190px"],
+            content: '<div class="popup-form">' +
+                    '<div class="layui-btn-container" style="padding-top: 12px;">' +
+                    '<button type="button" class="layui-btn layui-btn-fluid" data-export-format="json">JSON</button>' +
+                    '<button type="button" class="layui-btn layui-btn-normal layui-btn-fluid" data-export-format="excel">Excel</button>' +
+                    '</div>' +
+                    '</div>',
+            success: function (layero, index) {
+                layero.find("[data-export-format]").on("click", function () {
+                    var format = this.getAttribute("data-export-format");
+                    layer.close(index);
+                    downloadAssetExport(host, format);
+                });
+            }
+        });
+    }
+
+    async function downloadAssetExport(host, format) {
+        var token = AppAuth.getToken();
+        var url = "/api/asset/export/" + encodeURIComponent(host.id) + "?format=" + encodeURIComponent(format);
+        try {
+            var response = await fetch(url, {
+                method: "GET",
+                headers: token ? {Authorization: "Bearer " + token} : {}
+            });
+            if (!response.ok) {
+                await handleDownloadError(response);
+                return;
+            }
+            var blob;
+            var fileName;
+            if (format === "excel") {
+                blob = await response.blob();
+                fileName = getDownloadFileName(response) || buildExportFileName(host.id, "xlsx");
+            } else {
+                var result = await response.json();
+                if (!result || result.code !== 200) {
+                    layer.msg(result && result.message ? result.message : "导出失败", {icon: 2});
+                    return;
+                }
+                blob = new Blob([JSON.stringify(result.data, null, 2)], {type: "application/json;charset=utf-8"});
+                fileName = buildExportFileName(host.id, "json");
+            }
+            triggerDownload(blob, fileName);
+            layer.msg("导出成功", {icon: 1});
+        } catch (error) {
+            layer.msg(error.message || "导出失败", {icon: 2});
+        }
+    }
+
+    async function handleDownloadError(response) {
+        var message = "导出失败";
+        try {
+            var result = await response.json();
+            if (result && result.message) {
+                message = result.message;
+            }
+        } catch (error) {
+            message = response.statusText || message;
+        }
+        if (response.status === 401 || response.status === 403) {
+            AppAuth.clearLogin();
+            AppAuth.redirectToLogin();
+        } else {
+            layer.msg(message, {icon: 2});
+        }
+    }
+
+    function getDownloadFileName(response) {
+        var disposition = response.headers.get("content-disposition") || "";
+        var utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+            return decodeURIComponent(utf8Match[1]);
+        }
+        var nameMatch = disposition.match(/filename="?([^";]+)"?/i);
+        return nameMatch ? nameMatch[1] : "";
+    }
+
+    function buildExportFileName(hostId, suffix) {
+        var now = new Date();
+        var timestamp = [
+            now.getFullYear(),
+            pad2(now.getMonth() + 1),
+            pad2(now.getDate()),
+            pad2(now.getHours()),
+            pad2(now.getMinutes()),
+            pad2(now.getSeconds())
+        ].join("");
+        return "asset_export_" + hostId + "_" + timestamp + "." + suffix;
+    }
+
+    function pad2(value) {
+        return value < 10 ? "0" + value : String(value);
+    }
+
+    function triggerDownload(blob, fileName) {
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     function buildDetailHtml(host) {
@@ -274,7 +402,8 @@ layui.use(["table", "form", "layer"], function () {
             ]},
             {title: "时间", items: [
                 {label: "创建时间", value: AppUtils.formatDateTime(h.createdAt)},
-                {label: "更新时间", value: AppUtils.formatDateTime(h.updatedAt)}
+                {label: "更新时间", value: AppUtils.formatDateTime(h.updatedAt)},
+                {label: "最近探测时间", value: h.lastScanTime ? AppUtils.formatDateTime(h.lastScanTime) : "从未探测", full: true}
             ]}
         ];
 

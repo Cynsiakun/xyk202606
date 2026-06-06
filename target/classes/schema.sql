@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS user (
 );
 
 INSERT INTO user (user_name, user_pwd, status)
-SELECT 'admin', '21232f297a57a5a743894a0e4a801fc3', 1
+SELECT 'admin', 'b358ecf888cf98e406d6017e740b7209', 1
 WHERE NOT EXISTS (
     SELECT 1 FROM user WHERE user_name = 'admin'
 );
@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS sys_role_permission (
     role_id BIGINT NOT NULL,
     permission_id BIGINT NOT NULL,
     UNIQUE KEY uk_role_permission (role_id, permission_id)
+);
+
+CREATE TABLE IF NOT EXISTS asset_export_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT,
+    host_id BIGINT NOT NULL,
+    export_time DATETIME NOT NULL,
+    export_format VARCHAR(16) NOT NULL,
+    ip_address VARCHAR(64)
 );
 
 CREATE TABLE IF NOT EXISTS sys_menu (
@@ -261,6 +270,7 @@ CREATE TABLE IF NOT EXISTS hosts (
     mem_available VARCHAR(50),
     mem_usage VARCHAR(50),
     status TINYINT DEFAULT 1,
+    last_scan_time DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -293,6 +303,12 @@ INSERT INTO sys_permission (permission_code, permission_name, permission_type, p
 SELECT 'host:asset:view', '查看主机资产', 'API', '/api/assets/host-latest', 1
 WHERE NOT EXISTS (
     SELECT 1 FROM sys_permission WHERE permission_code = 'host:asset:view'
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'asset:export', '导出资产清单', 'API', '/api/asset/export/**', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_permission WHERE permission_code = 'asset:export'
 );
 
 INSERT INTO sys_role_permission (role_id, permission_id)
@@ -329,6 +345,7 @@ FROM sys_role r
                   'dashboard:view',
                   'user:view', 'user:create', 'user:update', 'user:delete',
                   'host:view', 'host:create', 'host:update', 'host:delete',
+                  'asset:export',
                   'role:view', 'permission:view', 'login-log:view'
               )
 WHERE r.role_code = 'SECURITY_ADMIN'
@@ -357,6 +374,7 @@ FROM sys_role r
               ON p.permission_code IN (
                   'dashboard:view',
                   'user:view', 'host:view', 'host:asset:view',
+                  'asset:export',
                   'role:view', 'permission:view', 'login-log:view'
               )
 WHERE r.role_code = 'AUDITOR'

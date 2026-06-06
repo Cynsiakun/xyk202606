@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.AssetExportLogMapper">
+
+    <insert id="insert" parameterType="com.cd.entity.AssetExportLogEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO asset_export_logs (user_id, host_id, export_time, export_format, ip_address)
+        VALUES (#{userId}, #{hostId}, #{exportTime}, #{exportFormat}, #{ipAddress})
+    </insert>
+</mapper>

@@ -91,6 +91,17 @@ public class AssetModuleInitializer {
                     )
                     """);
 
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS asset_export_logs (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        user_id BIGINT,
+                        host_id BIGINT NOT NULL,
+                        export_time DATETIME NOT NULL,
+                        export_format VARCHAR(16) NOT NULL,
+                        ip_address VARCHAR(64)
+                    )
+                    """);
+
             // ——— 兼容旧表：补建 deleted 列（幂等，列已存在时报错静默忽略） ———
             addColumnIfAbsent("accounts", "deleted", "TINYINT DEFAULT 0");
             addColumnIfAbsent("services", "deleted", "TINYINT DEFAULT 0");
@@ -100,6 +111,7 @@ public class AssetModuleInitializer {
             // ——— 权限 ———
             insertPermission("asset:view", "查看资产管理", "/api/assets/**");
             insertPermission("asset:delete", "删除资产记录", "/api/assets/*/delete");
+            insertPermission("asset:export", "导出资产清单", "/api/asset/export/**");
 
             // ——— 菜单（资产管理 > 5 个子项） ———
             insertAssetMenus();

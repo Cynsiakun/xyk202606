@@ -40,10 +40,12 @@ public class HostRbacInitializer {
                         mem_available VARCHAR(50),
                         mem_usage VARCHAR(50),
                         status TINYINT DEFAULT 1,
+                        last_scan_time DATETIME,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                     )
                     """);
+            addColumnIfAbsent("hosts", "last_scan_time", "DATETIME");
 
             insertPermission("host:view", "查看主机", "/api/host/list");
             insertPermission("host:create", "新增主机", "/api/host");
@@ -62,6 +64,14 @@ public class HostRbacInitializer {
                 SELECT ?, ?, 'API', ?, 1
                 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = ?)
                 """, permissionCode, permissionName, path, permissionCode);
+    }
+
+    private void addColumnIfAbsent(String table, String column, String definition) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (Exception ignored) {
+            // Column already exists.
+        }
     }
 
     private void insertHostMenu() {

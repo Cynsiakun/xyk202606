@@ -37,6 +37,8 @@ public interface HostService {
      */
     int markOfflineHosts(int offlineThresholdSeconds);
 
+    int autoProbeOnlineHosts(int limit);
+
     /**
      * 下发资产探测任务：按勾选项组装消息并发送到 {@code agent_exchange}，
      * 路由键为目标主机的 MAC 地址（与客户端专属队列绑定时一致）。

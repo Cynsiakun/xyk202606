@@ -18,8 +18,60 @@ window.AssetUtils = (function () {
     /** 涓绘満璧勪骇 Tab 椤哄簭銆?*/
     var TAB_TYPES = ["account", "service", "process", "app"];
 
+    var ANALYZABLE_TYPES = {
+        account: {
+            endpointType: "account",
+            kicker: "ACCOUNT RISK ANALYSIS",
+            title: "账号资产详情",
+            itemLabel: "账号对象",
+            emptyText: "当前筛选条件下暂无账号",
+            nameFields: ["name", "user", "username", "account"],
+            fallbackName: "账号",
+            idLabel: "SID",
+            idField: "sid",
+            parseErrorText: "AI返回格式异常：无法解析更新后的账号数据"
+        },
+        service: {
+            endpointType: "service",
+            kicker: "SERVICE RISK ANALYSIS",
+            title: "服务资产详情",
+            itemLabel: "服务对象",
+            emptyText: "当前筛选条件下暂无服务",
+            nameFields: ["name", "serviceName", "displayName"],
+            fallbackName: "服务",
+            idLabel: "PID",
+            idField: "pid",
+            parseErrorText: "AI返回格式异常：无法解析更新后的服务数据"
+        },
+        process: {
+            endpointType: "process",
+            kicker: "PROCESS RISK ANALYSIS",
+            title: "进程资产详情",
+            itemLabel: "进程对象",
+            emptyText: "当前筛选条件下暂无进程",
+            nameFields: ["name", "processName"],
+            fallbackName: "进程",
+            idLabel: "PID",
+            idField: "pid",
+            parseErrorText: "AI返回格式异常：无法解析更新后的进程数据"
+        },
+        app: {
+            endpointType: "app",
+            kicker: "APP RISK ANALYSIS",
+            title: "APP资产详情",
+            itemLabel: "APP对象",
+            emptyText: "当前筛选条件下暂无APP",
+            nameFields: ["name", "appName"],
+            fallbackName: "APP",
+            idLabel: "版本",
+            idField: "version",
+            parseErrorText: "AI返回格式异常：无法解析更新后的APP数据"
+        }
+    };
+
     /** 璇︽儏姣忛〉灞曠ず鐨勮祫浜ф潯鏁般€?*/
     var PAGE_SIZE = 50;
+    var RISK_CARD_PAGE_SIZE = 25;
 
     // ============ 鍗曠被鍨嬭鎯呭脊绐楋紙璧勪骇椤甸潰鐢級 ============
 
@@ -48,7 +100,7 @@ window.AssetUtils = (function () {
                     area: [dialog.width + "px", dialog.height + "px"],
                     content: '<div class="asset-detail-wrap" id="assetDetailWrap"></div>',
                     success: function (layero) {
-                        renderRecordInto(layero.find("#assetDetailWrap"), record, assetData, columns);
+                        renderRecordInto(layero.find("#assetDetailWrap"), record, assetData, columns, assetType, true);
                     }
                 });
             })
@@ -129,7 +181,7 @@ window.AssetUtils = (function () {
                     {label: "主机名", value: record.hostName},
                     {label: "MAC地址", value: record.macAddress},
                     {label: "任务ID", value: record.taskId}
-                ]);
+                ], type, false);
             })
             .catch(function () {
                 pane.html('<div class="host-asset-state">加载中...</div>');
@@ -140,12 +192,15 @@ window.AssetUtils = (function () {
 
     /**
      * 鎶婁竴鏉¤祫浜ц褰曟覆鏌撹繘瀹瑰櫒锛氫俊鎭〃 + 鍘熷JSON鍒囨崲 + 鍒嗛〉琛ㄦ牸銆?     */
-    function renderRecordInto($wrap, record, assetData, columns) {
+    function renderRecordInto($wrap, record, assetData, columns, assetType, enableAnalysis) {
         var state = {
             record: record,
             assetData: assetData,
             columns: columns || [],
+            assetType: assetType,
+            enableAnalysis: !!enableAnalysis,
             filter: "ALL",
+            riskPage: 1,
             error: ""
         };
         renderDetailState($wrap, state);
@@ -154,8 +209,9 @@ window.AssetUtils = (function () {
     function renderDetailState($wrap, state) {
         var record = state.record;
         var assetData = state.assetData;
-        if (isAccountRecord(record)) {
-            renderAccountDetailState($wrap, state);
+        var analyzableConfig = getAnalyzableConfig(state);
+        if (analyzableConfig) {
+            renderAccountDetailState($wrap, state, analyzableConfig);
             return;
         }
 
@@ -186,34 +242,41 @@ window.AssetUtils = (function () {
         bindJsonToggle($wrap);
     }
 
-    function renderAccountDetailState($wrap, state) {
+    function renderAccountDetailState($wrap, state, config) {
         var record = state.record;
         var assetData = state.assetData;
         var filtered = filterAssetData(assetData, state.filter);
+        var totalPages = Math.max(1, Math.ceil(filtered.length / RISK_CARD_PAGE_SIZE));
+        state.riskPage = Math.min(Math.max(1, state.riskPage || 1), totalPages);
+        var pageStart = (state.riskPage - 1) * RISK_CARD_PAGE_SIZE;
+        var pageEnd = Math.min(pageStart + RISK_CARD_PAGE_SIZE, filtered.length);
+        var pageItems = filtered.slice(pageStart, pageEnd);
         var counts = countRiskLevels(assetData);
         var rawJson = JSON.stringify(assetData, null, 2);
 
         $wrap.html(''
             + '<div class="account-ai-panel">'
-            +   renderAccountHero(record, assetData, counts)
+            +   renderAccountHero(record, assetData, counts, config)
             +   renderAccountToolbar(state, counts)
             +   (state.error ? '<div class="account-ai-error">' + escapeHtml(state.error) + '</div>' : '')
-            +   '<div class="account-card-list">' + renderAccountCards(filtered) + '</div>'
+            +   '<div class="account-card-list">' + renderAccountCards(pageItems, config, pageStart) + '</div>'
+            +   renderRiskCardPager(filtered.length, pageStart, pageEnd, state.riskPage, totalPages)
             + '</div>'
             + '<div class="asset-detail-json" style="display:none;"><pre class="json-block">' + escapeHtml(rawJson) + '</pre></div>');
 
         bindJsonToggle($wrap);
-        bindAccountAnalysis($wrap, state);
+        bindAccountAnalysis($wrap, state, config);
         bindRiskTabs($wrap, state);
+        bindRiskCardPager($wrap, state);
     }
 
-    function renderAccountHero(record, assetData, counts) {
+    function renderAccountHero(record, assetData, counts, config) {
         var topLevel = getTopRiskLevel(counts);
         return ''
             + '<div class="account-ai-hero">'
             +   '<div class="account-ai-title-block">'
-            +     '<div class="account-ai-kicker">ACCOUNT RISK ANALYSIS</div>'
-            +     '<div class="account-ai-title">账号资产详情</div>'
+            +     '<div class="account-ai-kicker">' + escapeHtml(config.kicker) + '</div>'
+            +     '<div class="account-ai-title">' + escapeHtml(config.title) + '</div>'
             +     '<div class="account-ai-meta">'
             +       '<span>主机：' + formatCell(record.hostName) + '</span>'
             +       '<span>MAC：' + formatCell(record.macAddress) + '</span>'
@@ -223,7 +286,7 @@ window.AssetUtils = (function () {
             +   '<div class="account-ai-status">'
             +     '<span class="asset-risk-badge ' + riskClass(topLevel) + '">' + topLevel + '</span>'
             +     '<strong>' + assetData.length + '</strong>'
-            +     '<span>账号对象</span>'
+            +     '<span>' + escapeHtml(config.itemLabel) + '</span>'
             +   '</div>'
             + '</div>';
     }
@@ -256,39 +319,56 @@ window.AssetUtils = (function () {
             }).join("") + '</div>';
     }
 
-    function renderAccountCards(accounts) {
-        if (!accounts.length) {
-            return '<div class="account-empty">当前筛选条件下暂无账号</div>';
+    function renderAccountCards(items, config, offset) {
+        if (!items.length) {
+            return '<div class="account-empty">' + escapeHtml(config.emptyText) + '</div>';
         }
-        return accounts.map(function (account, index) {
-            var level = normalizeRiskLevel(account.risk_level);
-            var name = account.name || account.user || account.username || account.account || ("账号 #" + (index + 1));
-            var tags = Array.isArray(account.risk_tags) ? account.risk_tags : [];
-            var suggestions = Array.isArray(account.suggestions) ? account.suggestions : [];
+        offset = offset || 0;
+        return items.map(function (item, index) {
+            var level = normalizeRiskLevel(item.risk_level);
+            var name = pickFirstText(item, config.nameFields) || (config.fallbackName + " #" + (offset + index + 1));
+            var tags = Array.isArray(item.risk_tags) ? item.risk_tags : [];
+            var suggestions = Array.isArray(item.suggestions) ? item.suggestions : [];
             return ''
                 + '<div class="account-risk-card risk-' + level.toLowerCase() + '">'
                 +   '<div class="account-card-head">'
                 +     '<div>'
                 +       '<div class="account-name">' + escapeHtml(name) + '</div>'
-                +       '<div class="account-subline">SID：' + formatCell(account.sid) + '</div>'
+                +       '<div class="account-subline">' + escapeHtml(config.idLabel) + '：' + formatCell(item[config.idField]) + '</div>'
                 +     '</div>'
                 +     '<div class="account-card-score">'
                 +       '<span class="asset-risk-badge ' + riskClass(level) + '">' + level + '</span>'
-                +       '<strong>' + formatCell(account.risk_score) + '</strong>'
+                +       '<strong>' + formatCell(item.risk_score) + '</strong>'
                 +     '</div>'
                 +   '</div>'
                 +   '<div class="account-tag-row">' + (tags.length ? tags.map(function (tag) { return '<span>' + escapeHtml(tag) + '</span>'; }).join("") : '<span class="muted">暂无风险标签</span>') + '</div>'
-                +   '<div class="account-result">' + formatCell(account.result || '尚未进行AI分析') + '</div>'
+                +   '<div class="account-result">' + formatCell(item.result || '尚未进行AI分析') + '</div>'
                 +   '<div class="account-suggestions">'
                 +     '<div class="account-section-title">整改建议</div>'
                 +     (suggestions.length ? '<ul>' + suggestions.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("") + '</ul>' : '<p class="muted">暂无建议</p>')
                 +   '</div>'
                 +   '<details class="account-raw-fields">'
                 +     '<summary>查看原始字段</summary>'
-                +     '<div class="account-field-grid">' + renderAccountRawFields(account) + '</div>'
+                +     '<div class="account-field-grid">' + renderAccountRawFields(item) + '</div>'
                 +   '</details>'
                 + '</div>';
         }).join("");
+    }
+
+    function renderRiskCardPager(total, start, end, currentPage, totalPages) {
+        if (total <= RISK_CARD_PAGE_SIZE) {
+            return "";
+        }
+        var prevDisabled = currentPage <= 1 ? ' layui-btn-disabled' : '';
+        var nextDisabled = currentPage >= totalPages ? ' layui-btn-disabled' : '';
+        return ''
+            + '<div class="asset-pager account-card-pager">'
+            +   '<span class="asset-pager-info">第 ' + (total === 0 ? 0 : start + 1) + ' - ' + end + ' 条 / 共 ' + total + ' 条，第 ' + currentPage + ' / ' + totalPages + ' 页</span>'
+            +   '<div class="asset-pager-controls">'
+            +     '<button type="button" class="layui-btn layui-btn-xs layui-btn-primary account-card-prev' + prevDisabled + '">上一页</button>'
+            +     '<button type="button" class="layui-btn layui-btn-xs layui-btn-primary account-card-next' + nextDisabled + '">下一页</button>'
+            +   '</div>'
+            + '</div>';
     }
 
     function renderAccountRawFields(account) {
@@ -392,7 +472,7 @@ window.AssetUtils = (function () {
         return '<span class="asset-risk-badge ' + riskClass(level) + '">' + label + ' ' + count + '</span>';
     }
 
-    function bindAccountAnalysis($wrap, state) {
+    function bindAccountAnalysis($wrap, state, config) {
         $wrap.find(".asset-ai-analysis").on("click", async function () {
             var button = this;
             var stateText = $wrap.find(".asset-analysis-state");
@@ -400,20 +480,20 @@ window.AssetUtils = (function () {
             button.classList.add("layui-btn-disabled");
             stateText.show();
             try {
-                var result = await AppRequest.request("/api/assets/account/" + state.record.id + "/ai-analysis", {
-                    method: "POST",
-                    body: {assetJson: JSON.stringify(state.assetData)}
+                var result = await AppRequest.request("/api/assets/" + config.endpointType + "/" + state.record.id + "/ai-analysis", {
+                    method: "POST"
                 }, {showErrorMessage: false});
                 var nextRecord = result.data;
                 var nextAssetData = parseAssetJson(nextRecord);
                 if (nextAssetData == null) {
-                    state.error = "AI返回格式异常：无法解析更新后的账号数据";
+                    state.error = config.parseErrorText;
                     renderDetailState($wrap, state);
                     return;
                 }
                 state.record = nextRecord;
                 state.assetData = nextAssetData;
                 state.filter = "ALL";
+                state.riskPage = 1;
                 state.error = "";
                 renderDetailState($wrap, state);
                 AppRequest.showMessage("AI分析完成", 1, 1600);
@@ -429,7 +509,21 @@ window.AssetUtils = (function () {
     function bindRiskTabs($wrap, state) {
         $wrap.find(".account-risk-tab, .asset-risk-tab").on("click", function () {
             state.filter = this.getAttribute("data-risk") || "ALL";
+            state.riskPage = 1;
             state.error = "";
+            renderDetailState($wrap, state);
+        });
+    }
+
+    function bindRiskCardPager($wrap, state) {
+        $wrap.find(".account-card-prev").on("click", function () {
+            if (state.riskPage > 1) {
+                state.riskPage -= 1;
+                renderDetailState($wrap, state);
+            }
+        });
+        $wrap.find(".account-card-next").on("click", function () {
+            state.riskPage += 1;
             renderDetailState($wrap, state);
         });
     }
@@ -528,8 +622,21 @@ window.AssetUtils = (function () {
         }
     }
 
-    function isAccountRecord(record) {
-        return !!(record && record.id && record.assetJson && window.location.pathname.indexOf("asset-account") >= 0);
+    function getAnalyzableConfig(state) {
+        if (!state || !state.enableAnalysis || !state.record || !state.record.id || !state.record.assetJson) {
+            return null;
+        }
+        return ANALYZABLE_TYPES[state.assetType] || null;
+    }
+
+    function pickFirstText(obj, fields) {
+        for (var i = 0; i < fields.length; i++) {
+            var value = obj ? obj[fields[i]] : null;
+            if (value !== null && value !== undefined && value !== "") {
+                return String(value);
+            }
+        }
+        return "";
     }
     // ============ 宸ュ叿 ============
 

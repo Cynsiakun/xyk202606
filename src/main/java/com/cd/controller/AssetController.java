@@ -104,6 +104,14 @@ public class AssetController {
         return Result.success(assetQueryService.serviceDetail(id));
     }
 
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/service/{id}/ai-analysis")
+    public Result<AssetRecordDTO> analyzeService(@PathVariable @Min(1) Long id,
+                                                 @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
+        String assetJson = dto == null ? null : dto.getAssetJson();
+        return Result.success(assetAiAnalysisService.analyzeService(id, assetJson));
+    }
+
     @PreAuthorize("@perm.has('asset:delete')")
     @DeleteMapping("/service/{id}")
     public Result<Void> deleteService(@PathVariable @Min(1) Long id) {
@@ -128,6 +136,14 @@ public class AssetController {
         return Result.success(assetQueryService.processDetail(id));
     }
 
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/process/{id}/ai-analysis")
+    public Result<AssetRecordDTO> analyzeProcess(@PathVariable @Min(1) Long id,
+                                                 @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
+        String assetJson = dto == null ? null : dto.getAssetJson();
+        return Result.success(assetAiAnalysisService.analyzeProcess(id, assetJson));
+    }
+
     @PreAuthorize("@perm.has('asset:delete')")
     @DeleteMapping("/process/{id}")
     public Result<Void> deleteProcess(@PathVariable @Min(1) Long id) {
@@ -150,6 +166,14 @@ public class AssetController {
     @GetMapping("/app/{id}")
     public Result<AssetRecordDTO> appDetail(@PathVariable @Min(1) Long id) {
         return Result.success(assetQueryService.appDetail(id));
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/app/{id}/ai-analysis")
+    public Result<AssetRecordDTO> analyzeApp(@PathVariable @Min(1) Long id,
+                                             @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
+        String assetJson = dto == null ? null : dto.getAssetJson();
+        return Result.success(assetAiAnalysisService.analyzeApp(id, assetJson));
     }
 
     @PreAuthorize("@perm.has('asset:delete')")

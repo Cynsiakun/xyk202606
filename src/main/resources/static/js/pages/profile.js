@@ -49,10 +49,12 @@ layui.use(["layer", "form"], function () {
                     method: "POST",
                     body: data.field
                 }, {
-                    successMessage: "密码修改成功",
                     showErrorMessage: false
                 });
                 layer.closeAll("page");
+                window.AppAuth.clearLogin();
+                AppRequest.showMessage("密码修改成功，请重新登录", 1, 2000);
+                window.AppAuth.redirectToLogin();
             } catch (error) {
                 AppUtils.showFormError(formEl, error.message);
             }
@@ -110,10 +112,81 @@ layui.use(["layer", "form"], function () {
         var index = layer.open({
             type: 1,
             title: "修改密码",
-            area: ["500px", "300px"],
+            area: ["520px", "380px"],
             content: AppUtils.getTemplateHtml("passwordFormTemplate"),
             success: function (layero) {
                 form.render();
+
+                var container = layero[0];
+                var saveButton = container.querySelector('button[lay-filter="savePassword"]');
+                var newPwdInput = container.querySelector('input[name="newPwd"]');
+                var confirmPwdInput = container.querySelector('input[name="confirmPwd"]');
+
+                function renderFieldError(input, message) {
+                    var block = input.closest(".layui-input-block") || input.parentNode;
+                    var errorEl = block.querySelector(".field-error");
+                    if (message) {
+                        if (!errorEl) {
+                            errorEl = document.createElement("div");
+                            errorEl.className = "field-error";
+                            block.appendChild(errorEl);
+                        }
+                        errorEl.textContent = message;
+                    } else if (errorEl) {
+                        errorEl.remove();
+                    }
+                }
+
+                function validateConfirmMatch() {
+                    if (!newPwdInput || !confirmPwdInput) {
+                        return true;
+                    }
+
+                    var newPwd = (newPwdInput.value || "").trim();
+                    var confirmPwd = (confirmPwdInput.value || "").trim();
+                    if (!confirmPwd) {
+                        renderFieldError(confirmPwdInput, "确认密码不能为空");
+                        return false;
+                    }
+                    if (newPwd !== confirmPwd) {
+                        renderFieldError(confirmPwdInput, "两次输入的新密码必须一致");
+                        return false;
+                    }
+                    renderFieldError(confirmPwdInput, "");
+                    return true;
+                }
+
+                var basicValidator = AppUtils.bindLiveValidation(container, {
+                    saveButton: 'button[lay-filter="savePassword"]',
+                    fields: [
+                        {selector: 'input[name="oldPwd"]', required: true, message: "旧密码不能为空"},
+                        {selector: 'input[name="newPwd"]', required: true, message: "新密码不能为空"},
+                        {selector: 'input[name="confirmPwd"]', required: true, message: "确认密码不能为空"}
+                    ]
+                });
+
+                function updateSaveButtonState() {
+                    var basicValid = basicValidator();
+                    var matchValid = validateConfirmMatch();
+                    if (saveButton) {
+                        saveButton.disabled = !(basicValid && matchValid);
+                        if (basicValid && matchValid) {
+                            saveButton.classList.remove("layui-btn-disabled");
+                        } else {
+                            saveButton.classList.add("layui-btn-disabled");
+                        }
+                    }
+                    return basicValid && matchValid;
+                }
+
+                [newPwdInput, confirmPwdInput].forEach(function (input) {
+                    if (input) {
+                        input.addEventListener("input", updateSaveButtonState);
+                        input.addEventListener("blur", updateSaveButtonState);
+                    }
+                });
+
+                updateSaveButtonState();
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);
                 });

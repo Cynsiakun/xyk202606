@@ -7,6 +7,7 @@ import com.cd.entity.ProcessEntity;
 import com.cd.entity.ServiceEntity;
 import com.cd.mapper.AccountMapper;
 import com.cd.mapper.AppMapper;
+import com.cd.mapper.HostMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.ProcessMapper;
 import com.cd.mapper.ServiceMapper;
@@ -16,6 +17,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 /**
  * 资产探测结果处理实现。
@@ -35,6 +38,7 @@ public class AssetDataServiceImpl implements AssetDataService {
     private final ProcessMapper processMapper;
     private final AppMapper appMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
+    private final HostMapper hostMapper;
 
     @Override
     public void processAssetMessage(String queueName, String message) {
@@ -154,6 +158,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                     appMapper.insert(entity);
                 }
             }
+            hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
             log.info("资产探测结果已入库: queue={}, type={}, host={}, count={}", queueName, type, hostName, assetCount);
 
         } catch (Exception e) {

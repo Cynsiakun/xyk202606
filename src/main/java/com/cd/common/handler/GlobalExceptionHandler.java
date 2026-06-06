@@ -2,6 +2,7 @@ package com.cd.common.handler;
 
 import com.cd.common.Result;
 import com.cd.common.ai.AiException;
+import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
 import jakarta.validation.ConstraintViolationException;
@@ -49,6 +50,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public Result<Void> handleIllegalArgumentException(IllegalArgumentException e) {
         return Result.fail(400, e.getMessage());
+    }
+
+    @ExceptionHandler(ProbeConfirmRequiredException.class)
+    public Result<Void> handleProbeConfirmRequiredException(ProbeConfirmRequiredException e) {
+        return Result.fail(409, e.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)

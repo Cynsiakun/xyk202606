@@ -30,3 +30,7 @@ ai:
   model: qwen-plus
   temperature: 0.2
   max-tokens: 2048
+  asset-analysis:
+    service-batch-size: 25
+    process-batch-size: 25
+    app-batch-size: 25

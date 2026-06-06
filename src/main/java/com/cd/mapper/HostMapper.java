@@ -44,6 +44,11 @@ public interface HostMapper {
      */
     int reconcileStatusByHeartbeat(@Param("seconds") int seconds);
 
+    int updateLastScanTimeByMac(@Param("macAddress") String macAddress,
+                                @Param("lastScanTime") java.time.LocalDateTime lastScanTime);
+
+    List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
+
     List<HostEntity> selectPage(@Param("offset") int offset,
                                 @Param("size") int size,
                                 @Param("keyword") String keyword);

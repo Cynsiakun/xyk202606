@@ -24,5 +24,11 @@ public interface ServiceMapper {
 
     int softDeleteById(@Param("id") Long id);
 
+    int updateAssetJsonById(@Param("id") Long id,
+                            @Param("assetJson") String assetJson,
+                            @Param("assetCount") Integer assetCount);
+
     List<ServiceEntity> selectLatestPerMac();
+
+    ServiceEntity selectLatestByMac(@Param("macAddress") String macAddress);
 }

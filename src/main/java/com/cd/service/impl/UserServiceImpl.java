@@ -171,7 +171,22 @@ public class UserServiceImpl implements UserService {
         if (!md5PasswordEncoder.matches(dto.getOldPwd(), existing.getUserPwd())) {
             throw new IllegalArgumentException("原密码不正确");
         }
+        if (dto.getNewPwd().equals(dto.getOldPwd())) {
+            throw new IllegalArgumentException("新密码不能与当前密码相同");
+        }
+        if (!dto.getNewPwd().matches("^(?=.*[A-Za-z])(?=.*\\d).{8,64}$")) {
+            throw new IllegalArgumentException("新密码长度不少于8位，且必须同时包含字母和数字");
+        }
+        if (!dto.getNewPwd().equals(dto.getConfirmPwd())) {
+            throw new IllegalArgumentException("两次输入的新密码必须一致");
+        }
         userMapper.updatePasswordById(currentUserId, md5PasswordEncoder.encode(dto.getNewPwd()));
+
+        String token = SecurityUtils.getCurrentToken();
+        if (StringUtils.hasText(token)) {
+            validateToken(token);
+            jwtTokenBlacklistService.revokeToken(token, jwtTokenProvider.parseClaims(token));
+        }
     }
 
     @Override

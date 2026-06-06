@@ -59,10 +59,26 @@
         UPDATE apps SET deleted = 1 WHERE id = #{id} AND deleted = 0
     </update>
 
+    <update id="updateAssetJsonById">
+        UPDATE apps
+        SET asset_json = #{assetJson},
+            asset_count = #{assetCount}
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
     <select id="selectLatestPerMac" resultMap="AppResultMap">
         SELECT <include refid="baseColumns"/>
         FROM apps a
         WHERE a.deleted = 0
           AND a.id = (SELECT MAX(id) FROM apps WHERE mac_address = a.mac_address AND deleted = 0)
+    </select>
+
+    <select id="selectLatestByMac" resultMap="AppResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM apps
+        WHERE deleted = 0
+          AND mac_address = #{macAddress}
+        ORDER BY id DESC
+        LIMIT 1
     </select>
 </mapper>

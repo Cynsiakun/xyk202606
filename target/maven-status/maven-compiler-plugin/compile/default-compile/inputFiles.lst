@@ -9,6 +9,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RbacMenuInitializer.j
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\RoleMatrixInitializer.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\WebMvcConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\constant\AuthConstants.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\ProbeConfirmRequiredException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\ResourceNotFoundException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\UnauthorizedException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\handler\GlobalExceptionHandler.java
@@ -28,6 +29,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUser.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUtils.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AiController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetExportController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\CurrentUserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostController.java
@@ -40,9 +42,12 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiChatResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiTestRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetAiAnalysisRequestDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetExportDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetExportFileDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetOverviewDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetProbeDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRecordDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostResponseDTO.java
@@ -71,6 +76,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateSelfDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AppEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\AssetExportLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\LoginLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\MqErrorLogEntity.java
@@ -85,6 +91,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\TestEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\UserEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AppMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AssetExportLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\MqErrorLogMapper.java
@@ -104,11 +111,13 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mq\SysInfoListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AiService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetAiAnalysisService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetDataService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetExportService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetQueryService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetAiAnalysisServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetDataServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetExportServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetQueryServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashboardServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashScopeAiServiceImpl.java
@@ -121,5 +130,6 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\LoginLogService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\RbacService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\TestService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\task\AssetProbeScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\task\HostStatusScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\ThreatPlatformApplication.java

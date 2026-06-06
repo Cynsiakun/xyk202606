@@ -23,6 +23,7 @@ public class HostEntity {
     private String memAvailable;
     private String memUsage;
     private Integer status;
+    private LocalDateTime lastScanTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
