@@ -309,7 +309,7 @@ WHERE r.role_code = 'SUPER_ADMIN'
 );
 
 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
-SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-screen', p.id, 7, 1
+SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-component', p.id, 7, 1
 FROM sys_permission p
 WHERE p.permission_code = 'host:view'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'host');

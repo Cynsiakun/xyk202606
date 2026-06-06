@@ -10,20 +10,26 @@ layui.use(["table", "form", "layer"], function () {
         url: "/api/host/list",
         cols: [[
             {field: "id", title: "ID", width: 70, sort: true},
-            {field: "hostname", title: "主机名", minWidth: 140, templet: function (d) { return d.hostname || "-"; }},
+            {field: "hostname", title: "主机名", minWidth: 120, templet: function (d) { return d.hostname || "-"; }},
             {field: "ipv4", title: "主IP", minWidth: 130, templet: function (d) { return d.ipv4 || "-"; }},
             {field: "macAddress", title: "MAC地址", minWidth: 160},
-            {field: "osName", title: "操作系统", minWidth: 160, templet: function (d) {
-                var parts = [d.osName, d.osRelease].filter(Boolean).join(" ");
-                return parts || "-";
+            {field: "osRelease", title: "操作系统", minWidth: 140, templet: function (d) {
+                return d.osRelease || "-";
             }},
-            {field: "memUsage", title: "内存占用", width: 110, templet: function (d) { return d.memUsage || "-"; }},
-            {field: "status", title: "状态", width: 90, templet: function (d) {
+            {title: "内存占用", width: 150, templet: function (d) {
+                var total = d.memTotal || "-";
+                var usage = d.memUsage || "-";
+                if (total === "-" && usage === "-") {
+                    return "-";
+                }
+                return total + (usage === "-" ? "" : " / " + usage);
+            }},
+            {field: "status", title: "状态", width: 90, fixed: "right", templet: function (d) {
                 return d.status === 1
                         ? '<span class="status-tag success">在线</span>'
                         : '<span class="status-tag fail">离线</span>';
             }},
-            {title: "操作", width: 360, fixed: "right", templet: function () {
+            {title: "操作", width: 320, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
                 if (AppAuth.hasPermission("host:asset:view")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="asset">查看资产</button>';

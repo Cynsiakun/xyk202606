@@ -59,6 +59,13 @@
         UPDATE accounts SET deleted = 1 WHERE id = #{id} AND deleted = 0
     </update>
 
+    <update id="updateAssetJsonById">
+        UPDATE accounts
+        SET asset_json = #{assetJson},
+            asset_count = #{assetCount}
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
     <!-- 每个 MAC 最新一条记录（用于总览聚合） -->
     <select id="selectLatestPerMac" resultMap="AccountResultMap">
         SELECT <include refid="baseColumns"/>

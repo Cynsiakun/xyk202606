@@ -70,10 +70,16 @@ public class HostRbacInitializer {
         int sortOrder = (maxSort == null ? 0 : maxSort) + 1;
         jdbcTemplate.update("""
                 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status)
-                SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-screen', p.id, ?, 1
+                SELECT 'host', '主机管理', './pages/host.html', 'layui-icon-component', p.id, ?, 1
                 FROM sys_permission p
                 WHERE p.permission_code = 'host:view'
                   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'host')
                 """, sortOrder);
+        jdbcTemplate.update("""
+                UPDATE sys_menu
+                SET menu_icon = 'layui-icon-component'
+                WHERE menu_code = 'host'
+                  AND (menu_icon IS NULL OR menu_icon = '' OR menu_icon IN ('layui-icon-screen', 'layui-icon-app'))
+                """);
     }
 }

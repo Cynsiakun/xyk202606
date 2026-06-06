@@ -24,6 +24,10 @@ public interface AccountMapper {
 
     int softDeleteById(@Param("id") Long id);
 
+    int updateAssetJsonById(@Param("id") Long id,
+                            @Param("assetJson") String assetJson,
+                            @Param("assetCount") Integer assetCount);
+
     /** 每个 MAC 的最新一条记录（用于总览聚合）。 */
     List<AccountEntity> selectLatestPerMac();
 }

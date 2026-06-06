@@ -23,3 +23,10 @@ security:
   jwt:
     secret: 1234567890123456789012345678901234567890123456789012345678901234
     expire-seconds: 86400
+
+ai:
+  api-key: ${DASHSCOPE_API_KEY:}
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen-plus
+  temperature: 0.2
+  max-tokens: 2048

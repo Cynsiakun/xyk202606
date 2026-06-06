@@ -1,6 +1,7 @@
 package com.cd.common.handler;
 
 import com.cd.common.Result;
+import com.cd.common.ai.AiException;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
 import jakarta.validation.ConstraintViolationException;
@@ -53,6 +54,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public Result<Void> handleUnauthorizedException(UnauthorizedException e) {
         return Result.fail(401, e.getMessage());
+    }
+
+    @ExceptionHandler(AiException.class)
+    public Result<Void> handleAiException(AiException e) {
+        return Result.fail(502, e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,0 +1,70 @@
+.asset-detail-wrap { padding: 8px 0; }
+.asset-detail-info { margin-bottom: 10px; }
+.asset-info-table td { padding: 6px 12px; }
+.asset-info-table .detail-label { width: 90px; font-weight: 600; color: #555; }
+.asset-detail-actions { margin-bottom: 8px; }
+.asset-detail-array { margin-bottom: 8px; }
+.asset-table-scroll { max-height: 300px; overflow: auto; }
+.asset-data-table { margin: 0; font-size: 12px; }
+.asset-data-table th, .asset-data-table td { white-space: nowrap; padding: 4px 8px; }
+.asset-data-table td.asset-risk-result,
+.asset-data-table td.asset-risk-suggestions { white-space: normal; min-width: 180px; max-width: 260px; }
+.asset-risk-badge { display: inline-block; min-width: 54px; padding: 2px 8px; border-radius: 4px; text-align: center; font-weight: 600; font-size: 12px; }
+.asset-risk-high { color: #fff; background: #d93026; }
+.asset-risk-medium { color: #6b3f00; background: #fbbc04; }
+.asset-risk-low { color: #6b5200; background: #fff3bf; }
+.asset-risk-none { color: #0b6b3a; background: #dff7e8; }
+.asset-risk-summary { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.asset-risk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.asset-risk-tab.is-active { color: #fff; background: #16baaa; border-color: #16baaa; }
+.asset-analysis-state { display: none; margin-left: 8px; color: #666; font-size: 12px; }
+.asset-analysis-error { margin: 8px 0; color: #d93026; font-size: 12px; }
+.account-ai-panel { padding: 4px 2px 10px; }
+.account-ai-hero { display: flex; justify-content: space-between; gap: 18px; padding: 18px 20px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; }
+.account-ai-kicker { margin-bottom: 6px; font-size: 11px; color: #64748b; letter-spacing: .08em; }
+.account-ai-title { font-size: 20px; font-weight: 700; color: #111827; }
+.account-ai-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: #64748b; }
+.account-ai-status { min-width: 130px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; }
+.account-ai-status strong { font-size: 28px; color: #111827; }
+.account-ai-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 14px 0 10px; flex-wrap: wrap; }
+.account-risk-metrics { display: grid; grid-template-columns: repeat(4, minmax(86px, 1fr)); gap: 10px; flex: 1; }
+.account-risk-metric { padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; }
+.account-risk-metric span { display: block; font-size: 12px; color: #64748b; }
+.account-risk-metric strong { display: block; margin-top: 4px; font-size: 20px; color: #111827; }
+.account-ai-actions { display: flex; align-items: center; gap: 8px; }
+.account-risk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 14px; }
+.account-risk-tab { border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; padding: 7px 12px; cursor: pointer; color: #475569; }
+.account-risk-tab span { margin-left: 6px; color: #94a3b8; }
+.account-risk-tab.is-active { background: #111827; border-color: #111827; color: #fff; }
+.account-card-list { display: grid; gap: 12px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.account-risk-card { border: 1px solid #e5e7eb; border-left-width: 4px; border-radius: 12px; background: #fff; padding: 14px 16px; }
+.account-risk-card.risk-high { border-left-color: #d93026; }
+.account-risk-card.risk-medium { border-left-color: #fbbc04; }
+.account-risk-card.risk-low { border-left-color: #f4d35e; }
+.account-risk-card.risk-none { border-left-color: #22c55e; }
+.account-card-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.account-name { font-size: 16px; font-weight: 700; color: #111827; }
+.account-subline { margin-top: 5px; font-size: 12px; color: #64748b; word-break: break-all; }
+.account-card-score { display: flex; align-items: center; gap: 10px; }
+.account-card-score strong { font-size: 22px; }
+.account-tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.account-tag-row span { padding: 4px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 12px; }
+.account-result { color: #334155; line-height: 1.7; }
+.account-suggestions { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; }
+.account-section-title { margin-bottom: 6px; font-weight: 700; color: #111827; }
+.account-suggestions ul { margin: 0; padding-left: 18px; color: #334155; line-height: 1.8; }
+.account-raw-fields { margin-top: 10px; color: #475569; }
+.account-raw-fields summary { cursor: pointer; font-size: 12px; }
+.account-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.account-field-item { padding: 8px 10px; border-radius: 8px; background: #f8fafc; }
+.account-field-item span { display: block; font-size: 11px; color: #64748b; }
+.account-field-item strong { display: block; margin-top: 3px; font-weight: 500; color: #111827; word-break: break-all; }
+.account-empty, .account-ai-error { padding: 12px 14px; border-radius: 10px; background: #f8fafc; color: #64748b; }
+.account-ai-error { margin-bottom: 12px; background: #fef3f2; color: #b42318; }
+.muted { color: #94a3b8 !important; }
+@media (max-width: 720px) { .account-risk-metrics, .account-field-grid { grid-template-columns: 1fr; } .account-ai-hero, .account-card-head { flex-direction: column; } .account-ai-status { align-items: flex-start; } }
+.asset-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.asset-pager-info { font-size: 12px; color: #888; }
+.asset-pager-controls { display: flex; gap: 8px; }
+.asset-detail-json { max-height: 380px; overflow: auto; }
+.json-block { margin: 0; padding: 12px; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }

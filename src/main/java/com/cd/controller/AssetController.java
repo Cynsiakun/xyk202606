@@ -2,8 +2,10 @@ package com.cd.controller;
 
 import com.cd.common.PageResult;
 import com.cd.common.Result;
+import com.cd.dto.AssetAiAnalysisRequestDTO;
 import com.cd.dto.AssetOverviewDTO;
 import com.cd.dto.AssetRecordDTO;
+import com.cd.service.AssetAiAnalysisService;
 import com.cd.service.AssetQueryService;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssetController {
 
     private final AssetQueryService assetQueryService;
+    private final AssetAiAnalysisService assetAiAnalysisService;
 
     // ——— 总览 ———
     @PreAuthorize("@perm.has('asset:view')")
@@ -65,6 +70,14 @@ public class AssetController {
     @GetMapping("/account/{id}")
     public Result<AssetRecordDTO> accountDetail(@PathVariable @Min(1) Long id) {
         return Result.success(assetQueryService.accountDetail(id));
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/account/{id}/ai-analysis")
+    public Result<AssetRecordDTO> analyzeAccount(@PathVariable @Min(1) Long id,
+                                                 @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
+        String assetJson = dto == null ? null : dto.getAssetJson();
+        return Result.success(assetAiAnalysisService.analyzeAccount(id, assetJson));
     }
 
     @PreAuthorize("@perm.has('asset:delete')")
