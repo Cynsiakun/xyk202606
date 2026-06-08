@@ -17,6 +17,8 @@ public interface HostMapper {
 
     HostEntity selectByMac(@Param("macAddress") String macAddress);
 
+    HostEntity selectByNormalizedMac(@Param("normalizedMac") String normalizedMac);
+
     /**
      * 按 MAC 唯一键做存在即更新、不存在即插入。
      */
@@ -46,6 +48,9 @@ public interface HostMapper {
 
     int updateLastScanTimeByMac(@Param("macAddress") String macAddress,
                                 @Param("lastScanTime") java.time.LocalDateTime lastScanTime);
+
+    int updateLastScanTimeById(@Param("id") Long id,
+                               @Param("lastScanTime") java.time.LocalDateTime lastScanTime);
 
     List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
 

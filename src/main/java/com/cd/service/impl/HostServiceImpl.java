@@ -130,6 +130,11 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public int autoProbeOnlineHosts(int limit) {
+        return autoProbeOnlineHosts(limit, true, true, true, true);
+    }
+
+    @Override
+    public int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app) {
         int batchSize = Math.max(1, limit);
         List<HostEntity> hosts = hostMapper.selectAutoProbeCandidates(batchSize);
         int sentCount = 0;
@@ -138,10 +143,10 @@ public class HostServiceImpl implements HostService {
                 continue;
             }
             AssetProbeDTO dto = new AssetProbeDTO();
-            dto.setAccount(true);
-            dto.setService(true);
-            dto.setProcess(true);
-            dto.setApp(true);
+            dto.setAccount(account);
+            dto.setService(service);
+            dto.setProcess(process);
+            dto.setApp(app);
             dto.setMacAddress(host.getMacAddress());
             dto.setForce(true);
             try {

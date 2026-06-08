@@ -121,6 +121,31 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
+    form.on("submit(saveProbeStrategy)", function (data) {
+        var payload = {
+            enabled: data.field.enabled === "on",
+            periodHours: Number(data.field.periodHours),
+            account: data.field.account === "on",
+            service: data.field.service === "on",
+            process: data.field.process === "on",
+            app: data.field.app === "on"
+        };
+        (async function () {
+            try {
+                await AppRequest.request("/api/host/probe-strategy", {
+                    method: "PUT",
+                    body: payload
+                }, {
+                    successMessage: "保存成功"
+                });
+                layer.closeAll("page");
+            } catch (error) {
+                return;
+            }
+        })();
+        return false;
+    });
+
     async function submitProbe(payload, force) {
         var requestPayload = Object.assign({}, payload, {force: !!force});
         try {
@@ -152,6 +177,13 @@ layui.use(["table", "form", "layer"], function () {
         });
     } else {
         addHostButton.style.display = "none";
+    }
+
+    var probeStrategyButton = document.getElementById("probeStrategyButton");
+    if (AppAuth.hasPermission("host:probe")) {
+        probeStrategyButton.addEventListener("click", openProbeStrategyDialog);
+    } else {
+        probeStrategyButton.style.display = "none";
     }
 
     document.getElementById("resetButton").addEventListener("click", function () {
@@ -213,6 +245,55 @@ layui.use(["table", "form", "layer"], function () {
             },
             end: function () {
                 editingHostId = null;
+            }
+        });
+    }
+
+    function openProbeStrategyDialog() {
+        var viewportHeight = window.innerHeight || 420;
+        var viewportWidth = window.innerWidth || 460;
+        var dialogHeight = Math.min(360, viewportHeight - 30);
+        var dialogWidth = Math.min(460, viewportWidth - 30);
+        layer.open({
+            type: 1,
+            title: "探测策略配置",
+            area: [dialogWidth + "px", dialogHeight + "px"],
+            content: AppUtils.getTemplateHtml("probeStrategyTemplate"),
+            success: function (layero, index) {
+                layero.find('[data-action="close"]').on("click", function () {
+                    layer.close(index);
+                });
+                (async function () {
+                    var strategy = {
+                        enabled: false,
+                        periodHours: 8,
+                        account: true,
+                        service: true,
+                        process: true,
+                        app: true
+                    };
+                    try {
+                        var result = await AppRequest.request("/api/host/probe-strategy", {
+                            method: "GET"
+                        }, {
+                            showErrorMessage: false
+                        });
+                        if (result && result.data) {
+                            strategy = result.data;
+                        }
+                    } catch (error) {
+                        // 读取失败时使用默认值填充。
+                    }
+                    form.val("probeStrategyForm", {
+                        enabled: !!strategy.enabled,
+                        periodHours: String(strategy.periodHours || 8),
+                        account: !!strategy.account,
+                        service: !!strategy.service,
+                        process: !!strategy.process,
+                        app: !!strategy.app
+                    });
+                    form.render(null, "probeStrategyForm");
+                })();
             }
         });
     }

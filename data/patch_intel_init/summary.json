@@ -1,0 +1,6 @@
+{
+  "patch_cve_map_count": 100,
+  "patch_issue_intel_count": 18,
+  "patch_baseline_count": 40,
+  "output_dir": "C:\\DATA\\2026实训\\java\\data\\patch_intel_init"
+}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.HostPatchStatusMapper">
+
+    <resultMap id="HostPatchStatusResultMap" type="com.cd.entity.HostPatchStatusEntity">
+        <id column="id" property="id"/>
+        <result column="host_id" property="hostId"/>
+        <result column="os_family" property="osFamily"/>
+        <result column="os_build" property="osBuild"/>
+        <result column="kernel_version" property="kernelVersion"/>
+        <result column="support_status" property="supportStatus"/>
+        <result column="last_boot_time" property="lastBootTime"/>
+        <result column="pending_reboot" property="pendingReboot"/>
+        <result column="asset_criticality" property="assetCriticality"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="missing_patch_count" property="missingPatchCount"/>
+        <result column="scan_time" property="scanTime"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cd.entity.HostPatchStatusEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO host_patch_status (
+            host_id, os_family, os_build, kernel_version, support_status,
+            last_boot_time, pending_reboot, asset_criticality, risk_level,
+            missing_patch_count, scan_time, created_at, updated_at
+        ) VALUES (
+            #{hostId}, #{osFamily}, #{osBuild}, #{kernelVersion}, #{supportStatus},
+            #{lastBootTime}, #{pendingReboot}, #{assetCriticality}, #{riskLevel},
+            #{missingPatchCount}, #{scanTime}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.cd.entity.HostPatchStatusEntity">
+        UPDATE host_patch_status
+        SET host_id = #{hostId},
+            os_family = #{osFamily},
+            os_build = #{osBuild},
+            kernel_version = #{kernelVersion},
+            support_status = #{supportStatus},
+            last_boot_time = #{lastBootTime},
+            pending_reboot = #{pendingReboot},
+            asset_criticality = #{assetCriticality},
+            risk_level = #{riskLevel},
+            missing_patch_count = #{missingPatchCount},
+            scan_time = #{scanTime},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectLatestByHostId" resultMap="HostPatchStatusResultMap">
+        SELECT *
+        FROM host_patch_status
+        WHERE host_id = #{hostId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <delete id="deleteByHostIdAndExcludeId">
+        DELETE FROM host_patch_status
+        WHERE host_id = #{hostId}
+          AND id &lt;&gt; #{excludeId}
+    </delete>
+</mapper>

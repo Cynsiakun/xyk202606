@@ -40,6 +40,18 @@ public interface HostService {
     int autoProbeOnlineHosts(int limit);
 
     /**
+     * 自动资产探测：按全局策略指定的探测内容下发给在线主机。
+     *
+     * @param limit   单批下发的主机上限
+     * @param account 探测账号
+     * @param service 探测服务
+     * @param process 探测进程
+     * @param app     探测应用
+     * @return 本次成功下发的主机数量
+     */
+    int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app);
+
+    /**
      * 下发资产探测任务：按勾选项组装消息并发送到 {@code agent_exchange}，
      * 路由键为目标主机的 MAC 地址（与客户端专属队列绑定时一致）。
      */

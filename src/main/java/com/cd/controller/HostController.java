@@ -6,7 +6,9 @@ import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
+import com.cd.dto.ProbeStrategyDTO;
 import com.cd.service.HostService;
+import com.cd.service.ProbeStrategyService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HostController {
 
     private final HostService hostService;
+    private final ProbeStrategyService probeStrategyService;
 
     @PreAuthorize("@perm.has('host:create')")
     @PostMapping
@@ -70,5 +73,17 @@ public class HostController {
     public Result<Void> probe(@Valid @RequestBody AssetProbeDTO dto) {
         hostService.sendAssetProbe(dto);
         return Result.success();
+    }
+
+    @PreAuthorize("@perm.has('host:probe')")
+    @GetMapping("/probe-strategy")
+    public Result<ProbeStrategyDTO> getProbeStrategy() {
+        return Result.success(probeStrategyService.getStrategy());
+    }
+
+    @PreAuthorize("@perm.has('host:probe')")
+    @PutMapping("/probe-strategy")
+    public Result<ProbeStrategyDTO> updateProbeStrategy(@Valid @RequestBody ProbeStrategyDTO dto) {
+        return Result.success(probeStrategyService.updateStrategy(dto));
     }
 }

@@ -29,6 +29,9 @@
                         <option value="5">每 5 秒刷新</option>
                     </select>
                 </div>
+                <button type="button" class="layui-btn layui-btn-primary" id="probeStrategyButton">
+                    <i class="layui-icon layui-icon-set"></i> 探测策略配置
+                </button>
                 <button type="button" class="layui-btn" id="addHostButton">
                     <i class="layui-icon layui-icon-add-1"></i> 新增主机
                 </button>
@@ -141,6 +144,42 @@
         <div class="popup-actions">
             <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
             <button type="submit" class="layui-btn" lay-submit lay-filter="saveHost">保存</button>
+        </div>
+    </form>
+</template>
+
+<template id="probeStrategyTemplate">
+    <form class="layui-form popup-form" lay-filter="probeStrategyForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">自动探测</label>
+            <div class="layui-input-block">
+                <input type="checkbox" name="enabled" lay-skin="switch" lay-text="开启|关闭">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">探测周期</label>
+            <div class="layui-input-block">
+                <select name="periodHours">
+                    <option value="1">每 1 小时</option>
+                    <option value="4">每 4 小时</option>
+                    <option value="8">每 8 小时</option>
+                    <option value="12">每 12 小时</option>
+                    <option value="24">每 24 小时</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">探测内容</label>
+            <div class="layui-input-block">
+                <input type="checkbox" name="account" title="账号" lay-skin="primary">
+                <input type="checkbox" name="service" title="服务" lay-skin="primary">
+                <input type="checkbox" name="process" title="进程" lay-skin="primary">
+                <input type="checkbox" name="app" title="应用" lay-skin="primary">
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveProbeStrategy">保存</button>
         </div>
     </form>
 </template>

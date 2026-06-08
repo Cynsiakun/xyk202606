@@ -2,6 +2,8 @@ package com.cd.common.config;
 
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -44,6 +46,9 @@ public class RabbitMQConfig {
     public static final String PROCESS_QUEUE = "process_queue";
     /** 资产探测结果队列：安装软件。 */
     public static final String APP_QUEUE = "app_queue";
+    public static final String PATCH_SCAN_EXCHANGE = "patch_exchange";
+    public static final String PATCH_SCAN_ROUTING_KEY = "patch_scan";
+    public static final String PATCH_SCAN_QUEUE = "patch_scan_queue";
 
     @Bean
     public Queue sysinfoQueue() {
@@ -95,6 +100,21 @@ public class RabbitMQConfig {
     @Bean
     public Queue appQueue() {
         return new Queue(APP_QUEUE, true);
+    }
+
+    @Bean
+    public DirectExchange patchScanExchange() {
+        return new DirectExchange(PATCH_SCAN_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue patchScanQueue() {
+        return new Queue(PATCH_SCAN_QUEUE, true);
+    }
+
+    @Bean
+    public Binding patchScanBinding() {
+        return BindingBuilder.bind(patchScanQueue()).to(patchScanExchange()).with(PATCH_SCAN_ROUTING_KEY);
     }
 
     /**

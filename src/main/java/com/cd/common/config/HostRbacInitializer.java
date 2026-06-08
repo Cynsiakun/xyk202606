@@ -47,6 +47,26 @@ public class HostRbacInitializer {
                     """);
             addColumnIfAbsent("hosts", "last_scan_time", "DATETIME");
 
+            // ——— 全局自动探测策略表（系统仅维护一行 id=1） ———
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS probe_strategy (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        enabled TINYINT DEFAULT 0,
+                        period_hours INT DEFAULT 8,
+                        probe_account TINYINT DEFAULT 1,
+                        probe_service TINYINT DEFAULT 1,
+                        probe_process TINYINT DEFAULT 1,
+                        probe_app TINYINT DEFAULT 1,
+                        last_run_at DATETIME,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbcTemplate.update("""
+                    INSERT INTO probe_strategy (id, enabled, period_hours, probe_account, probe_service, probe_process, probe_app)
+                    SELECT 1, 0, 8, 1, 1, 1, 1
+                    WHERE NOT EXISTS (SELECT 1 FROM probe_strategy WHERE id = 1)
+                    """);
+
             insertPermission("host:view", "查看主机", "/api/host/list");
             insertPermission("host:create", "新增主机", "/api/host");
             insertPermission("host:update", "修改主机", "/api/host/{id}");

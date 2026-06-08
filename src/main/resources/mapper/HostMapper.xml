@@ -87,6 +87,13 @@
         WHERE mac_address = #{macAddress}
     </select>
 
+    <select id="selectByNormalizedMac" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE LOWER(REPLACE(REPLACE(REPLACE(mac_address, ':', ''), '-', ''), ' ', '')) = #{normalizedMac}
+        LIMIT 1
+    </select>
+
     <insert id="upsertByMac" parameterType="com.cd.entity.HostEntity">
         INSERT INTO hosts (hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
                            cpu_model, cpu_physical_cores, cpu_logical_cores,
@@ -141,6 +148,13 @@
         SET last_scan_time = #{lastScanTime},
             updated_at = updated_at
         WHERE mac_address = #{macAddress}
+    </update>
+
+    <update id="updateLastScanTimeById">
+        UPDATE hosts
+        SET last_scan_time = #{lastScanTime},
+            updated_at = updated_at
+        WHERE id = #{id}
     </update>
 
     <select id="selectAutoProbeCandidates" resultMap="HostEntityResultMap">
