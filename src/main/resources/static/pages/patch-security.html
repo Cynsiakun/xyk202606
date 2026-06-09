@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>补丁安全</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/patch-security.css">
+</head>
+<body class="page-body">
+<div class="page-shell patch-security-page">
+    <section class="posture-panel">
+        <div class="posture-head">
+            <div class="posture-title">
+                <div class="section-kicker">Patch Risk Posture</div>
+                <h1>安全态势概览</h1>
+            </div>
+            <div class="posture-actions">
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshSummaryButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary" id="analyzeAllButton">
+                    <i class="layui-icon layui-icon-search"></i> 重新分析风险
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary" id="autoStrategyButton">
+                    <i class="layui-icon layui-icon-set"></i> 自动扫描策略
+                </button>
+                <button type="button" class="layui-btn" id="scanAllButton">
+                    <i class="layui-icon layui-icon-release"></i> 下发补丁扫描
+                </button>
+            </div>
+        </div>
+        <div class="metric-grid metric-grid-compact" id="summaryMetrics">
+            <div class="metric-tile"><span>风险主机总数</span><strong>-</strong></div>
+            <div class="metric-tile danger"><span>Critical 风险数量</span><strong>-</strong></div>
+            <div class="metric-tile warning"><span>High 风险数量</span><strong>-</strong></div>
+            <div class="metric-tile"><span>未扫描主机数量</span><strong>-</strong></div>
+        </div>
+    </section>
+
+    <div class="toolbar-card patch-toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="patchRiskSearchForm">
+            <div class="toolbar-group patch-filter-group">
+                <input type="text" name="keyword" placeholder="主机名 / IP / MAC / KB / CVE" autocomplete="off" class="layui-input toolbar-input">
+                <select name="riskLevel">
+                    <option value="">全部等级</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                <select name="riskType">
+                    <option value="">全部类型</option>
+                    <option value="missing_patch">缺失安全基线</option>
+                    <option value="bad_patch">已知问题补丁</option>
+                    <option value="patch_not_effective">补丁未生效</option>
+                    <option value="patch_install_failure">安装失败</option>
+                    <option value="eol">停止支持</option>
+                </select>
+                <select name="pendingReboot">
+                    <option value="">重启状态</option>
+                    <option value="1">待重启</option>
+                    <option value="0">无需重启</option>
+                </select>
+                <select name="osName">
+                    <option value="">全部系统</option>
+                    <option value="Windows 10">Windows 10</option>
+                    <option value="Windows 11">Windows 11</option>
+                    <option value="Windows Server 2019">Windows Server 2019</option>
+                    <option value="Windows Server 2022">Windows Server 2022</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <button type="submit" class="layui-btn" lay-submit lay-filter="patchRiskSearchSubmit">筛选</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card patch-table-card">
+        <div class="table-title-row">
+            <div>
+                <h2>有风险主机</h2>
+                <p>仅展示当前存在开放补丁风险的主机</p>
+            </div>
+        </div>
+        <table id="patchRiskHostTable" lay-filter="patchRiskHostTable"></table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/patch-security.js"></script>
+</body>
+</html>

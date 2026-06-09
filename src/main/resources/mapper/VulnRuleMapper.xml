@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.VulnRuleMapper">
+
+    <resultMap id="VulnRuleResultMap" type="com.cd.entity.VulnRuleEntity">
+        <id column="id" property="id"/>
+        <result column="product_type" property="productType"/>
+        <result column="product_name" property="productName"/>
+        <result column="match_type" property="matchType"/>
+        <result column="affected_version_expr" property="affectedVersionExpr"/>
+        <result column="severity" property="severity"/>
+        <result column="title" property="title"/>
+        <result column="suggestion" property="suggestion"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectEnabledRules" resultMap="VulnRuleResultMap">
+        SELECT id, product_type, product_name, match_type, affected_version_expr,
+               severity, title, suggestion, enabled, created_at, updated_at
+        FROM vuln_rule
+        WHERE enabled = 1
+        ORDER BY product_type ASC, product_name ASC, id ASC
+    </select>
+</mapper>

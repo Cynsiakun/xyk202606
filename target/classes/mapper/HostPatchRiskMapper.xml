@@ -55,4 +55,23 @@
         ORDER BY id DESC
         LIMIT 1
     </select>
+
+    <update id="markFixedByHostIdExceptRiskIds">
+        UPDATE host_patch_risk
+        SET status = 'fixed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE host_id = #{hostId}
+          AND status = 'open'
+        <choose>
+            <when test="riskIds != null and riskIds.size() > 0">
+                AND risk_id NOT IN
+                <foreach collection="riskIds" item="riskId" open="(" separator="," close=")">
+                    #{riskId}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 1
+            </otherwise>
+        </choose>
+    </update>
 </mapper>

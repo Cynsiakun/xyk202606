@@ -34,6 +34,7 @@
                     data: pageData.list || []
                 };
             },
+            text: config.text,
             cols: config.cols
         });
     }

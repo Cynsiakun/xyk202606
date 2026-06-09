@@ -418,3 +418,62 @@ FROM user u
          JOIN sys_role r ON r.role_code = 'AUDITOR'
 WHERE u.user_name = 'auditor'
   AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.user_id = u.id AND ur.role_id = r.id);
+
+CREATE TABLE IF NOT EXISTS vuln_rule (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    product_type VARCHAR(32) NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    match_type VARCHAR(32) NOT NULL,
+    affected_version_expr VARCHAR(512),
+    severity VARCHAR(32),
+    title VARCHAR(255) NOT NULL,
+    suggestion TEXT,
+    enabled TINYINT DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_vuln_rule_enabled_type_name (enabled, product_type, product_name)
+);
+
+CREATE TABLE IF NOT EXISTS host_vuln_result (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    host_id BIGINT NOT NULL,
+    rule_id BIGINT NOT NULL,
+    severity VARCHAR(32),
+    vuln_name VARCHAR(255),
+    product_name VARCHAR(255),
+    product_version VARCHAR(255),
+    suggestion TEXT,
+    status TINYINT DEFAULT 1,
+    verify_status VARCHAR(32) DEFAULT 'PENDING',
+    evidence_json LONGTEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_host_vuln_result_host_status (host_id, status),
+    INDEX idx_host_vuln_result_rule (rule_id)
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-detection:view', '查看漏洞检测结果', 'API', '/api/vuln-detection/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-detection:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-detection:analyze', '执行漏洞规则匹配', 'API', '/api/vuln-detection/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-detection:analyze');
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('vuln-detection:view', 'vuln-detection:analyze')
+WHERE r.role_code IN ('SUPER_ADMIN', 'SECURITY_ADMIN')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code = 'vuln-detection:view'
+WHERE r.role_code IN ('ANALYST', 'AUDITOR')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);

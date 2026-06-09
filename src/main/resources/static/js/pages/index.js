@@ -33,6 +33,9 @@ layui.use(["element", "layer"], function () {
         "APP资产": "浏览与搜索主机安装软件探测记录，支持详情与删除。"
     };
 
+    menuDescriptions["风险发现"] = "聚合安全风险入口，优先呈现需要处置的主机与证据。";
+    menuDescriptions["补丁安全"] = "查看存在补丁风险的主机、风险证据与处置建议，支持重新分析和补丁扫描。";
+
     init();
 
     async function init() {
