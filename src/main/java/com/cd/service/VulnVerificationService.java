@@ -9,6 +9,10 @@ public interface VulnVerificationService {
 
     VulnVerificationTaskResponseDTO verifyHost(Long hostId);
 
+    VulnVerificationTaskResponseDTO verifyResult(Long hostId, Long resultId);
+
+    Map<Long, Long> verifyResults(List<Long> resultIds);
+
     Map<Long, Long> batchVerify(List<Long> hostIds);
 
     VulnVerificationTaskResponseDTO retry(Long taskId);

@@ -6,6 +6,7 @@ import lombok.Data;
 public class VulnVerificationRuleDTO {
 
     private Long resultId;
+    private Long hostId;
     private Long ruleId;
     private String productType;
     private String productName;

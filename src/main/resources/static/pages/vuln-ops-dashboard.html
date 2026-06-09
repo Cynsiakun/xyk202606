@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漏洞运营仪表盘</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/vuln-ops-dashboard.css">
+</head>
+<body class="page-body ops-body">
+<div class="page-shell ops-shell">
+    <section class="ops-header-card">
+        <div class="ops-header">
+            <div>
+                <div class="ops-kicker">Vulnerability Operations Cockpit</div>
+                <h1>漏洞运营仪表盘</h1>
+            </div>
+            <div class="ops-actions">
+                <button type="button" class="ops-export-btn" id="exportReportButton">导出报告</button>
+            </div>
+        </div>
+
+        <div class="ops-toolbar">
+            <div class="toolbar-group">
+                <span class="toolbar-label">时间范围</span>
+                <div class="range-tabs" id="rangeTabs">
+                    <button type="button" class="range-tab is-active" data-range="24h">24h</button>
+                    <button type="button" class="range-tab" data-range="7d">7天</button>
+                    <button type="button" class="range-tab" data-range="30d">30天</button>
+                    <button type="button" class="range-tab" data-range="90d">90天</button>
+                </div>
+                <div class="custom-range">
+                    <input id="customStartDate" type="date">
+                    <span>至</span>
+                    <input id="customEndDate" type="date">
+                </div>
+            </div>
+
+            <div class="toolbar-group refresh-group">
+                <span class="toolbar-label">自动刷新</span>
+                <div class="refresh-tabs" id="refreshTabs">
+                    <button type="button" class="refresh-tab" data-refresh="off">关闭</button>
+                    <button type="button" class="refresh-tab is-active" data-refresh="1m">1min</button>
+                    <button type="button" class="refresh-tab" data-refresh="5m">5min</button>
+                    <button type="button" class="refresh-tab" data-refresh="15m">15min</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="kpi-grid" id="kpiGrid"></section>
+
+    <section class="ops-grid ops-grid-two">
+        <article class="panel-card panel-card-wide">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Trend</div>
+                    <h2>漏洞趋势</h2>
+                </div>
+                <div class="panel-meta" id="trendMeta">-</div>
+            </div>
+            <div class="chart-legend" id="trendLegend"></div>
+            <div class="chart-frame">
+                <svg id="trendChart" class="trend-chart" viewBox="0 0 900 250" preserveAspectRatio="none"></svg>
+                <div class="chart-tooltip" id="trendTooltip"></div>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Critical Mix</div>
+                    <h2>高危未修复分布</h2>
+                </div>
+                <div class="panel-meta">基于当前未闭环记录</div>
+            </div>
+            <div class="rose-chart-shell">
+                <div class="donut-chart" id="highRiskDonut"></div>
+                <div class="rose-center">
+                    <span>高危未修复</span>
+                    <strong id="highRiskTotal">0</strong>
+                </div>
+            </div>
+            <div class="donut-list" id="highRiskList"></div>
+        </article>
+    </section>
+
+    <section class="ops-grid ops-grid-two">
+        <article class="panel-card">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Efficiency</div>
+                    <h2>修复时效分布</h2>
+                </div>
+                <div class="panel-meta">当前窗口内已修复记录</div>
+            </div>
+            <div class="bar-distribution" id="slaDistribution"></div>
+            <div class="drill-hint" id="slaDrillHint">平均线与目标线基于真实修复记录计算</div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Verification</div>
+                    <h2>验证成功率趋势</h2>
+                </div>
+                <div class="panel-meta">成功率与验证次数</div>
+            </div>
+            <div class="combo-chart-shell">
+                <svg id="verifyChart" class="combo-chart" viewBox="0 0 760 250" preserveAspectRatio="none"></svg>
+                <div class="chart-tooltip" id="verifyTooltip"></div>
+            </div>
+        </article>
+    </section>
+
+    <section class="ops-grid ops-grid-two">
+        <article class="panel-card">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Client Coverage</div>
+                    <h2>Client 在线率</h2>
+                </div>
+                <div class="panel-meta">按主机最近活跃时间近似绘制</div>
+            </div>
+            <div class="client-chart-shell">
+                <svg id="clientChart" class="client-chart" viewBox="0 0 760 250" preserveAspectRatio="none"></svg>
+                <div class="chart-tooltip" id="clientTooltip"></div>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-head">
+                <div>
+                    <div class="panel-kicker">Offline Hosts</div>
+                    <h2>离线主机列表</h2>
+                </div>
+                <div class="panel-meta">当前离线 Top 8</div>
+            </div>
+            <div class="offline-sheet" id="offlineSheet"></div>
+        </article>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/vuln-ops-dashboard.js"></script>
+</body>
+</html>

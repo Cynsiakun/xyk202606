@@ -42,6 +42,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\UserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnDetectionController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnOpsDashboardController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnVerificationController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiChatResponseDTO.java
@@ -88,8 +89,12 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserRoleAssignDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateSelfDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnAffectedHostDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnDetectionSummaryDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnHostOverviewDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnOpsDashboardResponseDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnOverviewDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnResultBatchActionRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationBatchRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationRuleDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationTaskResponseDTO.java
@@ -177,6 +182,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RuleEngineServiceImpl.
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\TestServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\UserServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnDetectionServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnOpsDashboardServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleCacheServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleEngineImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnVerificationServiceImpl.java
@@ -192,6 +198,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\RuleEnrichmentService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\TestService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnDetectionService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnOpsDashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnRuleCacheService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnRuleEngine.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnVerificationService.java

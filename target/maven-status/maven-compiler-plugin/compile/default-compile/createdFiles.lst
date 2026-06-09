@@ -38,6 +38,7 @@ com\cd\dto\UserRoleAssignDTO.class
 com\cd\service\impl\AssetAiAnalysisServiceImpl$Builder.class
 com\cd\mapper\UserMapper.class
 com\cd\mapper\HostPatchStatusMapper.class
+com\cd\service\impl\VulnOpsDashboardServiceImpl$1.class
 com\cd\common\config\AssetModuleInitializer.class
 com\cd\dto\SysRoleUpdateDTO.class
 com\cd\dto\RiskContext.class

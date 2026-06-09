@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -57,7 +58,58 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         if (rules.isEmpty()) {
             throw new IllegalArgumentException("该主机没有可下发的待验证漏洞规则");
         }
+        return createAndSendTask(host, rules);
+    }
 
+    @Override
+    @Transactional
+    public VulnVerificationTaskResponseDTO verifyResult(Long hostId, Long resultId) {
+        HostEntity host = requireHost(hostId);
+        VulnVerificationRuleDTO rule = hostVulnResultMapper.selectVerificationRuleByResultId(hostId, resultId);
+        if (rule == null) {
+            throw new IllegalArgumentException("该漏洞结果不存在或不可下发验证");
+        }
+        return createAndSendTask(host, List.of(rule));
+    }
+
+    @Override
+    @Transactional
+    public Map<Long, Long> verifyResults(List<Long> resultIds) {
+        if (resultIds == null || resultIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> distinctIds = resultIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (distinctIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectVerificationRulesByResultIds(distinctIds);
+        Map<Long, List<VulnVerificationRuleDTO>> rulesByHost = rules.stream()
+                .filter(rule -> rule.getHostId() != null)
+                .collect(Collectors.groupingBy(VulnVerificationRuleDTO::getHostId, LinkedHashMap::new, Collectors.toList()));
+
+        Map<Long, Long> result = new LinkedHashMap<>();
+        for (Long resultId : distinctIds) {
+            result.put(resultId, null);
+        }
+        for (Map.Entry<Long, List<VulnVerificationRuleDTO>> entry : rulesByHost.entrySet()) {
+            try {
+                HostEntity host = requireHost(entry.getKey());
+                VulnVerificationTaskResponseDTO task = createAndSendTask(host, entry.getValue());
+                for (VulnVerificationRuleDTO rule : entry.getValue()) {
+                    result.put(rule.getResultId(), task.getTaskId());
+                }
+            } catch (Exception e) {
+                log.warn("按漏洞结果下发验证任务失败: hostId={}, reason={}", entry.getKey(), e.getMessage());
+            }
+        }
+        return result;
+    }
+
+    private VulnVerificationTaskResponseDTO createAndSendTask(HostEntity host, List<VulnVerificationRuleDTO> rules) {
         HostVulnTaskEntity task = createTask(host, rules.size());
         Map<String, Object> agentMessage = buildAgentMessage(task.getId(), host.getMacAddress(), rules);
         List<Long> resultIds = rules.stream().map(VulnVerificationRuleDTO::getResultId).toList();

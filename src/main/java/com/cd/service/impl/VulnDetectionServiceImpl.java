@@ -1,7 +1,9 @@
 package com.cd.service.impl;
 
 import com.cd.dto.VulnDetectionSummaryDTO;
+import com.cd.dto.VulnAffectedHostDTO;
 import com.cd.dto.VulnHostOverviewDTO;
+import com.cd.dto.VulnOverviewDTO;
 import com.cd.dto.PatchSecurityActionResultDTO;
 import com.cd.entity.HostVulnResultEntity;
 import com.cd.mapper.HostMapper;
@@ -30,6 +32,31 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
     @Override
     public List<VulnHostOverviewDTO> listHostOverviews() {
         return hostVulnResultMapper.selectHostOverviews();
+    }
+
+    @Override
+    public List<VulnOverviewDTO> listVulnOverviews() {
+        return hostVulnResultMapper.selectVulnOverviews();
+    }
+
+    @Override
+    public List<VulnAffectedHostDTO> listAffectedHosts(Long ruleId) {
+        if (ruleId == null) {
+            return List.of();
+        }
+        return hostVulnResultMapper.selectAffectedHostsByRuleId(ruleId);
+    }
+
+    @Override
+    public int ignoreResults(List<Long> resultIds) {
+        if (resultIds == null || resultIds.isEmpty()) {
+            return 0;
+        }
+        List<Long> ids = resultIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        return ids.isEmpty() ? 0 : hostVulnResultMapper.ignoreByResultIds(ids);
     }
 
     @Override

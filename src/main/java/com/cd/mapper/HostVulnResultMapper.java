@@ -2,7 +2,9 @@ package com.cd.mapper;
 
 import com.cd.entity.HostVulnResultEntity;
 import com.cd.dto.VulnDetectionSummaryDTO;
+import com.cd.dto.VulnAffectedHostDTO;
 import com.cd.dto.VulnHostOverviewDTO;
+import com.cd.dto.VulnOverviewDTO;
 import com.cd.dto.VulnVerificationRuleDTO;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,6 +20,11 @@ public interface HostVulnResultMapper {
 
     List<VulnVerificationRuleDTO> selectPendingVerificationRules(@Param("hostId") Long hostId);
 
+    VulnVerificationRuleDTO selectVerificationRuleByResultId(@Param("hostId") Long hostId,
+                                                             @Param("resultId") Long resultId);
+
+    List<VulnVerificationRuleDTO> selectVerificationRulesByResultIds(@Param("ids") List<Long> ids);
+
     int updateVerifyStatusByIds(@Param("ids") List<Long> ids,
                                 @Param("verifyStatus") String verifyStatus);
 
@@ -31,4 +38,10 @@ public interface HostVulnResultMapper {
     VulnDetectionSummaryDTO selectSummary();
 
     List<VulnHostOverviewDTO> selectHostOverviews();
+
+    List<VulnOverviewDTO> selectVulnOverviews();
+
+    List<VulnAffectedHostDTO> selectAffectedHostsByRuleId(@Param("ruleId") Long ruleId);
+
+    int ignoreByResultIds(@Param("ids") List<Long> ids);
 }

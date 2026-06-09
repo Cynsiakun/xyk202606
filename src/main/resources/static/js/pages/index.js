@@ -35,7 +35,8 @@ layui.use(["element", "layer"], function () {
 
     menuDescriptions["风险发现"] = "聚合安全风险入口，优先呈现需要处置的主机与证据。";
     menuDescriptions["补丁安全"] = "查看存在补丁风险的主机、风险证据与处置建议，支持重新分析和补丁扫描。";
-    menuDescriptions["漏洞检测"] = "展示静态漏洞规则匹配结果，按待验证、已确认、误报与忽略分区推进处置。";
+    menuDescriptions["漏洞检测"] = "展示漏洞规则命中结果，按待验证、验证中、已验证、待修复、已修复推进处置。";
+    menuDescriptions["漏洞运营仪表盘"] = "面向安全管理层的漏洞运营驾驶舱，聚焦趋势、效能与资产健康度。";
 
     init();
 

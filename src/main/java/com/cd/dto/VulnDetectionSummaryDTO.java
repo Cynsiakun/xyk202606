@@ -13,5 +13,6 @@ public class VulnDetectionSummaryDTO {
     private Long verifyingCount;
     private Long verifiedCount;
     private Long repairCount;
+    private Long fixedCount;
     private Long ignoredCount;
 }

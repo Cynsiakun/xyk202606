@@ -498,6 +498,10 @@ INSERT INTO sys_permission (permission_code, permission_name, permission_type, p
 SELECT 'vuln-detection:analyze', '执行漏洞规则匹配', 'API', '/api/vuln-detection/**', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-detection:analyze');
 
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-ops-dashboard:view', '查看漏洞运营仪表盘', 'API', '/api/vuln-ops-dashboard/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-ops-dashboard:view');
+
 INSERT INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id
 FROM sys_role r
@@ -512,6 +516,15 @@ SELECT r.id, p.id
 FROM sys_role r
          JOIN sys_permission p ON p.permission_code = 'vuln-detection:view'
 WHERE r.role_code IN ('ANALYST', 'AUDITOR')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code = 'vuln-ops-dashboard:view'
+WHERE r.role_code IN ('SECURITY_ADMIN', 'ANALYST', 'AUDITOR', 'SUPER_ADMIN')
   AND NOT EXISTS (
     SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
 );
@@ -539,6 +552,14 @@ FROM sys_permission p
 WHERE p.permission_code = 'vuln-detection:view'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_detection');
 
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'vuln_ops_dashboard', '漏洞运营仪表盘', './pages/vuln-ops-dashboard.html', 'layui-icon-chart-screen', p.id,
+       COALESCE(parent_menu.sort_order + 3, 13), 1, parent_menu.id
+FROM sys_permission p
+         JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'vuln-ops-dashboard:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_ops_dashboard');
+
 UPDATE sys_menu child
     JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
     JOIN sys_permission p ON p.permission_code = 'patch-security:view'
@@ -554,3 +575,11 @@ SET child.parent_id = parent_menu.id,
     child.menu_path = './pages/vuln-detection.html',
     child.permission_id = p.id
 WHERE child.menu_code = 'vuln_detection';
+
+UPDATE sys_menu child
+    JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+    JOIN sys_permission p ON p.permission_code = 'vuln-ops-dashboard:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/vuln-ops-dashboard.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'vuln_ops_dashboard';
