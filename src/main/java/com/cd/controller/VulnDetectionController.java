@@ -1,6 +1,9 @@
 package com.cd.controller;
 
 import com.cd.common.Result;
+import com.cd.dto.PatchSecurityActionResultDTO;
+import com.cd.dto.VulnDetectionSummaryDTO;
+import com.cd.dto.VulnHostOverviewDTO;
 import com.cd.entity.HostVulnResultEntity;
 import com.cd.service.VulnDetectionService;
 import jakarta.validation.constraints.Min;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @Validated
 @RestController
@@ -24,6 +28,18 @@ public class VulnDetectionController {
     private final VulnDetectionService vulnDetectionService;
 
     @PreAuthorize("@perm.has('vuln-detection:view')")
+    @GetMapping("/summary")
+    public Result<VulnDetectionSummaryDTO> summary() {
+        return Result.success(vulnDetectionService.summary());
+    }
+
+    @PreAuthorize("@perm.has('vuln-detection:view')")
+    @GetMapping("/hosts")
+    public Result<List<VulnHostOverviewDTO>> hosts() {
+        return Result.success(vulnDetectionService.listHostOverviews());
+    }
+
+    @PreAuthorize("@perm.has('vuln-detection:view')")
     @GetMapping("/hosts/{hostId}/results")
     public Result<List<HostVulnResultEntity>> hostResults(
             @PathVariable @Min(value = 1, message = "hostId必须大于0") Long hostId) {
@@ -31,9 +47,26 @@ public class VulnDetectionController {
     }
 
     @PreAuthorize("@perm.has('vuln-detection:analyze')")
+    @PostMapping("/evaluate-all")
+    public Result<PatchSecurityActionResultDTO> evaluateAll() {
+        return Result.success(vulnDetectionService.evaluateAllHosts());
+    }
+
+    @PreAuthorize("@perm.has('vuln-detection:analyze')")
     @PostMapping("/hosts/{hostId}/evaluate")
     public Result<List<HostVulnResultEntity>> evaluateHost(
             @PathVariable @Min(value = 1, message = "hostId必须大于0") Long hostId) {
         return Result.success(vulnDetectionService.evaluateHost(hostId));
+    }
+
+    @PreAuthorize("@perm.has('vuln-detection:analyze')")
+    @PostMapping("/hosts/{hostId}/verify-task")
+    public Result<Map<String, Object>> createVerifyTask(
+            @PathVariable @Min(value = 1, message = "hostId必须大于0") Long hostId) {
+        return Result.success(Map.of(
+                "hostId", hostId,
+                "status", "RESERVED",
+                "message", "验证探测任务接口已预留，后续接入下发队列"
+        ));
     }
 }

@@ -165,6 +165,12 @@
         LIMIT #{limit}
     </select>
 
+    <select id="selectAllIds" resultType="long">
+        SELECT id
+        FROM hosts
+        ORDER BY id ASC
+    </select>
+
     <select id="selectPage" resultMap="HostEntityResultMap">
         SELECT <include refid="baseColumns"/>
         FROM hosts

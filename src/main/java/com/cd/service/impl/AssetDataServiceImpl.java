@@ -12,6 +12,7 @@ import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.ProcessMapper;
 import com.cd.mapper.ServiceMapper;
 import com.cd.service.AssetDataService;
+import com.cd.service.VulnRuleEngine;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class AssetDataServiceImpl implements AssetDataService {
     private final AppMapper appMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final HostMapper hostMapper;
+    private final VulnRuleEngine vulnRuleEngine;
 
     @Override
     public void processAssetMessage(String queueName, String message) {
@@ -159,11 +161,25 @@ public class AssetDataServiceImpl implements AssetDataService {
                 }
             }
             hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
+            triggerStaticVulnMatch(macAddress);
             log.info("资产探测结果已入库: queue={}, type={}, host={}, count={}", queueName, type, hostName, assetCount);
 
         } catch (Exception e) {
             log.error("处理资产探测消息异常: queue={}", queueName, e);
             saveError(queueName, message, "服务端异常: " + e.getMessage());
+        }
+    }
+
+    private void triggerStaticVulnMatch(String macAddress) {
+        try {
+            var host = hostMapper.selectByMac(macAddress);
+            if (host == null || host.getId() == null) {
+                log.warn("资产入库后未找到主机，跳过静态漏洞匹配: mac={}", macAddress);
+                return;
+            }
+            vulnRuleEngine.evaluateHost(host.getId());
+        } catch (Exception e) {
+            log.warn("资产入库后静态漏洞匹配失败: mac={}", macAddress, e);
         }
     }
 

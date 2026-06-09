@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漏洞检测</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/vuln-detection.css">
+</head>
+<body class="page-body">
+<div class="page-shell vuln-page">
+    <section class="vuln-overview">
+        <div class="overview-head">
+            <div>
+                <div class="section-kicker">Host Vulnerability View</div>
+                <h1>漏洞检测</h1>
+            </div>
+            <div class="overview-actions">
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn layui-btn-warm" id="batchVerifyButton">
+                    <i class="layui-icon layui-icon-release"></i> 批量验证
+                </button>
+                <button type="button" class="layui-btn layui-btn-normal" id="rematchButton">
+                    <i class="layui-icon layui-icon-search"></i> 重新匹配
+                </button>
+            </div>
+        </div>
+
+        <div class="severity-grid" id="severityMetrics">
+            <div class="metric-card critical"><span>严重</span><strong>-</strong></div>
+            <div class="metric-card high"><span>高危</span><strong>-</strong></div>
+            <div class="metric-card medium"><span>中危</span><strong>-</strong></div>
+            <div class="metric-card low"><span>低危</span><strong>-</strong></div>
+        </div>
+
+        <div class="status-grid" id="statusMetrics">
+            <div class="metric-card pending"><span>待验证</span><strong>-</strong></div>
+            <div class="metric-card verifying"><span>验证中</span><strong>-</strong></div>
+            <div class="metric-card verified"><span>已验证</span><strong>-</strong></div>
+            <div class="metric-card repair"><span>待修复</span><strong>-</strong></div>
+            <div class="metric-card ignored"><span>误报/忽略</span><strong>-</strong></div>
+        </div>
+    </section>
+
+    <section class="host-board">
+        <div class="board-head">
+            <div>
+                <h2>主机视角</h2>
+                <p>每张卡片代表一台主机，优先看这台主机有哪些漏洞、哪些已验证、哪些还待修复。</p>
+            </div>
+            <div class="board-filter">
+                <button type="button" class="filter-pill is-active" data-filter="all">全部主机</button>
+                <button type="button" class="filter-pill" data-filter="pending">有待验证</button>
+                <button type="button" class="filter-pill" data-filter="verifying">验证中</button>
+                <button type="button" class="filter-pill" data-filter="verified">已验证</button>
+                <button type="button" class="filter-pill" data-filter="repair">待修复</button>
+            </div>
+        </div>
+
+        <div class="host-card-grid" id="hostCardGrid"></div>
+        <div class="host-empty" id="hostEmpty">
+            <div class="empty-icon"><i class="layui-icon layui-icon-template-1"></i></div>
+            <h3>暂无主机漏洞结果</h3>
+            <p>若资产或规则刚更新，请点击重新匹配；刷新只会重新加载当前结果。</p>
+        </div>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/vuln-detection.js"></script>
+</body>
+</html>

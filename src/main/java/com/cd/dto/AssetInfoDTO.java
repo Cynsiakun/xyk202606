@@ -17,4 +17,8 @@ public class AssetInfoDTO {
     private String version;
     private String command;
     private String source;
+    private String riskLevel;
+    private Integer riskScore;
+    private String riskResult;
+    private String suggestions;
 }

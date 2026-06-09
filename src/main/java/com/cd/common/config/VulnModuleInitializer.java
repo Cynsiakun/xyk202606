@@ -20,13 +20,19 @@ public class VulnModuleInitializer {
             jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS vuln_rule (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        rule_code VARCHAR(64),
+                        cve_id VARCHAR(64),
+                        category VARCHAR(32),
                         product_type VARCHAR(32) NOT NULL,
                         product_name VARCHAR(255) NOT NULL,
                         match_type VARCHAR(32) NOT NULL,
                         affected_version_expr VARCHAR(512),
                         severity VARCHAR(32),
                         title VARCHAR(255) NOT NULL,
+                        description VARCHAR(2000),
                         suggestion TEXT,
+                        verify_type VARCHAR(32),
+                        verify_rule LONGTEXT,
                         enabled TINYINT DEFAULT 1,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -37,6 +43,7 @@ public class VulnModuleInitializer {
             jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS host_vuln_result (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        task_id BIGINT DEFAULT 0,
                         host_id BIGINT NOT NULL,
                         rule_id BIGINT NOT NULL,
                         severity VARCHAR(32),
@@ -54,8 +61,45 @@ public class VulnModuleInitializer {
                     )
                     """);
 
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS host_vuln_task (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        task_name VARCHAR(255),
+                        task_type VARCHAR(32) NOT NULL DEFAULT 'VULN',
+                        host_id BIGINT NOT NULL,
+                        mac_address VARCHAR(64) NOT NULL,
+                        scan_mode VARCHAR(32) NOT NULL DEFAULT 'SNAPSHOT',
+                        rule_count INT DEFAULT 0,
+                        status TINYINT NOT NULL DEFAULT 0,
+                        triggered_by VARCHAR(64),
+                        started_at DATETIME,
+                        finished_at DATETIME,
+                        summary_json LONGTEXT,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_host_vuln_task_host_status (host_id, status),
+                        INDEX idx_host_vuln_task_mac_status (mac_address, status),
+                        INDEX idx_host_vuln_task_created (created_at)
+                    )
+                    """);
+
+            addColumnIfAbsent("vuln_rule", "rule_code", "VARCHAR(64)");
+            addColumnIfAbsent("vuln_rule", "cve_id", "VARCHAR(64)");
+            addColumnIfAbsent("vuln_rule", "category", "VARCHAR(32)");
+            addColumnIfAbsent("vuln_rule", "description", "VARCHAR(2000)");
+            addColumnIfAbsent("vuln_rule", "verify_type", "VARCHAR(32)");
+            addColumnIfAbsent("vuln_rule", "verify_rule", "LONGTEXT");
+
             addColumnIfAbsent("host_vuln_result", "verify_status", "VARCHAR(32) DEFAULT 'PENDING'");
             addColumnIfAbsent("host_vuln_result", "evidence_json", "LONGTEXT");
+            addColumnIfAbsent("host_vuln_result", "task_id", "BIGINT DEFAULT 0");
+            addColumnIfAbsent("host_vuln_result", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+            addColumnIfAbsent("host_vuln_result", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+            modifyColumnIfPossible("host_vuln_result", "task_id", "BIGINT DEFAULT 0");
+            modifyColumnIfPossible("host_vuln_result", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+
+            addColumnIfAbsent("host_vuln_task", "summary_json", "LONGTEXT");
+            addColumnIfAbsent("host_vuln_task", "scan_mode", "VARCHAR(32) NOT NULL DEFAULT 'SNAPSHOT'");
+            addColumnIfAbsent("host_vuln_task", "created_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP");
 
             insertPermission("vuln-detection:view", "查看漏洞检测结果", "/api/vuln-detection/**");
             insertPermission("vuln-detection:analyze", "执行漏洞规则匹配", "/api/vuln-detection/**");
@@ -73,6 +117,14 @@ public class VulnModuleInitializer {
             jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
         } catch (Exception ignored) {
             // Column already exists.
+        }
+    }
+
+    private void modifyColumnIfPossible(String table, String column, String definition) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + definition);
+        } catch (Exception ignored) {
+            // Some database variants may reject incompatible legacy definitions.
         }
     }
 

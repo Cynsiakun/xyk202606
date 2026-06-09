@@ -421,13 +421,19 @@ WHERE u.user_name = 'auditor'
 
 CREATE TABLE IF NOT EXISTS vuln_rule (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    rule_code VARCHAR(64),
+    cve_id VARCHAR(64),
+    category VARCHAR(32),
     product_type VARCHAR(32) NOT NULL,
     product_name VARCHAR(255) NOT NULL,
     match_type VARCHAR(32) NOT NULL,
     affected_version_expr VARCHAR(512),
     severity VARCHAR(32),
     title VARCHAR(255) NOT NULL,
+    description VARCHAR(2000),
     suggestion TEXT,
+    verify_type VARCHAR(32),
+    verify_rule LONGTEXT,
     enabled TINYINT DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -436,6 +442,7 @@ CREATE TABLE IF NOT EXISTS vuln_rule (
 
 CREATE TABLE IF NOT EXISTS host_vuln_result (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT DEFAULT 0,
     host_id BIGINT NOT NULL,
     rule_id BIGINT NOT NULL,
     severity VARCHAR(32),
@@ -451,6 +458,37 @@ CREATE TABLE IF NOT EXISTS host_vuln_result (
     INDEX idx_host_vuln_result_host_status (host_id, status),
     INDEX idx_host_vuln_result_rule (rule_id)
 );
+
+CREATE TABLE IF NOT EXISTS host_vuln_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_name VARCHAR(255),
+    task_type VARCHAR(32) NOT NULL DEFAULT 'VULN',
+    host_id BIGINT NOT NULL,
+    mac_address VARCHAR(64) NOT NULL,
+    scan_mode VARCHAR(32) NOT NULL DEFAULT 'SNAPSHOT',
+    rule_count INT DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 0,
+    triggered_by VARCHAR(64),
+    started_at DATETIME,
+    finished_at DATETIME,
+    summary_json LONGTEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_host_vuln_task_host_status (host_id, status),
+    INDEX idx_host_vuln_task_mac_status (mac_address, status),
+    INDEX idx_host_vuln_task_created (created_at)
+);
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-security:view', '查看补丁安全风险', 'API', '/api/patch-security/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-security:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-security:analyze', '重新分析补丁风险', 'API', '/api/patch-security/**/analyze', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-security:analyze');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-security:scan', '下发补丁扫描', 'API', '/api/patch-security/**/scan', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-security:scan');
 
 INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
 SELECT 'vuln-detection:view', '查看漏洞检测结果', 'API', '/api/vuln-detection/**', 1
@@ -477,3 +515,42 @@ WHERE r.role_code IN ('ANALYST', 'AUDITOR')
   AND NOT EXISTS (
     SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
 );
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'risk_discovery', '风险发现', '#', 'layui-icon-vercode', p.id,
+       COALESCE((SELECT MAX(m.sort_order) + 1 FROM sys_menu m), 10), 1, NULL
+FROM sys_permission p
+WHERE p.permission_code = 'patch-security:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'risk_discovery');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'patch_security', '补丁安全', './pages/patch-security.html', 'layui-icon-shield', p.id,
+       COALESCE(parent_menu.sort_order + 1, 11), 1, parent_menu.id
+FROM sys_permission p
+         JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'patch-security:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'patch_security');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'vuln_detection', '漏洞检测', './pages/vuln-detection.html', 'layui-icon-search', p.id,
+       COALESCE(parent_menu.sort_order + 2, 12), 1, parent_menu.id
+FROM sys_permission p
+         JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'vuln-detection:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_detection');
+
+UPDATE sys_menu child
+    JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+    JOIN sys_permission p ON p.permission_code = 'patch-security:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/patch-security.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'patch_security';
+
+UPDATE sys_menu child
+    JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+    JOIN sys_permission p ON p.permission_code = 'vuln-detection:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/vuln-detection.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'vuln_detection';

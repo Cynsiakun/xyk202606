@@ -20,13 +20,55 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
+    <resultMap id="VulnDetectionSummaryMap" type="com.cd.dto.VulnDetectionSummaryDTO">
+        <result column="critical_count" property="criticalCount"/>
+        <result column="high_count" property="highCount"/>
+        <result column="medium_count" property="mediumCount"/>
+        <result column="low_count" property="lowCount"/>
+        <result column="pending_count" property="pendingCount"/>
+        <result column="verifying_count" property="verifyingCount"/>
+        <result column="verified_count" property="verifiedCount"/>
+        <result column="repair_count" property="repairCount"/>
+        <result column="ignored_count" property="ignoredCount"/>
+    </resultMap>
+
+    <resultMap id="VulnHostOverviewMap" type="com.cd.dto.VulnHostOverviewDTO">
+        <result column="host_id" property="hostId"/>
+        <result column="hostname" property="hostname"/>
+        <result column="ipv4" property="ipv4"/>
+        <result column="mac_address" property="macAddress"/>
+        <result column="os_name" property="osName"/>
+        <result column="os_version" property="osVersion"/>
+        <result column="host_status" property="hostStatus"/>
+        <result column="highest_severity" property="highestSeverity"/>
+        <result column="total_vuln_count" property="totalVulnCount"/>
+        <result column="pending_count" property="pendingCount"/>
+        <result column="pending_rule_count" property="pendingRuleCount"/>
+        <result column="verifying_count" property="verifyingCount"/>
+        <result column="verified_count" property="verifiedCount"/>
+        <result column="repair_count" property="repairCount"/>
+        <result column="ignored_count" property="ignoredCount"/>
+        <result column="latest_scan_time" property="latestScanTime"/>
+    </resultMap>
+
+    <resultMap id="VulnVerificationRuleMap" type="com.cd.dto.VulnVerificationRuleDTO">
+        <result column="result_id" property="resultId"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="product_type" property="productType"/>
+        <result column="product_name" property="productName"/>
+        <result column="match_type" property="matchType"/>
+        <result column="version_expression" property="versionExpression"/>
+        <result column="verify_type" property="verifyType"/>
+        <result column="verify_rule" property="verifyRule"/>
+    </resultMap>
+
     <insert id="insert" parameterType="com.cd.entity.HostVulnResultEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO host_vuln_result (
-            host_id, rule_id, severity, vuln_name, product_name, product_version,
-            suggestion, status, verify_status, evidence_json
+            task_id, host_id, rule_id, severity, vuln_name, product_name, product_version,
+            suggestion, status, verify_status, evidence_json, created_at
         ) VALUES (
-            #{hostId}, #{ruleId}, #{severity}, #{vulnName}, #{productName}, #{productVersion},
-            #{suggestion}, #{status}, #{verifyStatus}, #{evidenceJson}
+            0, #{hostId}, #{ruleId}, #{severity}, #{vulnName}, #{productName}, #{productVersion},
+            #{suggestion}, #{status}, #{verifyStatus}, #{evidenceJson}, COALESCE(#{createdAt}, CURRENT_TIMESTAMP)
         )
     </insert>
 
@@ -44,6 +86,8 @@
         FROM host_vuln_result
         WHERE host_id = #{hostId}
           AND status = 1
+          AND rule_id IS NOT NULL
+          AND rule_id &gt; 0
         ORDER BY CASE LOWER(severity)
             WHEN 'critical' THEN 4
             WHEN 'high' THEN 3
@@ -51,5 +95,113 @@
             WHEN 'low' THEN 1
             ELSE 0
         END DESC, id DESC
+    </select>
+
+    <select id="selectPendingVerificationRules" resultMap="VulnVerificationRuleMap">
+        SELECT hvr.id AS result_id,
+               vr.id AS rule_id,
+               vr.product_type,
+               vr.product_name,
+               vr.match_type,
+               vr.affected_version_expr AS version_expression,
+               vr.verify_type,
+               vr.verify_rule
+        FROM host_vuln_result hvr
+        INNER JOIN vuln_rule vr ON vr.id = hvr.rule_id
+        WHERE hvr.host_id = #{hostId}
+          AND hvr.status = 1
+          AND UPPER(hvr.verify_status) = 'PENDING'
+          AND hvr.rule_id IS NOT NULL
+          AND hvr.rule_id &gt; 0
+          AND vr.enabled = 1
+        ORDER BY hvr.id ASC
+    </select>
+
+    <update id="updateVerifyStatusByIds">
+        UPDATE host_vuln_result
+        SET verify_status = #{verifyStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="updateTaskIdByIds">
+        UPDATE host_vuln_result
+        SET task_id = #{taskId},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="updateVerifyStatusByTaskAndRule">
+        UPDATE host_vuln_result
+        SET verify_status = #{verifyStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_id = #{taskId}
+          AND rule_id = #{ruleId}
+          AND status = 1
+    </update>
+
+    <select id="selectSummary" resultMap="VulnDetectionSummaryMap">
+        SELECT
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'critical' THEN 1 END) AS critical_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'high' THEN 1 END) AS high_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'medium' THEN 1 END) AS medium_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'low' THEN 1 END) AS low_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'PENDING' THEN 1 END) AS pending_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'VERIFIED' THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'VERIFIED' THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN rule_id > 0 AND UPPER(verify_status) = 'FAILED' THEN 1 END) AS ignored_count
+        FROM host_vuln_result
+    </select>
+
+    <select id="selectHostOverviews" resultMap="VulnHostOverviewMap">
+        SELECT
+            h.id AS host_id,
+            h.hostname,
+            h.ipv4,
+            h.mac_address,
+            h.os_name,
+            h.os_version,
+            h.status AS host_status,
+            CASE MAX(CASE LOWER(hvr.severity)
+                WHEN 'critical' THEN 4
+                WHEN 'high' THEN 3
+                WHEN 'medium' THEN 2
+                WHEN 'low' THEN 1
+                ELSE 0
+            END)
+                WHEN 4 THEN 'critical'
+                WHEN 3 THEN 'high'
+                WHEN 2 THEN 'medium'
+                WHEN 1 THEN 'low'
+                ELSE 'unknown'
+            END AS highest_severity,
+            COUNT(CASE WHEN hvr.status = 1 THEN 1 END) AS total_vuln_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'PENDING' THEN 1 END) AS pending_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'PENDING' AND hvr.rule_id > 0 THEN 1 END) AS pending_rule_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'VERIFIED' THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'VERIFIED' THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN UPPER(hvr.verify_status) = 'FAILED' THEN 1 END) AS ignored_count,
+            MAX(COALESCE(hvr.updated_at, hvr.created_at)) AS latest_scan_time
+        FROM host_vuln_result hvr
+        INNER JOIN hosts h ON h.id = hvr.host_id
+        WHERE hvr.rule_id IS NOT NULL
+          AND hvr.rule_id &gt; 0
+        GROUP BY h.id, h.hostname, h.ipv4, h.mac_address, h.os_name, h.os_version, h.status
+        HAVING total_vuln_count > 0
+        ORDER BY MAX(CASE LOWER(hvr.severity)
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+        END) DESC, pending_count DESC, total_vuln_count DESC, latest_scan_time DESC
     </select>
 </mapper>

@@ -97,8 +97,11 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         assets.add(AssetInfoDTO.builder()
                 .hostId(host.getId())
                 .type(TYPE_OS)
-                .name(host.getOsName())
+                .name(joinText(host.getOsName(), host.getOsRelease()))
                 .version(firstText(host.getOsVersion(), host.getOsRelease()))
+                .riskResult("os_name=" + valueOrDash(host.getOsName())
+                        + ", os_version=" + valueOrDash(host.getOsVersion())
+                        + ", os_detail=" + valueOrDash(host.getOsRelease()))
                 .source("hosts")
                 .build());
 
@@ -133,13 +136,16 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
 
             List<AssetInfoDTO> assets = new ArrayList<>();
             for (JsonNode item : items) {
-                String name = switch (type) {
+                String rawName = switch (type) {
                     case TYPE_APP -> firstText(item, "name", "software_name", "softwareName", "Name", "DisplayName", "displayName");
                     case TYPE_SERVICE -> firstText(item, "Name", "name", "DisplayName", "displayName", "service_name", "serviceName");
                     case TYPE_PROCESS -> firstText(item, "name", "Name", "process_name", "processName", "exe", "path");
                     default -> firstText(item, "name", "Name");
                 };
                 String cmd = firstText(item, "cmd", "Cmd", "command", "Command", "CommandLine", "commandLine");
+                String path = firstText(item, "binpath", "binPath", "exe", "path", "Path");
+                String displayName = firstText(item, "displayName", "DisplayName");
+                String name = joinText(rawName, displayName);
                 String version = firstText(item, "version", "Version", "product_version", "productVersion");
                 if (!StringUtils.hasText(version)) {
                     version = extractVersion(firstText(name, cmd));
@@ -151,8 +157,12 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
                         .type(type)
                         .name(StringUtils.hasText(name) ? name : cmd)
                         .version(version)
-                        .command(cmd)
+                        .command(firstText(cmd, path))
                         .source(type + ".asset_json")
+                        .riskLevel(firstText(item, "risk_level", "riskLevel"))
+                        .riskScore(integerValue(item, "risk_score", "riskScore"))
+                        .riskResult(firstText(item, "result", "risk_result", "riskResult"))
+                        .suggestions(suggestionsText(item))
                         .build());
             }
             return assets;
@@ -182,6 +192,7 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             return List.of();
         }
         String assetName = normalizeName(asset.getName());
+        String assetText = normalizeName(joinText(asset.getName(), asset.getCommand()));
         List<VulnRuleEntity> candidates = vulnRuleCacheService.getRulesByType(asset.getType());
         List<VulnRuleEntity> matches = new ArrayList<>();
         for (VulnRuleEntity rule : candidates) {
@@ -189,7 +200,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             if (!StringUtils.hasText(ruleName)) {
                 continue;
             }
-            if (assetName.equals(ruleName) || assetName.contains(ruleName) || ruleName.contains(assetName)) {
+            if (assetName.equals(ruleName)
+                    || assetName.contains(ruleName)
+                    || ruleName.contains(assetName)
+                    || assetText.contains(ruleName)) {
                 matches.add(rule);
             }
         }
@@ -201,10 +215,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         result.setHostId(hostId);
         result.setRuleId(rule.getId());
         result.setSeverity(rule.getSeverity());
-        result.setVulnName(rule.getTitle());
-        result.setProductName(asset.getName());
-        result.setProductVersion(asset.getVersion());
-        result.setSuggestion(rule.getSuggestion());
+        result.setVulnName(limit(rule.getTitle(), 255));
+        result.setProductName(limit(asset.getName(), 255));
+        result.setProductVersion(limit(asset.getVersion(), 128));
+        result.setSuggestion(limit(rule.getSuggestion(), 1000));
         result.setStatus(1);
         result.setVerifyStatus("PENDING");
         result.setEvidenceJson(buildEvidenceJson(rule, asset));
@@ -223,6 +237,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         }
         evidence.put("rule_expr", rule.getAffectedVersionExpr());
         evidence.put("match_type", rule.getMatchType());
+        evidence.put("verify_type", rule.getVerifyType());
+        evidence.put("verify_rule", rule.getVerifyRule());
+        evidence.put("category", rule.getCategory());
+        evidence.put("rule_code", rule.getRuleCode());
         evidence.put("reason", VersionExpressionParser.reason(rule.getMatchType()));
         evidence.put("rule_product_name", rule.getProductName());
         try {
@@ -240,12 +258,60 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         return StringUtils.hasText(first) ? first : second;
     }
 
+    private String joinText(String... values) {
+        List<String> parts = new ArrayList<>();
+        for (String value : values) {
+            if (StringUtils.hasText(value) && !parts.contains(value.trim())) {
+                parts.add(value.trim());
+            }
+        }
+        return parts.isEmpty() ? null : String.join(" ", parts);
+    }
+
+    private String valueOrDash(String value) {
+        return StringUtils.hasText(value) ? value : "-";
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
     private String extractVersion(String value) {
         if (!StringUtils.hasText(value)) {
             return null;
         }
         Matcher matcher = VERSION_PATTERN.matcher(value);
         return matcher.find() ? matcher.group() : null;
+    }
+
+    private Integer integerValue(JsonNode node, String... keys) {
+        for (String key : keys) {
+            JsonNode value = node.get(key);
+            if (value != null && value.canConvertToInt()) {
+                return value.asInt();
+            }
+        }
+        return null;
+    }
+
+    private String suggestionsText(JsonNode item) {
+        JsonNode suggestions = item.get("suggestions");
+        if (suggestions == null || suggestions.isNull()) {
+            return null;
+        }
+        if (suggestions.isArray()) {
+            List<String> values = new ArrayList<>();
+            for (JsonNode suggestion : suggestions) {
+                if (StringUtils.hasText(suggestion.asText())) {
+                    values.add(suggestion.asText());
+                }
+            }
+            return values.isEmpty() ? null : String.join("；", values);
+        }
+        return suggestions.asText();
     }
 
     private String firstText(JsonNode node, String... keys) {

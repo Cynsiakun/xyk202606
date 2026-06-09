@@ -1,0 +1,242 @@
+package com.cd.service.impl;
+
+import com.cd.common.config.RabbitMQConfig;
+import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.SecurityUtils;
+import com.cd.dto.VulnVerificationRuleDTO;
+import com.cd.dto.VulnVerificationTaskResponseDTO;
+import com.cd.entity.HostEntity;
+import com.cd.entity.HostVulnTaskEntity;
+import com.cd.mapper.HostMapper;
+import com.cd.mapper.HostVulnResultMapper;
+import com.cd.mapper.HostVulnTaskMapper;
+import com.cd.service.VulnVerificationService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class VulnVerificationServiceImpl implements VulnVerificationService {
+
+    private static final String TASK_TYPE = "VULN";
+    private static final String SCAN_MODE = "REALTIME";
+    private static final int STATUS_PENDING = 0;
+    private static final int STATUS_RUNNING = 1;
+    private static final String VERIFYING = "VERIFYING";
+
+    private final HostMapper hostMapper;
+    private final HostVulnResultMapper hostVulnResultMapper;
+    private final HostVulnTaskMapper hostVulnTaskMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
+    private final AmqpAdmin amqpAdmin;
+
+    @Override
+    @Transactional
+    public VulnVerificationTaskResponseDTO verifyHost(Long hostId) {
+        HostEntity host = requireHost(hostId);
+        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectPendingVerificationRules(hostId);
+        if (rules.isEmpty()) {
+            throw new IllegalArgumentException("该主机没有可下发的待验证漏洞规则");
+        }
+
+        HostVulnTaskEntity task = createTask(host, rules.size());
+        Map<String, Object> agentMessage = buildAgentMessage(task.getId(), host.getMacAddress(), rules);
+        List<Long> resultIds = rules.stream().map(VulnVerificationRuleDTO::getResultId).toList();
+        String summaryJson = buildSummaryJson(agentMessage, resultIds, null);
+        hostVulnResultMapper.updateTaskIdByIds(resultIds, task.getId());
+        hostVulnTaskMapper.updateStatus(task.getId(), STATUS_PENDING, summaryJson);
+
+        boolean sent = sendToAgent(host.getMacAddress(), agentMessage);
+        if (sent) {
+            hostVulnTaskMapper.updateStatus(task.getId(), STATUS_RUNNING, summaryJson);
+            hostVulnResultMapper.updateVerifyStatusByIds(resultIds, VERIFYING);
+        }
+        return response(task.getId(), rules.size(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
+                sent ? "验证任务已下发" : "验证任务已创建，但消息下发失败，可稍后重试");
+    }
+
+    @Override
+    public Map<Long, Long> batchVerify(List<Long> hostIds) {
+        Map<Long, Long> result = new LinkedHashMap<>();
+        for (Long hostId : hostIds) {
+            try {
+                VulnVerificationTaskResponseDTO task = verifyHost(hostId);
+                result.put(hostId, task.getTaskId());
+            } catch (Exception e) {
+                log.warn("批量下发漏洞验证任务失败: hostId={}, reason={}", hostId, e.getMessage());
+                result.put(hostId, null);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public VulnVerificationTaskResponseDTO retry(Long taskId) {
+        HostVulnTaskEntity task = hostVulnTaskMapper.selectById(taskId);
+        if (task == null) {
+            throw new ResourceNotFoundException("漏洞验证任务不存在: " + taskId);
+        }
+        if (task.getStatus() != null && task.getStatus() == STATUS_RUNNING) {
+            return response(task.getId(), task.getRuleCount(), true, STATUS_RUNNING, "任务已处于执行中");
+        }
+
+        JsonNode summary = readSummary(task.getSummaryJson());
+        JsonNode messageNode = summary.path("agentMessage");
+        if (messageNode.isMissingNode() || messageNode.isNull()) {
+            throw new IllegalArgumentException("任务缺少可重试的下发消息");
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> agentMessage = objectMapper.convertValue(messageNode, Map.class);
+        boolean sent = sendToAgent(task.getMacAddress(), agentMessage);
+        if (sent) {
+            hostVulnTaskMapper.updateStatus(task.getId(), STATUS_RUNNING, task.getSummaryJson());
+            List<Long> resultIds = readResultIds(summary.path("resultIds"));
+            if (!resultIds.isEmpty()) {
+                hostVulnResultMapper.updateVerifyStatusByIds(resultIds, VERIFYING);
+            }
+        }
+        return response(task.getId(), task.getRuleCount(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
+                sent ? "验证任务已重新下发" : "重试下发失败，任务仍为待执行");
+    }
+
+    private HostEntity requireHost(Long hostId) {
+        HostEntity host = hostMapper.selectById(hostId);
+        if (host == null) {
+            throw new ResourceNotFoundException("主机不存在: " + hostId);
+        }
+        if (!StringUtils.hasText(host.getMacAddress())) {
+            throw new IllegalArgumentException("主机缺少MAC地址: " + hostId);
+        }
+        return host;
+    }
+
+    private HostVulnTaskEntity createTask(HostEntity host, int ruleCount) {
+        LocalDateTime now = LocalDateTime.now();
+        HostVulnTaskEntity task = new HostVulnTaskEntity();
+        task.setTaskName("VULN_VERIFY_HOST_" + host.getId() + "_" + System.currentTimeMillis());
+        task.setTaskType(TASK_TYPE);
+        task.setHostId(host.getId());
+        task.setMacAddress(host.getMacAddress());
+        task.setScanMode(SCAN_MODE);
+        task.setRuleCount(ruleCount);
+        task.setStatus(STATUS_PENDING);
+        task.setTriggeredBy(currentUsername());
+        task.setStartedAt(now);
+        task.setCreatedAt(now);
+        hostVulnTaskMapper.insert(task);
+        return task;
+    }
+
+    private Map<String, Object> buildAgentMessage(Long taskId, String macAddress, List<VulnVerificationRuleDTO> rules) {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("taskId", String.valueOf(taskId));
+        message.put("type", "vuln_verify");
+        message.put("macAddress", macAddress);
+        message.put("rules", rules.stream().map(rule -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("ruleId", rule.getRuleId());
+            item.put("productType", rule.getProductType());
+            item.put("productName", rule.getProductName());
+            item.put("matchType", rule.getMatchType());
+            item.put("versionExpression", rule.getVersionExpression());
+            item.put("verifyType", rule.getVerifyType());
+            item.put("verifyRule", rule.getVerifyRule());
+            return item;
+        }).toList());
+        message.put("createdAt", OffsetDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        return message;
+    }
+
+    private boolean sendToAgent(String macAddress, Map<String, Object> agentMessage) {
+        try {
+            amqpAdmin.declareExchange(new DirectExchange(RabbitMQConfig.AGENT_EXCHANGE, true, false));
+            String payload = objectMapper.writeValueAsString(agentMessage);
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.AGENT_EXCHANGE,
+                    macAddress,
+                    payload,
+                    message -> {
+                        message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                        message.getMessageProperties().setContentType("application/json");
+                        return message;
+                    });
+            log.info("漏洞验证任务已下发: routingKey={}, payload={}", macAddress, payload);
+            return true;
+        } catch (Exception e) {
+            log.error("漏洞验证任务下发失败: routingKey={}", macAddress, e);
+            return false;
+        }
+    }
+
+    private String buildSummaryJson(Map<String, Object> agentMessage, List<Long> resultIds, String errorMessage) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("agentMessage", agentMessage);
+        summary.put("resultIds", resultIds);
+        if (StringUtils.hasText(errorMessage)) {
+            summary.put("error", errorMessage);
+        }
+        try {
+            return objectMapper.writeValueAsString(summary);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private JsonNode readSummary(String summaryJson) {
+        try {
+            return objectMapper.readTree(StringUtils.hasText(summaryJson) ? summaryJson : "{}");
+        } catch (Exception e) {
+            throw new IllegalArgumentException("任务下发内容解析失败");
+        }
+    }
+
+    private List<Long> readResultIds(JsonNode resultIdsNode) {
+        if (!resultIdsNode.isArray()) {
+            return List.of();
+        }
+        return java.util.stream.StreamSupport.stream(resultIdsNode.spliterator(), false)
+                .filter(JsonNode::canConvertToLong)
+                .map(JsonNode::asLong)
+                .toList();
+    }
+
+    private String currentUsername() {
+        String username = SecurityUtils.getCurrentUsername();
+        return StringUtils.hasText(username) ? username : "system";
+    }
+
+    private VulnVerificationTaskResponseDTO response(Long taskId,
+                                                     Integer ruleCount,
+                                                     boolean sent,
+                                                     Integer status,
+                                                     String message) {
+        VulnVerificationTaskResponseDTO response = new VulnVerificationTaskResponseDTO();
+        response.setTaskId(taskId);
+        response.setRuleCount(ruleCount);
+        response.setSent(sent);
+        response.setStatus(status);
+        response.setMessage(message);
+        return response;
+    }
+}

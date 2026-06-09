@@ -42,6 +42,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\UserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnDetectionController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnVerificationController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiChatResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiTestRequestDTO.java
@@ -87,6 +88,11 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserRoleAssignDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\UserUpdateSelfDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnDetectionSummaryDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnHostOverviewDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationBatchRequestDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationRuleDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationTaskResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AppEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AssetExportLogEntity.java
@@ -94,6 +100,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostPatchRiskEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostPatchStatusEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostVulnResultEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostVulnTaskEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\InstalledPatchEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\LoginLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\MqErrorLogEntity.java
@@ -115,6 +122,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostPatchRiskMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostPatchStatusMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostVulnResultMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostVulnTaskMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\InstalledPatchMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\MqErrorLogMapper.java
@@ -136,6 +144,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mq\AssetDataListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\HostStatusListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\PatchScanListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\SysInfoListener.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mq\VulnVerifyResultListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\rule\impl\EolRule.java
 C:\DATA\2026实训\java\src\main\java\com\cd\rule\impl\InstallFailureRule.java
 C:\DATA\2026实训\java\src\main\java\com\cd\rule\impl\KnownIssueRule.java
@@ -170,6 +179,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\UserServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnDetectionServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleCacheServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleEngineImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnVerificationServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\LoginLogService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\PatchNormalizeService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\PatchScanService.java
@@ -184,6 +194,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnDetectionService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnRuleCacheService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnRuleEngine.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnVerificationService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\task\AssetProbeScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\task\HostStatusScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\ThreatPlatformApplication.java

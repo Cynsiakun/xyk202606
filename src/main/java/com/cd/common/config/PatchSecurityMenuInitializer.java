@@ -20,11 +20,16 @@ public class PatchSecurityMenuInitializer {
             insertPermission("patch-security:view", "查看补丁安全风险", "/api/patch-security/**");
             insertPermission("patch-security:analyze", "重新分析补丁风险", "/api/patch-security/**/analyze");
             insertPermission("patch-security:scan", "下发补丁扫描", "/api/patch-security/**/scan");
+            insertPermission("vuln-detection:view", "查看漏洞检测结果", "/api/vuln-detection/**");
+            insertPermission("vuln-detection:analyze", "执行漏洞规则匹配", "/api/vuln-detection/**");
 
             insertMenus();
             grant("SECURITY_ADMIN", "patch-security:view", "patch-security:analyze", "patch-security:scan");
             grant("ANALYST", "patch-security:view", "patch-security:analyze", "patch-security:scan");
             grant("AUDITOR", "patch-security:view");
+            grant("SECURITY_ADMIN", "vuln-detection:view", "vuln-detection:analyze");
+            grant("ANALYST", "vuln-detection:view", "vuln-detection:analyze");
+            grant("AUDITOR", "vuln-detection:view");
         };
     }
 
@@ -43,6 +48,8 @@ public class PatchSecurityMenuInitializer {
 
         Long viewPermissionId = jdbcTemplate.queryForObject(
                 "SELECT id FROM sys_permission WHERE permission_code = 'patch-security:view'", Long.class);
+        Long vulnViewPermissionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_permission WHERE permission_code = 'vuln-detection:view'", Long.class);
 
         jdbcTemplate.update("""
                 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
@@ -60,10 +67,22 @@ public class PatchSecurityMenuInitializer {
                 """, viewPermissionId, baseSort + 1, parentId);
 
         jdbcTemplate.update("""
+                INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+                SELECT 'vuln_detection', '漏洞检测', './pages/vuln-detection.html', 'layui-icon-search', ?, ?, 1, ?
+                WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_detection')
+                """, vulnViewPermissionId, baseSort + 2, parentId);
+
+        jdbcTemplate.update("""
                 UPDATE sys_menu
                 SET parent_id = ?, menu_path = './pages/patch-security.html', permission_id = ?
                 WHERE menu_code = 'patch_security'
                 """, parentId, viewPermissionId);
+
+        jdbcTemplate.update("""
+                UPDATE sys_menu
+                SET parent_id = ?, menu_path = './pages/vuln-detection.html', permission_id = ?
+                WHERE menu_code = 'vuln_detection'
+                """, parentId, vulnViewPermissionId);
     }
 
     private void grant(String roleCode, String... permissionCodes) {

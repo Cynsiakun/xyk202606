@@ -24,6 +24,7 @@ public final class VersionExpressionParser {
         String type = matchType.trim().toLowerCase(Locale.ROOT);
         String expr = expression.trim();
         return switch (type) {
+            case "name_only" -> nameOnly(expr, assetInfo);
             case "exact" -> exact(expr, textCandidates(assetInfo));
             case "contains" -> contains(expr, textCandidates(assetInfo));
             case "version_lt" -> compareVersion(assetInfo.getVersion(), stripOperator(expr), "<");
@@ -49,8 +50,13 @@ public final class VersionExpressionParser {
             case "version_ge" -> "资产版本不低于规则限定版本";
             case "version_range" -> "资产版本落入漏洞影响区间";
             case "regex" -> "资产实际值命中正则表达式";
+            case "name_only" -> "资产名称命中高危组件规则";
             default -> "资产命中漏洞规则";
         };
+    }
+
+    private static boolean nameOnly(String expr, AssetInfoDTO assetInfo) {
+        return "*".equals(expr) || StringUtils.hasText(assetInfo.getName());
     }
 
     private static boolean exact(String expr, List<String> candidates) {

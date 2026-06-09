@@ -54,6 +54,8 @@ public interface HostMapper {
 
     List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
 
+    List<Long> selectAllIds();
+
     List<HostEntity> selectPage(@Param("offset") int offset,
                                 @Param("size") int size,
                                 @Param("keyword") String keyword);
