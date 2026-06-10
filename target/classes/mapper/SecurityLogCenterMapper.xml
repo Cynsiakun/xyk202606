@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.SecurityLogCenterMapper">
+
+    <sql id="filterConditions">
+        <where>
+            <if test="q.logType != null and q.logType != ''">
+                AND w.log_type = #{q.logType}
+            </if>
+            <if test="q.eventId != null">
+                AND w.event_id = #{q.eventId}
+            </if>
+            <if test="q.hostId != null">
+                AND w.host_id = #{q.hostId}
+            </if>
+            <if test="q.level != null and q.level != ''">
+                AND w.level = #{q.level}
+            </if>
+            <if test="q.username != null and q.username != ''">
+                AND w.username LIKE CONCAT('%', #{q.username}, '%')
+            </if>
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (w.message LIKE CONCAT('%', #{q.keyword}, '%')
+                     OR w.username LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+            <if test="q.startTime != null">
+                AND w.event_time &gt;= #{q.startTime}
+            </if>
+            <if test="q.endTime != null">
+                AND w.event_time &lt;= #{q.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectPage" resultType="com.cd.dto.EventLogItemDTO">
+        SELECT w.id            AS id,
+               w.host_id       AS hostId,
+               h.hostname      AS hostname,
+               h.ipv4          AS ipv4,
+               w.log_type      AS logType,
+               w.event_id      AS eventId,
+               w.event_time    AS eventTime,
+               w.username      AS username,
+               w.level         AS level,
+               w.message       AS message,
+               w.record_number AS recordNumber
+        FROM windows_event_logs w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        <include refid="filterConditions"/>
+        ORDER BY w.${q.sortColumn} ${q.sortDirection}, w.id DESC
+        LIMIT #{q.size} OFFSET #{q.offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1)
+        FROM windows_event_logs w
+        <include refid="filterConditions"/>
+    </select>
+
+    <select id="selectForExport" resultType="com.cd.dto.EventLogItemDTO">
+        SELECT w.id            AS id,
+               w.host_id       AS hostId,
+               h.hostname      AS hostname,
+               h.ipv4          AS ipv4,
+               w.log_type      AS logType,
+               w.event_id      AS eventId,
+               w.event_time    AS eventTime,
+               w.username      AS username,
+               w.level         AS level,
+               w.message       AS message,
+               w.record_number AS recordNumber
+        FROM windows_event_logs w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        <include refid="filterConditions"/>
+        ORDER BY w.${q.sortColumn} ${q.sortDirection}, w.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectDetailById" resultType="com.cd.dto.EventLogDetailDTO">
+        SELECT w.id            AS id,
+               w.host_id       AS hostId,
+               h.hostname      AS hostname,
+               h.ipv4          AS ipv4,
+               w.log_type      AS logType,
+               w.event_id      AS eventId,
+               w.event_time    AS eventTime,
+               w.username      AS username,
+               w.level         AS level,
+               w.message       AS message,
+               w.record_number AS recordNumber,
+               w.raw_json      AS rawXml,
+               w.create_time   AS createTime
+        FROM windows_event_logs w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        WHERE w.id = #{id}
+    </select>
+
+    <select id="countTodayByType" resultType="long">
+        SELECT COUNT(1)
+        FROM windows_event_logs
+        WHERE log_type = #{logType}
+          AND DATE(event_time) = CURDATE()
+    </select>
+
+    <select id="countTodayError" resultType="long">
+        SELECT COUNT(1)
+        FROM windows_event_logs
+        WHERE level IN ('Error', 'Critical')
+          AND DATE(event_time) = CURDATE()
+    </select>
+
+    <select id="selectHostOptions" resultType="com.cd.dto.HostOptionDTO">
+        SELECT h.id       AS id,
+               h.hostname AS hostname,
+               h.ipv4     AS ipv4
+        FROM hosts h
+        ORDER BY h.id ASC
+    </select>
+</mapper>

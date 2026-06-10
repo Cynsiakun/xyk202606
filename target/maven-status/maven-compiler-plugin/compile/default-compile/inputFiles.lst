@@ -42,6 +42,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\PageController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PatchCveMapController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PatchSecurityController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\SecurityLogCenterController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\UserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\VulnDetectionController.java
@@ -62,7 +63,12 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRecordDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\CsvImportResultDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\EventLogDetailDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\EventLogItemDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\EventLogQueryDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\EventLogStatDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostCreateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostOptionDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\HostUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\InstalledPatchBatchDeleteDTO.java
@@ -164,6 +170,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\ProbeStrategyMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\ProcessMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\RbacMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SecurityAlertMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SecurityLogCenterMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\ServiceMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysMenuMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysPermissionMapper.java
@@ -216,6 +223,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RbacServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RiskLevelEvaluatorImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RuleEngineServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\SecurityAlertRuleEngineImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\SecurityLogCenterServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\TestServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\UserServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnDetectionServiceImpl.java
@@ -236,6 +244,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\RiskLevelEvaluator.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\RuleEngineService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\RuleEnrichmentService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\SecurityAlertRuleEngine.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\SecurityLogCenterService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\TestService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnDetectionService.java
