@@ -2,6 +2,7 @@ package com.cd.controller;
 
 import com.cd.common.PageResult;
 import com.cd.common.Result;
+import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
@@ -25,7 +26,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -64,7 +64,7 @@ public class UserController {
 
     @PostMapping(value = "/avatar/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<UserAvatarUploadResponseDTO> uploadAvatar(@RequestParam("file") MultipartFile file) {
-        return new Result<>(200, "上传成功", userService.uploadAvatar(file));
+        return Result.success(userService.uploadAvatar(file));
     }
 
     @PostMapping("/changePassword")
@@ -77,6 +77,12 @@ public class UserController {
     @PostMapping
     public Result<UserResponseDTO> create(@Valid @RequestBody UserCreateDTO dto) {
         return Result.success(userService.create(dto));
+    }
+
+    @PreAuthorize("@perm.has('user:create')")
+    @PostMapping("/import")
+    public Result<CsvImportResultDTO> importCsv(@RequestParam("file") MultipartFile file) {
+        return Result.success(userService.importCsv(file));
     }
 
     @PreAuthorize("@perm.has('user:delete')")

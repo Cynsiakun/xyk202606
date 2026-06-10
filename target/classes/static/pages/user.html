@@ -17,9 +17,14 @@
                 <button type="submit" class="layui-btn" lay-submit lay-filter="userSearchSubmit">搜索</button>
                 <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
             </div>
-            <button type="button" class="layui-btn" id="addUserButton">
-                <i class="layui-icon layui-icon-add-1"></i> 新增用户
-            </button>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-normal" id="importButton">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 导入CSV
+                </button>
+                <button type="button" class="layui-btn" id="addUserButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增用户
+                </button>
+            </div>
         </form>
     </div>
 
@@ -93,6 +98,24 @@
             <button type="submit" class="layui-btn" lay-submit lay-filter="saveUserRoles">保存</button>
         </div>
     </form>
+</template>
+
+<template id="userImportTemplate">
+    <div class="import-dialog">
+        <div class="import-dialog-body">
+            <p class="import-dialog-tip">请选择 UTF-8 编码的 CSV 文件，首行为表头。系统按用户名去重：用户名已存在则更新，不存在则新增。更新时如果未提供密码，将保留原密码。</p>
+            <input type="file" id="userCsvFile" accept=".csv,text/csv" class="import-file-input">
+            <div class="import-file-name" id="userCsvFileName">尚未选择文件</div>
+            <div class="import-example">
+                <div class="import-example-title">建议表头</div>
+                <code>user_name,user_pwd,user_phone,user_email,user_avatar,status</code>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn layui-btn-normal" id="submitImportButton">开始导入</button>
+        </div>
+    </div>
 </template>
 
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>

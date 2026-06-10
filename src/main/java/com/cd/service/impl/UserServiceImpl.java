@@ -10,6 +10,7 @@ import com.cd.common.security.JwtTokenProvider;
 import com.cd.common.security.Md5PasswordEncoder;
 import com.cd.common.security.SecurityUser;
 import com.cd.common.security.SecurityUtils;
+import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
@@ -24,13 +25,16 @@ import com.cd.mapper.RbacMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.LoginLogService;
 import com.cd.service.UserService;
+import com.cd.util.CsvImportUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -204,6 +208,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public CsvImportResultDTO importCsv(MultipartFile file) {
+        return CsvImportUtil.importCsv(file, this::mapCsvRecord, this::saveImportedRecord);
+    }
+
+    @Override
     @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#id")
     public void deleteById(Long id) {
         ensureExists(id);
@@ -240,10 +250,48 @@ public class UserServiceImpl implements UserService {
         return new PageResult<>(total, list);
     }
 
+    private UserEntity mapCsvRecord(CSVRecord record) {
+        UserEntity entity = new UserEntity();
+        entity.setUserName(requireField(record, "user_name", "userName"));
+        entity.setUserPwd(CsvImportUtil.getValue(record, "user_pwd", "userPwd"));
+        entity.setUserAvatar(emptyToNull(CsvImportUtil.getValue(record, "user_avatar", "userAvatar")));
+        entity.setUserPhone(emptyToNull(CsvImportUtil.getValue(record, "user_phone", "userPhone")));
+        entity.setUserEmail(emptyToNull(CsvImportUtil.getValue(record, "user_email", "userEmail")));
+        entity.setStatus(parseStatus(CsvImportUtil.getValue(record, "status")));
+        return entity;
+    }
+
+    private void saveImportedRecord(UserEntity imported, CsvImportResultDTO result) {
+        UserEntity existing = userMapper.selectByUserName(imported.getUserName());
+        if (existing == null) {
+            if (!StringUtils.hasText(imported.getUserPwd())) {
+                throw new IllegalArgumentException("新增用户必须提供 user_pwd");
+            }
+            validateUnique(null, imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
+            imported.setUserPwd(md5PasswordEncoder.encode(imported.getUserPwd().trim()));
+            imported.setStatus(imported.getStatus() == null ? 1 : imported.getStatus());
+            userMapper.insert(imported);
+            result.incrementInserted();
+            return;
+        }
+
+        validateUnique(existing.getId(), imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
+        existing.setUserAvatar(imported.getUserAvatar());
+        existing.setUserPhone(imported.getUserPhone());
+        existing.setUserEmail(imported.getUserEmail());
+        existing.setStatus(imported.getStatus() == null ? existing.getStatus() : imported.getStatus());
+        if (StringUtils.hasText(imported.getUserPwd())) {
+            existing.setUserPwd(md5PasswordEncoder.encode(imported.getUserPwd().trim()));
+            userMapper.updatePasswordById(existing.getId(), existing.getUserPwd());
+        }
+        userMapper.updateById(existing);
+        result.incrementUpdated();
+    }
+
     private UserEntity ensureExists(Long id) {
         UserEntity entity = userMapper.selectById(id);
         if (entity == null) {
-            throw new ResourceNotFoundException("记录不存在: id=" + id);
+            throw new ResourceNotFoundException("记录不存在，id=" + id);
         }
         return entity;
     }
@@ -315,8 +363,31 @@ public class UserServiceImpl implements UserService {
         return dto;
     }
 
+    private String requireField(CSVRecord record, String... headerNames) {
+        String value = CsvImportUtil.getValue(record, headerNames);
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException("必填字段缺失: " + headerNames[0]);
+        }
+        return value.trim();
+    }
+
+    private Integer parseStatus(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            int status = Integer.parseInt(value.trim());
+            if (status != 0 && status != 1) {
+                throw new IllegalArgumentException("status 仅支持 0 或 1");
+            }
+            return status;
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("status 必须是整数");
+        }
+    }
+
     private String emptyToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private void validateAvatarFile(MultipartFile file) {

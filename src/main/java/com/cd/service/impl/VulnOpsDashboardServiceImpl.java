@@ -51,6 +51,90 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
         return response;
     }
 
+    @Override
+    public String exportHtml(String range, LocalDate startDate, LocalDate endDate) {
+        RangeWindow window = resolveWindow(range, startDate, endDate);
+        VulnOpsDashboardResponseDTO data = overview(range, startDate, endDate);
+        String title = "漏洞运营仪表盘";
+        String exportedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        StringBuilder html = new StringBuilder();
+        html.append("""
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>漏洞运营仪表盘报告</title>
+                    <style>
+                        body { font-family: "Microsoft YaHei", Arial, sans-serif; margin: 0; background: #f5f7fa; color: #162132; }
+                        .shell { max-width: 1200px; margin: 0 auto; padding: 24px; }
+                        .header, .section, .card { background: #fff; border: 1px solid #e7edf4; border-radius: 12px; box-shadow: 0 4px 14px rgba(15,23,42,.05); }
+                        .header { padding: 24px; margin-bottom: 16px; }
+                        h1, h2, h3, p { margin: 0; }
+                        .meta { margin-top: 8px; color: #6d7a8c; font-size: 13px; }
+                        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+                        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
+                        .card { padding: 16px; }
+                        .label { color: #6d7a8c; font-size: 13px; margin-bottom: 10px; }
+                        .value { font-size: 30px; font-weight: 700; font-family: "JetBrains Mono", Consolas, monospace; }
+                        .hint { margin-top: 8px; color: #6d7a8c; font-size: 12px; line-height: 1.6; }
+                        .section { padding: 16px; }
+                        .section + .section { margin-top: 16px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+                        th, td { border-bottom: 1px solid #edf2f8; padding: 10px 8px; text-align: left; vertical-align: top; }
+                        th { color: #6d7a8c; font-weight: 600; background: #f8fafc; }
+                        .bar { height: 10px; border-radius: 999px; background: #edf2f8; overflow: hidden; }
+                        .bar > span { display: block; height: 100%; }
+                        .list { margin: 12px 0 0; padding: 0; list-style: none; }
+                        .list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #edf2f8; }
+                        .severity-critical { color: #b91c1c; }
+                        .severity-high { color: #c2410c; }
+                        .severity-medium { color: #a16207; }
+                        .severity-low { color: #166534; }
+                        @media (max-width: 960px) {
+                            .grid-5, .grid-2 { grid-template-columns: 1fr; }
+                        }
+                    </style>
+                </head>
+                <body>
+                <div class="shell">
+                """);
+
+        html.append("<section class=\"header\">")
+                .append("<h1>").append(escapeHtml(title)).append("</h1>")
+                .append("<p class=\"meta\">统计窗口：").append(escapeHtml(window.metaLabel()))
+                .append(" | 导出时间：").append(escapeHtml(exportedAt)).append("</p>")
+                .append("</section>");
+
+        VulnOpsDashboardResponseDTO.KpisDTO kpis = data.getKpis();
+        html.append("<section class=\"grid-5\">")
+                .append(kpiHtml("漏洞总量", valueOf(kpis.getTotal().getCount()), valueOf(kpis.getTotal().getTrendText())))
+                .append(kpiHtml("待修复漏洞", valueOf(kpis.getToFix().getCount()), "高危占比 " + kpis.getToFix().getHighRiskRatio() + "%"))
+                .append(kpiHtml("平均修复时效", valueOf(kpis.getAvgFixDays().getCount()), valueOf(kpis.getAvgFixDays().getGapText())))
+                .append(kpiHtml("验证成功率", valueOf(kpis.getVerifyRate().getCount()) + "%", valueOf(kpis.getVerifyRate().getGapText())))
+                .append(kpiHtml("Client 在线率", kpis.getClientOnline().getRate() + "%", "在线 " + kpis.getClientOnline().getOnline() + " / 总数 " + kpis.getClientOnline().getTotal()))
+                .append("</section>");
+
+        html.append("<section class=\"grid-2\">")
+                .append(sectionTable("漏洞趋势", List.of("时间", "待验证", "验证中", "待修复", "已修复", "新增"), trendRows(data.getTrend().getPoints())))
+                .append(sectionTable("高危未修复分布", List.of("分类", "漏洞数", "影响主机", "占比"), highRiskRows(data.getHighRisk())))
+                .append("</section>");
+
+        html.append("<section class=\"grid-2\">")
+                .append(sectionTable("修复时效分布", List.of("区间", "数量", "占比条"), slaRows(data.getSla())))
+                .append(sectionTable("验证成功率趋势", List.of("时间", "验证次数", "命中", "不影响", "成功率"), verifyRows(data.getVerifyTrend().getPoints())))
+                .append("</section>");
+
+        html.append("<section class=\"grid-2\">")
+                .append(sectionTable("Client 在线率趋势", List.of("时间", "活跃主机数", "在线率"), clientTrendRows(data.getClientTrend().getPoints())))
+                .append(sectionTable("当前离线主机", List.of("主机名", "IP", "离线时长"), offlineRows(data.getClientTrend().getOfflineHosts())))
+                .append("</section>");
+
+        html.append("</div></body></html>");
+        return html.toString();
+    }
+
     private void fillKpis(VulnOpsDashboardResponseDTO.KpisDTO kpis,
                           List<ResultRecord> records,
                           List<HostRecord> hosts,
@@ -463,6 +547,112 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private String kpiHtml(String label, String value, String hint) {
+        return "<article class=\"card\">"
+                + "<div class=\"label\">" + escapeHtml(label) + "</div>"
+                + "<div class=\"value\">" + escapeHtml(value) + "</div>"
+                + "<div class=\"hint\">" + escapeHtml(hint) + "</div>"
+                + "</article>";
+    }
+
+    private String sectionTable(String title, List<String> headers, List<List<String>> rows) {
+        StringBuilder html = new StringBuilder();
+        html.append("<section class=\"section\">")
+                .append("<h2>").append(escapeHtml(title)).append("</h2>")
+                .append("<table><thead><tr>");
+        for (String header : headers) {
+            html.append("<th>").append(escapeHtml(header)).append("</th>");
+        }
+        html.append("</tr></thead><tbody>");
+        if (rows.isEmpty()) {
+            html.append("<tr><td colspan=\"").append(headers.size()).append("\">暂无数据</td></tr>");
+        } else {
+            for (List<String> row : rows) {
+                html.append("<tr>");
+                for (String cell : row) {
+                    html.append("<td>").append(cell).append("</td>");
+                }
+                html.append("</tr>");
+            }
+        }
+        html.append("</tbody></table></section>");
+        return html.toString();
+    }
+
+    private List<List<String>> trendRows(List<VulnOpsDashboardResponseDTO.TrendPointDTO> points) {
+        return points.stream().map(point -> List.of(
+                escapeHtml(valueOf(point.getLabel())),
+                String.valueOf(point.getPending()),
+                String.valueOf(point.getVerifying()),
+                String.valueOf(point.getRepair()),
+                String.valueOf(point.getFixed()),
+                String.valueOf(point.getNewCount())
+        )).toList();
+    }
+
+    private List<List<String>> highRiskRows(List<VulnOpsDashboardResponseDTO.HighRiskItemDTO> items) {
+        return items.stream().map(item -> List.of(
+                escapeHtml(valueOf(item.getName())),
+                String.valueOf(item.getCount()),
+                String.valueOf(item.getHosts()),
+                item.getRatio() + "%"
+        )).toList();
+    }
+
+    private List<List<String>> slaRows(VulnOpsDashboardResponseDTO.SlaDTO sla) {
+        int total = sla.getBuckets().stream().mapToInt(VulnOpsDashboardResponseDTO.SlaBucketDTO::getCount).sum();
+        return sla.getBuckets().stream().map(item -> List.of(
+                escapeHtml(valueOf(item.getLabel())),
+                String.valueOf(item.getCount()),
+                progressBar(total == 0 ? 0 : (int) Math.round(item.getCount() * 100.0 / total),
+                        item.isOverTarget() ? "#EF4444" : "#3B82F6")
+        )).toList();
+    }
+
+    private List<List<String>> verifyRows(List<VulnOpsDashboardResponseDTO.VerifyPointDTO> points) {
+        return points.stream().map(point -> List.of(
+                escapeHtml(valueOf(point.getLabel())),
+                String.valueOf(point.getTotal()),
+                String.valueOf(point.getSuccess()),
+                String.valueOf(point.getFail()),
+                point.getRate() + "%"
+        )).toList();
+    }
+
+    private List<List<String>> clientTrendRows(List<VulnOpsDashboardResponseDTO.ClientPointDTO> points) {
+        return points.stream().map(point -> List.of(
+                escapeHtml(valueOf(point.getLabel())),
+                String.valueOf(point.getOnline()),
+                point.getRate() + "%"
+        )).toList();
+    }
+
+    private List<List<String>> offlineRows(List<VulnOpsDashboardResponseDTO.OfflineHostDTO> items) {
+        return items.stream().map(item -> List.of(
+                escapeHtml(valueOf(item.getHostname())),
+                escapeHtml(valueOf(item.getIp())),
+                escapeHtml(valueOf(item.getOfflineFor()))
+        )).toList();
+    }
+
+    private String progressBar(int percent, String color) {
+        return "<div class=\"bar\"><span style=\"width:" + Math.max(0, Math.min(100, percent))
+                + "%;background:" + color + ";\"></span></div>";
+    }
+
+    private String valueOf(Object value) {
+        return value == null ? "-" : String.valueOf(value);
+    }
+
+    private String escapeHtml(String value) {
+        return value == null ? "" : value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private static class Aggregate {

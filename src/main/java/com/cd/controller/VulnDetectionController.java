@@ -2,8 +2,8 @@ package com.cd.controller;
 
 import com.cd.common.Result;
 import com.cd.dto.PatchSecurityActionResultDTO;
-import com.cd.dto.VulnDetectionSummaryDTO;
 import com.cd.dto.VulnAffectedHostDTO;
+import com.cd.dto.VulnDetectionSummaryDTO;
 import com.cd.dto.VulnHostOverviewDTO;
 import com.cd.dto.VulnOverviewDTO;
 import com.cd.dto.VulnResultBatchActionRequestDTO;
@@ -82,16 +82,5 @@ public class VulnDetectionController {
     public Result<Map<String, Object>> ignoreResults(@Valid @RequestBody VulnResultBatchActionRequestDTO request) {
         int updated = vulnDetectionService.ignoreResults(request.getResultIds());
         return Result.success(Map.of("updated", updated));
-    }
-
-    @PreAuthorize("@perm.has('vuln-detection:analyze')")
-    @PostMapping("/hosts/{hostId}/verify-task")
-    public Result<Map<String, Object>> createVerifyTask(
-            @PathVariable @Min(value = 1, message = "hostId必须大于0") Long hostId) {
-        return Result.success(Map.of(
-                "hostId", hostId,
-                "status", "RESERVED",
-                "message", "验证探测任务接口已预留，后续接入下发队列"
-        ));
     }
 }

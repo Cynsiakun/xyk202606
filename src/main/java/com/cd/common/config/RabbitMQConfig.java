@@ -7,6 +7,7 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +52,17 @@ public class RabbitMQConfig {
     public static final String PATCH_SCAN_EXCHANGE = "patch_exchange";
     public static final String PATCH_SCAN_ROUTING_KEY = "patch_scan";
     public static final String PATCH_SCAN_QUEUE = "patch_scan_queue";
+
+    /**
+     * Windows 事件日志队列：采集端通过 {@code log_exchange} + 路由键 {@code security_log}
+     * 投递，消费后批量写入 {@code windows_event_logs}。
+     *
+     * <p>该队列与交换机由采集端/运维预先创建，本服务<b>只消费、不声明</b>，避免参数不一致
+     * 导致的 PRECONDITION_FAILED。无死信队列，坏消息改落 {@code mq_error_logs} 表后正常 ACK。</p>
+     */
+    public static final String LOG_QUEUE = "log_queue";
+    /** 重试次数消息头：主机未注册时按此计数，超过上限不再重投，落 mq_error_logs。 */
+    public static final String HEADER_RETRY_COUNT = "x-retry-count";
 
     @Bean
     public Queue sysinfoQueue() {
@@ -133,6 +145,27 @@ public class RabbitMQConfig {
     @Bean
     public Binding patchScanBinding() {
         return BindingBuilder.bind(patchScanQueue()).to(patchScanExchange()).with(PATCH_SCAN_ROUTING_KEY);
+    }
+
+    /**
+     * Windows 日志专用手动 ACK 容器工厂：并发数可配置，单条预取放大以喂饱批量缓冲。
+     *
+     * <p>{@code concurrency} 由 {@code app.windows-log.concurrency} 控制（默认 2）。
+     * 入库的确认由批量写入器统一完成；消息可靠性靠手动 ACK 保证，坏消息落 mq_error_logs。</p>
+     */
+    @Bean
+    public SimpleRabbitListenerContainerFactory windowsLogContainerFactory(
+            ConnectionFactory connectionFactory,
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            @Value("${app.windows-log.concurrency:2}") int concurrency,
+            @Value("${app.windows-log.prefetch:200}") int prefetch) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        configurer.configure(factory, connectionFactory);
+        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        factory.setConcurrentConsumers(concurrency);
+        factory.setMaxConcurrentConsumers(Math.max(concurrency, concurrency * 2));
+        factory.setPrefetchCount(prefetch);
+        return factory;
     }
 
     /**

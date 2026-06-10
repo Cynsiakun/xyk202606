@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漏洞库管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/host.css">
+    <link rel="stylesheet" href="../css/vuln-rule-management.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="vulnRuleSearchForm">
+            <div class="toolbar-group toolbar-group-grow">
+                <input type="text" name="ruleCode" placeholder="规则编码" autocomplete="off" class="layui-input toolbar-input">
+                <input type="text" name="cveId" placeholder="CVE编号" autocomplete="off" class="layui-input toolbar-input">
+                <input type="text" name="productName" placeholder="产品名称" autocomplete="off" class="layui-input toolbar-input">
+                <select name="severity">
+                    <option value="">全部风险等级</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                </select>
+                <select name="enabled">
+                    <option value="">全部启用状态</option>
+                    <option value="1">已启用</option>
+                    <option value="0">已禁用</option>
+                </select>
+                <button type="submit" class="layui-btn" lay-submit lay-filter="vulnRuleSearchSubmit">搜索</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
+            </div>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn layui-btn-normal" id="importButton">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 导入CSV
+                </button>
+                <button type="button" class="layui-btn layui-btn-danger" id="batchDeleteButton">
+                    <i class="layui-icon layui-icon-delete"></i> 删除
+                </button>
+                <button type="button" class="layui-btn" id="addButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="vulnRuleTable" lay-filter="vulnRuleTable"></table>
+    </div>
+</div>
+
+<template id="vulnRuleFormTemplate">
+    <form class="layui-form popup-form vuln-rule-form" lay-filter="vulnRuleForm">
+        <div class="vuln-rule-form-fields">
+            <section class="form-section">
+                <div class="form-section-title">基础信息</div>
+                <div class="form-grid">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">规则编码</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="ruleCode" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">CVE编号</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="cveId" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">分类</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="category" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">风险等级</label>
+                        <div class="layui-input-block">
+                            <select name="severity">
+                                <option value="">请选择</option>
+                                <option value="CRITICAL">CRITICAL</option>
+                                <option value="HIGH">HIGH</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="LOW">LOW</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item full">
+                        <label class="layui-form-label">漏洞标题</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="title" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item full">
+                        <label class="layui-form-label">描述</label>
+                        <div class="layui-input-block">
+                            <textarea name="description" class="layui-textarea"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item full">
+                        <label class="layui-form-label">处置建议</label>
+                        <div class="layui-input-block">
+                            <textarea name="suggestion" class="layui-textarea"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <div class="form-section-title">匹配规则</div>
+                <div class="form-grid">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">产品类型</label>
+                        <div class="layui-input-block">
+                            <select name="productType">
+                                <option value="">请选择</option>
+                                <option value="os">os</option>
+                                <option value="app">app</option>
+                                <option value="service">service</option>
+                                <option value="process">process</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">产品名称</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="productName" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">匹配方式</label>
+                        <div class="layui-input-block">
+                            <select name="matchType">
+                                <option value="">请选择</option>
+                                <option value="exact">exact</option>
+                                <option value="contains">contains</option>
+                                <option value="version_lt">version_lt</option>
+                                <option value="version_le">version_le</option>
+                                <option value="version_gt">version_gt</option>
+                                <option value="version_ge">version_ge</option>
+                                <option value="version_range">version_range</option>
+                                <option value="regex">regex</option>
+                                <option value="NAME_ONLY">NAME_ONLY</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">版本表达式</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="affectedVersionExpr" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <div class="form-section-title">验证配置</div>
+                <div class="form-grid">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">验证方式</label>
+                        <div class="layui-input-block">
+                            <select name="verifyType">
+                                <option value="">请选择</option>
+                                <option value="VERSION">VERSION</option>
+                                <option value="EXISTENCE">EXISTENCE</option>
+                                <option value="PROCESS_NAME">PROCESS_NAME</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">启用状态</label>
+                        <div class="layui-input-block switch-block">
+                            <input type="checkbox" name="enabled" lay-skin="switch" lay-text="启用|禁用">
+                        </div>
+                    </div>
+                    <div class="layui-form-item full">
+                        <label class="layui-form-label">验证规则</label>
+                        <div class="layui-input-block">
+                            <textarea name="verifyRule" class="layui-textarea code-textarea" placeholder="可为空；若填写 JSON，请确保格式合法；普通字符串也支持"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveVulnRule">保存</button>
+        </div>
+    </form>
+</template>
+
+<template id="vulnRuleImportTemplate">
+    <div class="import-dialog">
+        <div class="import-dialog-body">
+            <p class="import-dialog-tip">请选择 UTF-8 编码的 CSV 文件，首行为表头。已存在的 rule_code 会自动更新。</p>
+            <input type="file" id="vulnRuleCsvFile" accept=".csv,text/csv" class="import-file-input">
+            <div class="import-file-name" id="vulnRuleCsvFileName">尚未选择文件</div>
+            <div class="import-example">
+                <div class="import-example-title">建议表头</div>
+                <code>rule_code,cve_id,category,product_type,product_name,match_type,affected_version_expr,severity,title,description,suggestion,verify_type,verify_rule,enabled</code>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn layui-btn-normal" id="submitImportButton">开始导入</button>
+        </div>
+    </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/vuln-rule-management.js"></script>
+</body>
+</html>

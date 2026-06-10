@@ -34,6 +34,87 @@ CREATE TABLE IF NOT EXISTS login_log (
     message VARCHAR(255)
 );
 
+CREATE TABLE IF NOT EXISTS windows_event_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    host_id BIGINT NOT NULL COMMENT '对应 hosts.id',
+    log_type VARCHAR(20) NOT NULL COMMENT 'Security/System/Application',
+    event_id INT NOT NULL COMMENT 'Windows事件ID',
+    event_time DATETIME NOT NULL COMMENT '事件发生时间',
+    username VARCHAR(255) DEFAULT NULL COMMENT '用户名',
+    level VARCHAR(20) DEFAULT NULL COMMENT 'Information/Warning/Error',
+    message VARCHAR(1000) DEFAULT NULL COMMENT '摘要信息',
+    record_number BIGINT NOT NULL COMMENT 'Windows RecordNumber，用于增量同步',
+    raw_json LONGTEXT DEFAULT NULL COMMENT '完整XML日志，不建索引',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_host_log_rec (host_id, log_type, record_number),
+    KEY idx_host_time (host_id, event_time),
+    KEY idx_event_id (event_id),
+    KEY idx_record_number (record_number),
+    KEY idx_log_type (log_type)
+);
+
+CREATE TABLE IF NOT EXISTS login_security_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    source_log_id BIGINT NOT NULL COMMENT '对应 windows_event_logs.id',
+    host_id BIGINT NOT NULL,
+    event_id INT NOT NULL,
+    event_time DATETIME NOT NULL,
+    username VARCHAR(255) DEFAULT NULL,
+    login_result VARCHAR(20) DEFAULT NULL COMMENT 'success/fail/logout',
+    login_type INT DEFAULT NULL COMMENT '交互、RDP、服务登录等',
+    source_ip VARCHAR(64) DEFAULT NULL,
+    process_name VARCHAR(255) DEFAULT NULL,
+    is_elevated TINYINT DEFAULT 0 COMMENT '是否提权',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_source_log (source_log_id),
+    KEY idx_host_time (host_id, event_time),
+    KEY idx_username (username),
+    KEY idx_source_ip (source_ip),
+    KEY idx_result (login_result)
+);
+
+CREATE TABLE IF NOT EXISTS account_change_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    source_log_id BIGINT NOT NULL COMMENT '对应 windows_event_logs.id',
+    host_id BIGINT NOT NULL,
+    event_id INT NOT NULL,
+    event_time DATETIME NOT NULL,
+    operator_username VARCHAR(255) DEFAULT NULL COMMENT '操作者',
+    target_username VARCHAR(255) DEFAULT NULL COMMENT '目标用户',
+    action_type VARCHAR(50) DEFAULT NULL COMMENT 'create/delete/add_admin等',
+    details VARCHAR(1000) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_source_log (source_log_id),
+    KEY idx_host_time (host_id, event_time),
+    KEY idx_operator (operator_username),
+    KEY idx_target (target_username),
+    KEY idx_action (action_type)
+);
+
+CREATE TABLE IF NOT EXISTS security_alerts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    source_log_id BIGINT NOT NULL COMMENT '对应 windows_event_logs.id',
+    host_id BIGINT NOT NULL,
+    event_id INT NOT NULL,
+    rule_code VARCHAR(64) DEFAULT NULL,
+    dedup_key VARCHAR(255) DEFAULT NULL,
+    alert_name VARCHAR(255) NOT NULL,
+    level VARCHAR(20) NOT NULL COMMENT 'Critical/High/Medium/Low',
+    risk_score INT DEFAULT 0,
+    description VARCHAR(1000) DEFAULT NULL,
+    evidence_json LONGTEXT,
+    status VARCHAR(20) DEFAULT 'new' COMMENT 'new/acked/resolved/ignored',
+    event_time DATETIME NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_source_rule (source_log_id, rule_code),
+    KEY idx_host_time (host_id, event_time),
+    KEY idx_level (level),
+    KEY idx_status (status),
+    KEY idx_source_log (source_log_id),
+    KEY idx_rule_code (rule_code),
+    KEY idx_dedup_status_time (dedup_key, status, create_time)
+);
+
 CREATE TABLE IF NOT EXISTS sys_role (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     role_code VARCHAR(50) NOT NULL UNIQUE,
@@ -491,6 +572,38 @@ SELECT 'patch-security:scan', '下发补丁扫描', 'API', '/api/patch-security/
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-security:scan');
 
 INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'installed-patch:view', '查看补丁管理', 'API', '/api/installed-patch/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'installed-patch:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'installed-patch:create', '新增补丁记录', 'API', '/api/installed-patch', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'installed-patch:create');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'installed-patch:update', '编辑补丁记录', 'API', '/api/installed-patch/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'installed-patch:update');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'installed-patch:delete', '删除补丁记录', 'API', '/api/installed-patch/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'installed-patch:delete');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-cve-map:view', '查看CVE映射', 'API', '/api/patch-cve-map/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-cve-map:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-cve-map:create', '新增CVE映射', 'API', '/api/patch-cve-map', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-cve-map:create');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-cve-map:update', '编辑CVE映射', 'API', '/api/patch-cve-map/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-cve-map:update');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'patch-cve-map:delete', '删除CVE映射', 'API', '/api/patch-cve-map/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'patch-cve-map:delete');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
 SELECT 'vuln-detection:view', '查看漏洞检测结果', 'API', '/api/vuln-detection/**', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-detection:view');
 
@@ -501,6 +614,60 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-det
 INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
 SELECT 'vuln-ops-dashboard:view', '查看漏洞运营仪表盘', 'API', '/api/vuln-ops-dashboard/**', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-ops-dashboard:view');
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('installed-patch:view', 'installed-patch:create', 'installed-patch:update', 'installed-patch:delete')
+WHERE r.role_code IN ('SUPER_ADMIN', 'SECURITY_ADMIN')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('installed-patch:view', 'installed-patch:create', 'installed-patch:update')
+WHERE r.role_code = 'ANALYST'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code = 'installed-patch:view'
+WHERE r.role_code = 'AUDITOR'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('patch-cve-map:view', 'patch-cve-map:create', 'patch-cve-map:update', 'patch-cve-map:delete')
+WHERE r.role_code IN ('SUPER_ADMIN', 'SECURITY_ADMIN')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('patch-cve-map:view', 'patch-cve-map:create', 'patch-cve-map:update')
+WHERE r.role_code = 'ANALYST'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code = 'patch-cve-map:view'
+WHERE r.role_code = 'AUDITOR'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
 
 INSERT INTO sys_role_permission (role_id, permission_id)
 SELECT r.id, p.id
@@ -545,8 +712,24 @@ WHERE p.permission_code = 'patch-security:view'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'patch_security');
 
 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
-SELECT 'vuln_detection', '漏洞检测', './pages/vuln-detection.html', 'layui-icon-search', p.id,
+SELECT 'patch_management', '补丁管理', './pages/patch-management.html', 'layui-icon-tabs', p.id,
        COALESCE(parent_menu.sort_order + 2, 12), 1, parent_menu.id
+FROM sys_permission p
+         JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'installed-patch:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'patch_management');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'cve_management', 'CVE管理', './pages/cve-management.html', 'layui-icon-dialogue', p.id,
+       COALESCE(parent_menu.sort_order + 3, 13), 1, parent_menu.id
+FROM sys_permission p
+         JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'patch-cve-map:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'cve_management');
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'vuln_detection', '漏洞检测', './pages/vuln-detection.html', 'layui-icon-search', p.id,
+       COALESCE(parent_menu.sort_order + 4, 14), 1, parent_menu.id
 FROM sys_permission p
          JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
 WHERE p.permission_code = 'vuln-detection:view'
@@ -554,7 +737,7 @@ WHERE p.permission_code = 'vuln-detection:view'
 
 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
 SELECT 'vuln_ops_dashboard', '漏洞运营仪表盘', './pages/vuln-ops-dashboard.html', 'layui-icon-chart-screen', p.id,
-       COALESCE(parent_menu.sort_order + 3, 13), 1, parent_menu.id
+       COALESCE(parent_menu.sort_order + 5, 15), 1, parent_menu.id
 FROM sys_permission p
          JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
 WHERE p.permission_code = 'vuln-ops-dashboard:view'
@@ -567,6 +750,22 @@ SET child.parent_id = parent_menu.id,
     child.menu_path = './pages/patch-security.html',
     child.permission_id = p.id
 WHERE child.menu_code = 'patch_security';
+
+UPDATE sys_menu child
+    JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+    JOIN sys_permission p ON p.permission_code = 'installed-patch:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/patch-management.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'patch_management';
+
+UPDATE sys_menu child
+    JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+    JOIN sys_permission p ON p.permission_code = 'patch-cve-map:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/cve-management.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'cve_management';
 
 UPDATE sys_menu child
     JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
@@ -583,3 +782,68 @@ SET child.parent_id = parent_menu.id,
     child.menu_path = './pages/vuln-ops-dashboard.html',
     child.permission_id = p.id
 WHERE child.menu_code = 'vuln_ops_dashboard';
+
+-- ============================================================
+-- Vulnerability rule management bootstrap
+-- Ensures the rule library menu and permissions exist for both
+-- fresh databases and upgraded environments.
+-- ============================================================
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-rule:view', '查看漏洞库规则', 'API', '/api/vuln-rule/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-rule:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-rule:create', '新增漏洞库规则', 'API', '/api/vuln-rule', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-rule:create');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-rule:update', '编辑漏洞库规则', 'API', '/api/vuln-rule/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-rule:update');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'vuln-rule:delete', '删除漏洞库规则', 'API', '/api/vuln-rule/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'vuln-rule:delete');
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+JOIN sys_permission p ON p.permission_code IN ('vuln-rule:view', 'vuln-rule:create', 'vuln-rule:update', 'vuln-rule:delete')
+WHERE r.role_code IN ('SUPER_ADMIN', 'SECURITY_ADMIN')
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+JOIN sys_permission p ON p.permission_code IN ('vuln-rule:view', 'vuln-rule:create', 'vuln-rule:update')
+WHERE r.role_code = 'ANALYST'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+JOIN sys_permission p ON p.permission_code = 'vuln-rule:view'
+WHERE r.role_code = 'AUDITOR'
+  AND NOT EXISTS (
+    SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id
+);
+
+INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
+SELECT 'vuln_rule_management', '漏洞库管理', './pages/vuln-rule-management.html', 'layui-icon-table', p.id,
+       COALESCE(parent_menu.sort_order + 5, 15), 1, parent_menu.id
+FROM sys_permission p
+JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+WHERE p.permission_code = 'vuln-rule:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_rule_management');
+
+UPDATE sys_menu child
+JOIN sys_menu parent_menu ON parent_menu.menu_code = 'risk_discovery'
+JOIN sys_permission p ON p.permission_code = 'vuln-rule:view'
+SET child.parent_id = parent_menu.id,
+    child.menu_path = './pages/vuln-rule-management.html',
+    child.permission_id = p.id
+WHERE child.menu_code = 'vuln_rule_management';

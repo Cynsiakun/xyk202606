@@ -19,10 +19,10 @@ layui.use(["element", "layer"], function () {
     };
 
     var menuDescriptions = {
-        "后台主页": "查看用户、登录和活跃情况统计。",
+        "后台首页": "查看用户、登录和活跃情况统计。",
         "用户管理": "维护后台用户，支持新增、编辑、删除、搜索和分页。",
         "登录日志": "审计登录成功和失败记录，支持用户名与状态筛选。",
-        "个人信息": "查看并维护当前登录账号的基础资料和密码。",
+        "个人信息": "查看并维护当前登录账户的基础资料和密码。",
         "角色管理": "角色管理模块。",
         "权限管理": "权限管理模块。",
         "主机管理": "查看与维护上报的主机系统信息，支持搜索、新增、编辑和删除。",
@@ -30,13 +30,15 @@ layui.use(["element", "layer"], function () {
         "账号资产": "浏览与搜索主机账号探测记录，支持详情与删除。",
         "服务资产": "浏览与搜索主机服务探测记录，支持详情与删除。",
         "进程资产": "浏览与搜索主机进程探测记录，支持详情与删除。",
-        "APP资产": "浏览与搜索主机安装软件探测记录，支持详情与删除。"
+        "APP资产": "浏览与搜索主机安装软件探测记录，支持详情与删除。",
+        "风险发现": "聚合安全风险入口，优先呈现需要处置的主机与证据。",
+        "补丁安全": "查看存在补丁风险的主机、风险证据与处置建议，支持重新分析和补丁扫描。",
+        "补丁管理": "维护主机已安装补丁记录，支持分页查询、筛选、编辑、详情与批量删除。",
+        "CVE管理": "维护补丁与CVE映射情报，支持分页查询、筛选、编辑、详情与批量删除。",
+        "漏洞检测": "展示漏洞规则命中结果，围绕待验证、验证中、已验证和待修复推进处置。",
+        "漏洞库管理": "维护漏洞规则库，支持分页查询、条件检索、新增、编辑、查看与批量删除。",
+        "漏洞运营仪表盘": "面向安全管理层的漏洞运营驾驶舱，聚焦趋势、效能与资产健康度。"
     };
-
-    menuDescriptions["风险发现"] = "聚合安全风险入口，优先呈现需要处置的主机与证据。";
-    menuDescriptions["补丁安全"] = "查看存在补丁风险的主机、风险证据与处置建议，支持重新分析和补丁扫描。";
-    menuDescriptions["漏洞检测"] = "展示漏洞规则命中结果，按待验证、验证中、已验证、待修复、已修复推进处置。";
-    menuDescriptions["漏洞运营仪表盘"] = "面向安全管理层的漏洞运营驾驶舱，聚焦趋势、效能与资产健康度。";
 
     init();
 
@@ -140,7 +142,7 @@ layui.use(["element", "layer"], function () {
             element.render("nav");
             activateDefaultMenu();
         } catch (error) {
-            return null;
+            layer.msg("菜单加载失败", {icon: 2});
         }
     }
 
@@ -162,23 +164,23 @@ layui.use(["element", "layer"], function () {
                             + '</a>'
                             + '</dd>';
                     }).join("")
-                    + '</dl>';
+                    + "</dl>";
 
                 return '<li class="layui-nav-item">'
                     + '<a href="javascript:;">'
                     + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
-                    + '<span>' + menu.title + '</span>'
-                    + '</a>'
+                    + '<span>' + menu.title + "</span>"
+                    + "</a>"
                     + childHtml
-                    + '</li>';
-            } else {
-                return '<li class="layui-nav-item">'
-                    + '<a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
-                    + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
-                    + '<span>' + menu.title + '</span>'
-                    + '</a>'
-                    + '</li>';
+                    + "</li>";
             }
+
+            return '<li class="layui-nav-item">'
+                + '<a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
+                + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
+                + '<span>' + menu.title + "</span>"
+                + "</a>"
+                + "</li>";
         }).join("");
     }
 
@@ -204,9 +206,9 @@ layui.use(["element", "layer"], function () {
         });
 
         var parent = link.parentElement;
-        if (parent.tagName === 'DD') {
+        if (parent.tagName === "DD") {
             parent.classList.add("layui-this");
-            var navItem = parent.closest('.layui-nav-item');
+            var navItem = parent.closest(".layui-nav-item");
             if (navItem) {
                 navItem.classList.add("layui-nav-itemed");
             }

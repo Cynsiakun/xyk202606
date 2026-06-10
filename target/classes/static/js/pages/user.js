@@ -5,6 +5,7 @@ layui.use(["table", "form", "layer"], function () {
     var editingUserId = null;
     var roleAssignUserId = null;
     var userTableId = "userTable";
+    var importFile = null;
     var roleApi = {
         allRoles: "/api/rbac/role/all",
         userRoles: "/api/rbac/user/{userId}/roles",
@@ -19,8 +20,8 @@ layui.use(["table", "form", "layer"], function () {
             {field: "userName", title: "用户名", minWidth: 140},
             {field: "userAvatar", title: "头像", width: 90, templet: function (d) {
                 return d.userAvatar
-                        ? '<img class="table-avatar" src="' + d.userAvatar + '" alt="头像">'
-                        : '<span class="empty-text">-</span>';
+                    ? '<img class="table-avatar" src="' + d.userAvatar + '" alt="头像">'
+                    : '<span class="empty-text">-</span>';
             }},
             {field: "userPhone", title: "手机号", minWidth: 140, templet: function (d) { return d.userPhone || "-"; }},
             {field: "userEmail", title: "邮箱", minWidth: 180, templet: function (d) { return d.userEmail || "-"; }},
@@ -29,13 +30,13 @@ layui.use(["table", "form", "layer"], function () {
                     return '<span class="empty-text">-</span>';
                 }
                 return d.roles.map(function (roleName) {
-                    return '<span class="status-tag info">' + roleName + '</span>';
+                    return '<span class="status-tag info">' + roleName + "</span>";
                 }).join(" ");
             }},
             {field: "status", title: "状态", width: 90, templet: function (d) {
                 return d.status === 1
-                        ? '<span class="status-tag success">启用</span>'
-                        : '<span class="status-tag fail">禁用</span>';
+                    ? '<span class="status-tag success">启用</span>'
+                    : '<span class="status-tag fail">禁用</span>';
             }},
             {field: "lastLoginTime", title: "最后登录时间", minWidth: 180, templet: function (d) { return AppUtils.formatDateTime(d.lastLoginTime); }},
             {title: "操作", width: 230, fixed: "right", templet: function () {
@@ -137,19 +138,30 @@ layui.use(["table", "form", "layer"], function () {
         }
     });
 
-    var addUserButton = document.getElementById("addUserButton");
-    if (AppAuth.hasPermission("user:create")) {
-        addUserButton.addEventListener("click", function () {
-            openUserDialog(null);
-        });
-    } else {
-        addUserButton.style.display = "none";
-    }
+    bindToolbar();
 
-    document.getElementById("resetButton").addEventListener("click", function () {
-        form.val("userSearchForm", {userName: ""});
-        AppTable.reload(table, userTableId, {userName: ""});
-    });
+    function bindToolbar() {
+        var addUserButton = document.getElementById("addUserButton");
+        if (AppAuth.hasPermission("user:create")) {
+            addUserButton.addEventListener("click", function () {
+                openUserDialog(null);
+            });
+        } else {
+            addUserButton.style.display = "none";
+        }
+
+        var importButton = document.getElementById("importButton");
+        if (AppAuth.hasPermission("user:create")) {
+            importButton.addEventListener("click", openImportDialog);
+        } else {
+            importButton.style.display = "none";
+        }
+
+        document.getElementById("resetButton").addEventListener("click", function () {
+            form.val("userSearchForm", {userName: ""});
+            AppTable.reload(table, userTableId, {userName: ""});
+        });
+    }
 
     function openUserDialog(user) {
         editingUserId = user ? user.id : null;
@@ -191,8 +203,90 @@ layui.use(["table", "form", "layer"], function () {
         });
     }
 
+    function openImportDialog() {
+        importFile = null;
+        var index = layer.open({
+            type: 1,
+            title: "导入用户 CSV",
+            area: ["560px", "380px"],
+            content: AppUtils.getTemplateHtml("userImportTemplate"),
+            success: function (layero) {
+                var fileInput = layero[0].querySelector("#userCsvFile");
+                var fileName = layero[0].querySelector("#userCsvFileName");
+                var submitButton = layero[0].querySelector("#submitImportButton");
+                var closeButton = layero[0].querySelector('[data-action="close"]');
+
+                closeButton.addEventListener("click", function () {
+                    layer.close(index);
+                });
+
+                fileInput.addEventListener("change", function (event) {
+                    importFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                    fileName.textContent = importFile ? ("已选择文件: " + importFile.name) : "尚未选择文件";
+                });
+
+                submitButton.addEventListener("click", function () {
+                    submitImport(submitButton, index);
+                });
+            },
+            end: function () {
+                importFile = null;
+            }
+        });
+    }
+
+    async function submitImport(button, dialogIndex) {
+        if (!importFile) {
+            AppRequest.showMessage("请先选择 CSV 文件", 2);
+            return;
+        }
+        var formData = new FormData();
+        formData.append("file", importFile);
+        button.disabled = true;
+        button.classList.add("layui-btn-disabled");
+        button.textContent = "导入中...";
+        try {
+            var result = await AppRequest.request("/api/user/import", {
+                method: "POST",
+                body: formData
+            }, {
+                successMessage: "导入完成"
+            });
+            layer.close(dialogIndex);
+            table.reload(userTableId);
+            showImportResult(result.data || {});
+        } catch (error) {
+            button.disabled = false;
+            button.classList.remove("layui-btn-disabled");
+            button.textContent = "开始导入";
+        }
+    }
+
+    function showImportResult(data) {
+        var errors = Array.isArray(data.errorMessages) ? data.errorMessages : [];
+        var content = '<div class="import-result">'
+            + '<div class="import-result-row"><span>成功总数</span><strong>' + Number(data.successCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>新增数量</span><strong>' + Number(data.insertedCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>更新数量</span><strong>' + Number(data.updatedCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>失败数量</span><strong>' + Number(data.failureCount || 0) + "</strong></div>";
+        if (errors.length > 0) {
+            content += '<div class="import-result-errors">';
+            errors.forEach(function (item) {
+                content += '<div class="import-result-error">' + escapeHtml(item) + "</div>";
+            });
+            content += "</div>";
+        }
+        content += "</div>";
+        layer.open({
+            type: 1,
+            title: "导入结果",
+            area: ["560px", "440px"],
+            content: content
+        });
+    }
+
     function confirmDelete(user) {
-        AppDialog.confirm(layer, "确定删除用户“" + user.userName + "”吗？", async function (index) {
+        AppDialog.confirm(layer, '确定删除用户 "' + user.userName + '" 吗？', async function (index) {
             try {
                 await AppRequest.request("/api/user/" + user.id, {
                     method: "DELETE"
@@ -263,7 +357,16 @@ layui.use(["table", "form", "layer"], function () {
 
         return roleList.map(function (role) {
             var checked = selectedMap[role.id] ? "checked" : "";
-            return '<input type="checkbox" name="role_' + role.id + '" title="' + role.roleName + ' (' + role.roleCode + ')" value="' + role.id + '" ' + checked + '>';
+            return '<input type="checkbox" name="role_' + role.id + '" title="' + role.roleName + " (" + role.roleCode + ')" value="' + role.id + '" ' + checked + ">";
         }).join("");
+    }
+
+    function escapeHtml(text) {
+        return String(text == null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
 });

@@ -1,5 +1,6 @@
 package com.cd.mapper;
 
+import com.cd.dto.AccountRiskSnapshotDTO;
 import com.cd.entity.AccountEntity;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,4 +31,6 @@ public interface AccountMapper {
 
     /** 每个 MAC 的最新一条记录（用于总览聚合）。 */
     List<AccountEntity> selectLatestPerMac();
+
+    List<AccountRiskSnapshotDTO> selectLatestRiskSnapshotByHostIds(@Param("hostIds") List<Long> hostIds);
 }

@@ -5,22 +5,29 @@ import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.dto.AssetProbeDTO;
+import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
 import com.cd.entity.HostEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.service.HostService;
+import com.cd.util.CsvImportUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +41,11 @@ public class HostServiceImpl implements HostService {
     private static final String PROBE_TYPE_ASSETS = "assets";
     private static final int PROBE_ONLINE_THRESHOLD_SECONDS = 15;
     private static final Duration MANUAL_PROBE_VALID_DURATION = Duration.ofHours(8);
+    private static final List<DateTimeFormatter> CSV_DATE_TIME_FORMATTERS = List.of(
+            DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")
+    );
 
     private final HostMapper hostMapper;
     private final RabbitTemplate rabbitTemplate;
@@ -108,6 +120,12 @@ public class HostServiceImpl implements HostService {
                 .map(this::toResponse)
                 .toList();
         return new PageResult<>(total, list);
+    }
+
+    @Override
+    @Transactional
+    public CsvImportResultDTO importCsv(MultipartFile file) {
+        return CsvImportUtil.importCsv(file, this::mapCsvRecord, this::saveImportedRecord);
     }
 
     @Override
@@ -211,6 +229,49 @@ public class HostServiceImpl implements HostService {
         log.info("资产探测任务已下发: routingKey={}, payload={}", macAddress, payload);
     }
 
+    private HostEntity mapCsvRecord(CSVRecord record) {
+        HostEntity entity = new HostEntity();
+        entity.setHostname(emptyToNull(CsvImportUtil.getValue(record, "hostname", "host_name")));
+        entity.setIpv4(emptyToNull(CsvImportUtil.getValue(record, "ipv4", "ip")));
+        entity.setMacAddress(requireField(record, "mac_address", "macAddress"));
+        entity.setOsName(emptyToNull(CsvImportUtil.getValue(record, "os_name", "osName")));
+        entity.setOsVersion(emptyToNull(CsvImportUtil.getValue(record, "os_version", "osVersion")));
+        entity.setOsArch(emptyToNull(CsvImportUtil.getValue(record, "os_arch", "osArch")));
+        entity.setOsRelease(emptyToNull(CsvImportUtil.getValue(record, "os_release", "osRelease")));
+        entity.setCpuModel(emptyToNull(CsvImportUtil.getValue(record, "cpu_model", "cpuModel")));
+        entity.setCpuPhysicalCores(parseInteger(CsvImportUtil.getValue(record, "cpu_physical_cores", "cpuPhysicalCores"), "cpu_physical_cores"));
+        entity.setCpuLogicalCores(parseInteger(CsvImportUtil.getValue(record, "cpu_logical_cores", "cpuLogicalCores"), "cpu_logical_cores"));
+        entity.setMemTotal(emptyToNull(CsvImportUtil.getValue(record, "mem_total", "memTotal")));
+        entity.setMemUsed(emptyToNull(CsvImportUtil.getValue(record, "mem_used", "memUsed")));
+        entity.setMemAvailable(emptyToNull(CsvImportUtil.getValue(record, "mem_available", "memAvailable")));
+        entity.setMemUsage(emptyToNull(CsvImportUtil.getValue(record, "mem_usage", "memUsage")));
+        entity.setStatus(parseStatus(CsvImportUtil.getValue(record, "status")));
+        entity.setLastScanTime(parseDateTime(CsvImportUtil.getValue(record, "last_scan_time", "lastScanTime"), "last_scan_time"));
+        return entity;
+    }
+
+    private void saveImportedRecord(HostEntity imported, CsvImportResultDTO result) {
+        HostEntity existing = hostMapper.selectByNormalizedMac(normalizeMac(imported.getMacAddress()));
+        if (existing == null) {
+            if (imported.getStatus() == null) {
+                imported.setStatus(1);
+            }
+            hostMapper.insert(imported);
+            result.incrementInserted();
+            return;
+        }
+
+        imported.setId(existing.getId());
+        if (imported.getStatus() == null) {
+            imported.setStatus(existing.getStatus());
+        }
+        if (imported.getLastScanTime() == null) {
+            imported.setLastScanTime(existing.getLastScanTime());
+        }
+        hostMapper.updateById(imported);
+        result.incrementUpdated();
+    }
+
     private String normalizeMac(String mac) {
         if (mac == null) {
             return "";
@@ -218,10 +279,55 @@ public class HostServiceImpl implements HostService {
         return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
+    private String requireField(CSVRecord record, String... headerNames) {
+        String value = CsvImportUtil.getValue(record, headerNames);
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException("必填字段缺失: " + headerNames[0]);
+        }
+        return value.trim();
+    }
+
+    private Integer parseInteger(String value, String fieldName) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(fieldName + " 必须是整数");
+        }
+    }
+
+    private Integer parseStatus(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        Integer status = parseInteger(value, "status");
+        if (status != 0 && status != 1) {
+            throw new IllegalArgumentException("status 仅支持 0 或 1");
+        }
+        return status;
+    }
+
+    private LocalDateTime parseDateTime(String value, String fieldName) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String text = value.trim();
+        for (DateTimeFormatter formatter : CSV_DATE_TIME_FORMATTERS) {
+            try {
+                return LocalDateTime.parse(text, formatter);
+            } catch (DateTimeParseException ignored) {
+                // try next
+            }
+        }
+        throw new IllegalArgumentException(fieldName + " 时间格式不正确，支持 yyyy-MM-dd HH:mm:ss 或 ISO_LOCAL_DATE_TIME");
+    }
+
     private HostEntity ensureExists(Long id) {
         HostEntity entity = hostMapper.selectById(id);
         if (entity == null) {
-            throw new ResourceNotFoundException("记录不存在 id=" + id);
+            throw new ResourceNotFoundException("记录不存在，id=" + id);
         }
         return entity;
     }
@@ -237,7 +343,7 @@ public class HostServiceImpl implements HostService {
     }
 
     private String emptyToNull(String value) {
-        return StringUtils.hasText(value) ? value : null;
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private HostResponseDTO toResponse(HostEntity entity) {

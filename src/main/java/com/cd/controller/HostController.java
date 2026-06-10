@@ -3,6 +3,7 @@ package com.cd.controller;
 import com.cd.common.PageResult;
 import com.cd.common.Result;
 import com.cd.dto.AssetProbeDTO;
+import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Validated
 @RestController
@@ -66,6 +68,12 @@ public class HostController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "size必须大于0") Integer size,
             @RequestParam(required = false) String keyword) {
         return Result.success(hostService.list(page, size, keyword));
+    }
+
+    @PreAuthorize("@perm.has('host:create')")
+    @PostMapping("/import")
+    public Result<CsvImportResultDTO> importCsv(@RequestParam("file") MultipartFile file) {
+        return Result.success(hostService.importCsv(file));
     }
 
     @PreAuthorize("@perm.has('host:probe')")

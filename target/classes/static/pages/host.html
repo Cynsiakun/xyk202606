@@ -29,6 +29,9 @@
                         <option value="5">每 5 秒刷新</option>
                     </select>
                 </div>
+                <button type="button" class="layui-btn layui-btn-normal" id="importButton">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 导入CSV
+                </button>
                 <button type="button" class="layui-btn layui-btn-primary" id="probeStrategyButton">
                     <i class="layui-icon layui-icon-set"></i> 探测策略配置
                 </button>
@@ -47,99 +50,99 @@
 <template id="hostFormTemplate">
     <form class="layui-form popup-form host-form" lay-filter="hostForm">
         <div class="host-form-fields">
-        <div class="layui-form-item">
-            <label class="layui-form-label">主机名</label>
-            <div class="layui-input-block">
-                <input type="text" name="hostname" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">主机名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="hostname" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">IPv4</label>
-            <div class="layui-input-block">
-                <input type="text" name="ipv4" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">IPv4</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ipv4" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">MAC地址</label>
-            <div class="layui-input-block">
-                <input type="text" name="macAddress" required lay-verify="required" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">MAC地址</label>
+                <div class="layui-input-block">
+                    <input type="text" name="macAddress" required lay-verify="required" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">操作系统</label>
-            <div class="layui-input-block">
-                <input type="text" name="osName" placeholder="系统名称" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">操作系统</label>
+                <div class="layui-input-block">
+                    <input type="text" name="osName" placeholder="系统名称" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">系统版本</label>
-            <div class="layui-input-block">
-                <input type="text" name="osVersion" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">系统版本</label>
+                <div class="layui-input-block">
+                    <input type="text" name="osVersion" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">系统架构</label>
-            <div class="layui-input-block">
-                <input type="text" name="osArch" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">系统架构</label>
+                <div class="layui-input-block">
+                    <input type="text" name="osArch" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">具体版本</label>
-            <div class="layui-input-block">
-                <input type="text" name="osRelease" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">具体版本</label>
+                <div class="layui-input-block">
+                    <input type="text" name="osRelease" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">CPU型号</label>
-            <div class="layui-input-block">
-                <input type="text" name="cpuModel" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">CPU型号</label>
+                <div class="layui-input-block">
+                    <input type="text" name="cpuModel" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">物理核心数</label>
-            <div class="layui-input-block">
-                <input type="number" name="cpuPhysicalCores" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">物理核心数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="cpuPhysicalCores" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">逻辑核心数</label>
-            <div class="layui-input-block">
-                <input type="number" name="cpuLogicalCores" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">逻辑核心数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="cpuLogicalCores" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">总内存</label>
-            <div class="layui-input-block">
-                <input type="text" name="memTotal" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">总内存</label>
+                <div class="layui-input-block">
+                    <input type="text" name="memTotal" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">已使用内存</label>
-            <div class="layui-input-block">
-                <input type="text" name="memUsed" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">已使用内存</label>
+                <div class="layui-input-block">
+                    <input type="text" name="memUsed" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">可用内存</label>
-            <div class="layui-input-block">
-                <input type="text" name="memAvailable" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">可用内存</label>
+                <div class="layui-input-block">
+                    <input type="text" name="memAvailable" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">使用率</label>
-            <div class="layui-input-block">
-                <input type="text" name="memUsage" autocomplete="off" class="layui-input">
+            <div class="layui-form-item">
+                <label class="layui-form-label">使用率</label>
+                <div class="layui-input-block">
+                    <input type="text" name="memUsage" autocomplete="off" class="layui-input">
+                </div>
             </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">状态</label>
-            <div class="layui-input-block">
-                <select name="status">
-                    <option value="1">在线</option>
-                    <option value="0">离线</option>
-                </select>
+            <div class="layui-form-item">
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-block">
+                    <select name="status">
+                        <option value="1">在线</option>
+                        <option value="0">离线</option>
+                    </select>
+                </div>
             </div>
-        </div>
         </div>
         <div class="popup-actions">
             <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
@@ -206,6 +209,24 @@
             <button type="submit" class="layui-btn" lay-submit lay-filter="startProbe">开始探测</button>
         </div>
     </form>
+</template>
+
+<template id="hostImportTemplate">
+    <div class="import-dialog">
+        <div class="import-dialog-body">
+            <p class="import-dialog-tip">请选择 UTF-8 编码的 CSV 文件，首行为表头。系统会按 MAC 地址去重，已存在的主机会更新，不会重复插入。</p>
+            <input type="file" id="hostCsvFile" accept=".csv,text/csv" class="import-file-input">
+            <div class="import-file-name" id="hostCsvFileName">尚未选择文件</div>
+            <div class="import-example">
+                <div class="import-example-title">建议表头</div>
+                <code>hostname,ipv4,mac_address,os_name,os_version,os_arch,os_release,cpu_model,cpu_physical_cores,cpu_logical_cores,mem_total,mem_used,mem_available,mem_usage,status,last_scan_time</code>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn layui-btn-normal" id="submitImportButton">开始导入</button>
+        </div>
+    </div>
 </template>
 
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>

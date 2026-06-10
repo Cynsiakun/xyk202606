@@ -20,20 +20,50 @@ public class PatchSecurityMenuInitializer {
             insertPermission("patch-security:view", "查看补丁安全风险", "/api/patch-security/**");
             insertPermission("patch-security:analyze", "重新分析补丁风险", "/api/patch-security/**/analyze");
             insertPermission("patch-security:scan", "下发补丁扫描", "/api/patch-security/**/scan");
+
+            insertPermission("installed-patch:view", "查看补丁管理", "/api/installed-patch/**");
+            insertPermission("installed-patch:create", "新增补丁记录", "/api/installed-patch");
+            insertPermission("installed-patch:update", "编辑补丁记录", "/api/installed-patch/{id}");
+            insertPermission("installed-patch:delete", "删除补丁记录", "/api/installed-patch/**");
+
+            insertPermission("patch-cve-map:view", "查看CVE映射", "/api/patch-cve-map/**");
+            insertPermission("patch-cve-map:create", "新增CVE映射", "/api/patch-cve-map");
+            insertPermission("patch-cve-map:update", "编辑CVE映射", "/api/patch-cve-map/{id}");
+            insertPermission("patch-cve-map:delete", "删除CVE映射", "/api/patch-cve-map/**");
+
             insertPermission("vuln-detection:view", "查看漏洞检测结果", "/api/vuln-detection/**");
             insertPermission("vuln-detection:analyze", "执行漏洞规则匹配", "/api/vuln-detection/**");
+
+            insertPermission("vuln-rule:view", "查看漏洞库规则", "/api/vuln-rule/**");
+            insertPermission("vuln-rule:create", "新增漏洞库规则", "/api/vuln-rule");
+            insertPermission("vuln-rule:update", "编辑漏洞库规则", "/api/vuln-rule/{id}");
+            insertPermission("vuln-rule:delete", "删除漏洞库规则", "/api/vuln-rule/**");
+
             insertPermission("vuln-ops-dashboard:view", "查看漏洞运营仪表盘", "/api/vuln-ops-dashboard/**");
 
             insertMenus();
-            grant("SECURITY_ADMIN", "patch-security:view", "patch-security:analyze", "patch-security:scan");
-            grant("ANALYST", "patch-security:view", "patch-security:analyze", "patch-security:scan");
-            grant("AUDITOR", "patch-security:view");
-            grant("SECURITY_ADMIN", "vuln-detection:view", "vuln-detection:analyze");
-            grant("ANALYST", "vuln-detection:view", "vuln-detection:analyze");
-            grant("AUDITOR", "vuln-detection:view");
-            grant("SECURITY_ADMIN", "vuln-ops-dashboard:view");
-            grant("ANALYST", "vuln-ops-dashboard:view");
-            grant("AUDITOR", "vuln-ops-dashboard:view");
+
+            grant("SECURITY_ADMIN",
+                    "patch-security:view", "patch-security:analyze", "patch-security:scan",
+                    "installed-patch:view", "installed-patch:create", "installed-patch:update", "installed-patch:delete",
+                    "patch-cve-map:view", "patch-cve-map:create", "patch-cve-map:update", "patch-cve-map:delete",
+                    "vuln-detection:view", "vuln-detection:analyze",
+                    "vuln-rule:view", "vuln-rule:create", "vuln-rule:update", "vuln-rule:delete",
+                    "vuln-ops-dashboard:view");
+            grant("ANALYST",
+                    "patch-security:view", "patch-security:analyze", "patch-security:scan",
+                    "installed-patch:view", "installed-patch:create", "installed-patch:update",
+                    "patch-cve-map:view", "patch-cve-map:create", "patch-cve-map:update",
+                    "vuln-detection:view", "vuln-detection:analyze",
+                    "vuln-rule:view", "vuln-rule:create", "vuln-rule:update",
+                    "vuln-ops-dashboard:view");
+            grant("AUDITOR",
+                    "patch-security:view",
+                    "installed-patch:view",
+                    "patch-cve-map:view",
+                    "vuln-detection:view",
+                    "vuln-rule:view",
+                    "vuln-ops-dashboard:view");
         };
     }
 
@@ -50,57 +80,72 @@ public class PatchSecurityMenuInitializer {
                 "SELECT COALESCE(MAX(sort_order), 0) FROM sys_menu", Integer.class);
         int baseSort = (maxSort == null ? 0 : maxSort) + 1;
 
-        Long viewPermissionId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_permission WHERE permission_code = 'patch-security:view'", Long.class);
-        Long vulnViewPermissionId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_permission WHERE permission_code = 'vuln-detection:view'", Long.class);
-        Long vulnOpsPermissionId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_permission WHERE permission_code = 'vuln-ops-dashboard:view'", Long.class);
+        Long patchSecurityViewPermissionId = permissionId("patch-security:view");
+        Long installedPatchViewPermissionId = permissionId("installed-patch:view");
+        Long patchCveMapViewPermissionId = permissionId("patch-cve-map:view");
+        Long vulnViewPermissionId = permissionId("vuln-detection:view");
+        Long vulnRuleViewPermissionId = permissionId("vuln-rule:view");
+        Long vulnOpsPermissionId = permissionId("vuln-ops-dashboard:view");
 
         jdbcTemplate.update("""
                 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
                 SELECT 'risk_discovery', '风险发现', '#', 'layui-icon-vercode', ?, ?, 1, NULL
                 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'risk_discovery')
-                """, viewPermissionId, baseSort);
+                """, patchSecurityViewPermissionId, baseSort);
 
-        Long parentId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_menu WHERE menu_code = 'risk_discovery'", Long.class);
+        Long riskDiscoveryId = menuId("risk_discovery");
 
+        insertChildMenu("patch_security", "补丁安全", "./pages/patch-security.html", "layui-icon-shield",
+                patchSecurityViewPermissionId, baseSort + 1, riskDiscoveryId);
+        insertChildMenu("patch_management", "补丁管理", "./pages/patch-management.html", "layui-icon-tabs",
+                installedPatchViewPermissionId, baseSort + 2, riskDiscoveryId);
+        insertChildMenu("cve_management", "CVE管理", "./pages/cve-management.html", "layui-icon-dialogue",
+                patchCveMapViewPermissionId, baseSort + 3, riskDiscoveryId);
+        insertChildMenu("vuln_detection", "漏洞检测", "./pages/vuln-detection.html", "layui-icon-search",
+                vulnViewPermissionId, baseSort + 4, riskDiscoveryId);
+        insertChildMenu("vuln_rule_management", "漏洞库管理", "./pages/vuln-rule-management.html", "layui-icon-table",
+                vulnRuleViewPermissionId, baseSort + 5, riskDiscoveryId);
+        insertChildMenu("vuln_ops_dashboard", "漏洞运营仪表盘", "./pages/vuln-ops-dashboard.html", "layui-icon-chart-screen",
+                vulnOpsPermissionId, baseSort + 6, riskDiscoveryId);
+
+        updateMenuParent("patch_security", riskDiscoveryId, patchSecurityViewPermissionId, "./pages/patch-security.html");
+        updateMenuParent("patch_management", riskDiscoveryId, installedPatchViewPermissionId, "./pages/patch-management.html");
+        updateMenuParent("cve_management", riskDiscoveryId, patchCveMapViewPermissionId, "./pages/cve-management.html");
+        updateMenuParent("vuln_detection", riskDiscoveryId, vulnViewPermissionId, "./pages/vuln-detection.html");
+        updateMenuParent("vuln_rule_management", riskDiscoveryId, vulnRuleViewPermissionId, "./pages/vuln-rule-management.html");
+        updateMenuParent("vuln_ops_dashboard", riskDiscoveryId, vulnOpsPermissionId, "./pages/vuln-ops-dashboard.html");
+    }
+
+    private void insertChildMenu(String menuCode,
+                                 String menuName,
+                                 String menuPath,
+                                 String menuIcon,
+                                 Long permissionId,
+                                 int sortOrder,
+                                 Long parentId) {
         jdbcTemplate.update("""
                 INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
-                SELECT 'patch_security', '补丁安全', './pages/patch-security.html', 'layui-icon-shield', ?, ?, 1, ?
-                WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'patch_security')
-                """, viewPermissionId, baseSort + 1, parentId);
+                SELECT ?, ?, ?, ?, ?, ?, 1, ?
+                WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = ?)
+                """, menuCode, menuName, menuPath, menuIcon, permissionId, sortOrder, parentId, menuCode);
+    }
 
-        jdbcTemplate.update("""
-                INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
-                SELECT 'vuln_detection', '漏洞检测', './pages/vuln-detection.html', 'layui-icon-search', ?, ?, 1, ?
-                WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_detection')
-                """, vulnViewPermissionId, baseSort + 2, parentId);
-
-        jdbcTemplate.update("""
-                INSERT INTO sys_menu (menu_code, menu_name, menu_path, menu_icon, permission_id, sort_order, status, parent_id)
-                SELECT 'vuln_ops_dashboard', '漏洞运营仪表盘', './pages/vuln-ops-dashboard.html', 'layui-icon-chart-screen', ?, ?, 1, ?
-                WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_code = 'vuln_ops_dashboard')
-                """, vulnOpsPermissionId, baseSort + 3, parentId);
-
+    private void updateMenuParent(String menuCode, Long parentId, Long permissionId, String menuPath) {
         jdbcTemplate.update("""
                 UPDATE sys_menu
-                SET parent_id = ?, menu_path = './pages/patch-security.html', permission_id = ?
-                WHERE menu_code = 'patch_security'
-                """, parentId, viewPermissionId);
+                SET parent_id = ?, menu_path = ?, permission_id = ?
+                WHERE menu_code = ?
+                """, parentId, menuPath, permissionId, menuCode);
+    }
 
-        jdbcTemplate.update("""
-                UPDATE sys_menu
-                SET parent_id = ?, menu_path = './pages/vuln-detection.html', permission_id = ?
-                WHERE menu_code = 'vuln_detection'
-                """, parentId, vulnViewPermissionId);
+    private Long permissionId(String permissionCode) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_permission WHERE permission_code = ?", Long.class, permissionCode);
+    }
 
-        jdbcTemplate.update("""
-                UPDATE sys_menu
-                SET parent_id = ?, menu_path = './pages/vuln-ops-dashboard.html', permission_id = ?
-                WHERE menu_code = 'vuln_ops_dashboard'
-                """, parentId, vulnOpsPermissionId);
+    private Long menuId(String menuCode) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE menu_code = ?", Long.class, menuCode);
     }
 
     private void grant(String roleCode, String... permissionCodes) {
@@ -109,7 +154,7 @@ public class PatchSecurityMenuInitializer {
                     INSERT INTO sys_role_permission (role_id, permission_id)
                     SELECT r.id, p.id
                     FROM sys_role r
-                             JOIN sys_permission p ON p.permission_code = ?
+                    JOIN sys_permission p ON p.permission_code = ?
                     WHERE r.role_code = ?
                       AND NOT EXISTS (
                         SELECT 1 FROM sys_role_permission rp

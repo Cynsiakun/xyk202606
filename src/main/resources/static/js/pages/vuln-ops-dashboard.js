@@ -41,7 +41,7 @@ layui.use(["layer"], function () {
         document.getElementById("customEndDate").addEventListener("change", handleCustomRange);
 
         document.getElementById("exportReportButton").addEventListener("click", function () {
-            layer.msg("导出接口已预留，当前先展示真实运营数据。");
+            exportReport();
         });
     }
 
@@ -86,6 +86,27 @@ layui.use(["layer"], function () {
             }
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function exportReport() {
+        var token = AppAuth.getToken();
+        var url = "/api/vuln-ops-dashboard/export" + buildQuery();
+        try {
+            var response = await fetch(url, {
+                method: "GET",
+                headers: token ? {Authorization: "Bearer " + token} : {}
+            });
+            if (!response.ok) {
+                await handleExportError(response);
+                return;
+            }
+            var blob = await response.blob();
+            var fileName = getDownloadFileName(response) || buildExportFileName();
+            triggerDownload(blob, fileName);
+            AppRequest.showMessage("报告导出成功", 1, 1600);
+        } catch (error) {
+            AppRequest.showMessage(error.message || "导出失败", 2, 2000);
         }
     }
 
@@ -660,6 +681,62 @@ layui.use(["layer"], function () {
 
     function getCustomEnd() {
         return document.getElementById("customEndDate").value;
+    }
+
+    async function handleExportError(response) {
+        var message = "导出失败";
+        try {
+            var result = await response.json();
+            if (result && result.message) {
+                message = result.message;
+            }
+        } catch (error) {
+            message = response.statusText || message;
+        }
+        if (response.status === 401 || response.status === 403) {
+            AppAuth.clearLogin();
+            AppAuth.redirectToLogin();
+            return;
+        }
+        AppRequest.showMessage(message, 2, 2000);
+    }
+
+    function getDownloadFileName(response) {
+        var disposition = response.headers.get("content-disposition") || "";
+        var utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+            return decodeURIComponent(utf8Match[1]);
+        }
+        var nameMatch = disposition.match(/filename="?([^";]+)"?/i);
+        return nameMatch ? nameMatch[1] : "";
+    }
+
+    function buildExportFileName() {
+        var now = new Date();
+        var timestamp = [
+            now.getFullYear(),
+            pad2(now.getMonth() + 1),
+            pad2(now.getDate()),
+            pad2(now.getHours()),
+            pad2(now.getMinutes()),
+            pad2(now.getSeconds())
+        ].join("");
+        return "vuln_ops_dashboard_" + timestamp + ".html";
+    }
+
+    function pad2(value) {
+        return value < 10 ? "0" + value : String(value);
+    }
+
+    function triggerDownload(blob, fileName) {
+        var downloadUrl = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
     }
 
     function escapeHtml(value) {

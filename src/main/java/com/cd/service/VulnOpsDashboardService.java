@@ -7,4 +7,6 @@ import java.time.LocalDate;
 public interface VulnOpsDashboardService {
 
     VulnOpsDashboardResponseDTO overview(String range, LocalDate startDate, LocalDate endDate);
+
+    String exportHtml(String range, LocalDate startDate, LocalDate endDate);
 }

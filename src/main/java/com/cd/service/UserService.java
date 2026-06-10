@@ -1,9 +1,10 @@
 package com.cd.service;
 
 import com.cd.common.PageResult;
+import com.cd.dto.CsvImportResultDTO;
+import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
 import com.cd.dto.UserCreateDTO;
-import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserCurrentDTO;
 import com.cd.dto.UserLoginDTO;
 import com.cd.dto.UserLoginResponseDTO;
@@ -43,4 +44,6 @@ public interface UserService {
     UserResponseDTO getById(Long id);
 
     PageResult<UserResponseDTO> list(int page, int size, String userName);
+
+    CsvImportResultDTO importCsv(MultipartFile file);
 }

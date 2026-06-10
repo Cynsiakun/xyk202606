@@ -2,19 +2,20 @@ layui.use(["table", "form", "layer"], function () {
     var table = layui.table;
     var form = layui.form;
     var layer = layui.layer;
-    var editingHostId = null;
     var hostTableId = "hostTable";
+    var editingHostId = null;
+    var importFile = null;
 
     AppTable.renderPageTable(table, {
         elem: "#" + hostTableId,
         url: "/api/host/list",
         cols: [[
             {field: "id", title: "ID", width: 70, sort: true},
-            {field: "hostname", title: "主机名", minWidth: 120, templet: function (d) { return d.hostname || "-"; }},
-            {field: "ipv4", title: "主IP", minWidth: 130, templet: function (d) { return d.ipv4 || "-"; }},
-            {field: "macAddress", title: "MAC地址", minWidth: 160},
-            {field: "osRelease", title: "操作系统", minWidth: 140, templet: function (d) {
-                return d.osRelease || "-";
+            {field: "hostname", title: "主机名", minWidth: 140, templet: function (d) { return d.hostname || "-"; }},
+            {field: "ipv4", title: "IP", minWidth: 130, templet: function (d) { return d.ipv4 || "-"; }},
+            {field: "macAddress", title: "MAC地址", minWidth: 170, templet: function (d) { return d.macAddress || "-"; }},
+            {field: "osRelease", title: "操作系统", minWidth: 180, templet: function (d) {
+                return d.osRelease || d.osVersion || d.osName || "-";
             }},
             {title: "内存占用", width: 150, templet: function (d) {
                 var total = d.memTotal || "-";
@@ -26,8 +27,8 @@ layui.use(["table", "form", "layer"], function () {
             }},
             {field: "status", title: "状态", width: 90, fixed: "right", templet: function (d) {
                 return d.status === 1
-                        ? '<span class="status-tag success">在线</span>'
-                        : '<span class="status-tag fail">离线</span>';
+                    ? '<span class="status-tag success">在线</span>'
+                    : '<span class="status-tag fail">离线</span>';
             }},
             {title: "操作", width: 360, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
@@ -86,27 +87,6 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
-    table.on("tool(hostTable)", function (obj) {
-        if (obj.event === "detail") {
-            openDetailDialog(obj.data);
-        }
-        if (obj.event === "asset") {
-            AssetUtils.openHostAssetTabs(layer, obj.data);
-        }
-        if (obj.event === "export") {
-            openExportDialog(obj.data);
-        }
-        if (obj.event === "probe") {
-            openProbeDialog(obj.data);
-        }
-        if (obj.event === "edit") {
-            openHostDialog(obj.data);
-        }
-        if (obj.event === "delete") {
-            confirmDelete(obj.data);
-        }
-    });
-
     form.on("submit(startProbe)", function (data) {
         var payload = {
             account: data.field.account === "on",
@@ -146,6 +126,77 @@ layui.use(["table", "form", "layer"], function () {
         return false;
     });
 
+    table.on("tool(hostTable)", function (obj) {
+        if (obj.event === "detail") {
+            openDetailDialog(obj.data);
+        }
+        if (obj.event === "asset") {
+            AssetUtils.openHostAssetTabs(layer, obj.data);
+        }
+        if (obj.event === "export") {
+            openExportDialog(obj.data);
+        }
+        if (obj.event === "probe") {
+            openProbeDialog(obj.data);
+        }
+        if (obj.event === "edit") {
+            openHostDialog(obj.data);
+        }
+        if (obj.event === "delete") {
+            confirmDelete(obj.data);
+        }
+    });
+
+    bindToolbar();
+
+    function bindToolbar() {
+        var addHostButton = document.getElementById("addHostButton");
+        if (AppAuth.hasPermission("host:create")) {
+            addHostButton.addEventListener("click", function () {
+                openHostDialog(null);
+            });
+        } else {
+            addHostButton.style.display = "none";
+        }
+
+        var importButton = document.getElementById("importButton");
+        if (AppAuth.hasPermission("host:create")) {
+            importButton.addEventListener("click", openImportDialog);
+        } else {
+            importButton.style.display = "none";
+        }
+
+        var probeStrategyButton = document.getElementById("probeStrategyButton");
+        if (AppAuth.hasPermission("host:probe")) {
+            probeStrategyButton.addEventListener("click", openProbeStrategyDialog);
+        } else {
+            probeStrategyButton.style.display = "none";
+        }
+
+        document.getElementById("resetButton").addEventListener("click", function () {
+            form.val("hostSearchForm", {keyword: ""});
+            AppTable.reload(table, hostTableId, {keyword: ""});
+        });
+
+        document.getElementById("refreshButton").addEventListener("click", refreshData);
+    }
+
+    function refreshData() {
+        table.reloadData(hostTableId, {scrollPos: "fixed"});
+    }
+
+    var autoRefreshTimer = null;
+    form.on("select(autoRefreshSelect)", function (data) {
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = null;
+        }
+        var seconds = Number(data.value);
+        if (seconds > 0) {
+            autoRefreshTimer = setInterval(refreshData, seconds * 1000);
+        }
+    });
+
     async function submitProbe(payload, force) {
         var requestPayload = Object.assign({}, payload, {force: !!force});
         try {
@@ -170,45 +221,6 @@ layui.use(["table", "form", "layer"], function () {
         }
     }
 
-    var addHostButton = document.getElementById("addHostButton");
-    if (AppAuth.hasPermission("host:create")) {
-        addHostButton.addEventListener("click", function () {
-            openHostDialog(null);
-        });
-    } else {
-        addHostButton.style.display = "none";
-    }
-
-    var probeStrategyButton = document.getElementById("probeStrategyButton");
-    if (AppAuth.hasPermission("host:probe")) {
-        probeStrategyButton.addEventListener("click", openProbeStrategyDialog);
-    } else {
-        probeStrategyButton.style.display = "none";
-    }
-
-    document.getElementById("resetButton").addEventListener("click", function () {
-        form.val("hostSearchForm", {keyword: ""});
-        AppTable.reload(table, hostTableId, {keyword: ""});
-    });
-
-    function refreshData() {
-        table.reloadData(hostTableId, {scrollPos: "fixed"});
-    }
-
-    document.getElementById("refreshButton").addEventListener("click", refreshData);
-
-    var autoRefreshTimer = null;
-    form.on("select(autoRefreshSelect)", function (data) {
-        if (autoRefreshTimer) {
-            clearInterval(autoRefreshTimer);
-            autoRefreshTimer = null;
-        }
-        var seconds = Number(data.value);
-        if (seconds > 0) {
-            autoRefreshTimer = setInterval(refreshData, seconds * 1000);
-        }
-    });
-
     function openHostDialog(host) {
         editingHostId = host ? host.id : null;
         var viewportHeight = window.innerHeight || 640;
@@ -221,7 +233,6 @@ layui.use(["table", "form", "layer"], function () {
             area: [dialogWidth + "px", dialogHeight + "px"],
             content: AppUtils.getTemplateHtml("hostFormTemplate"),
             success: function (layero) {
-                form.render();
                 form.val("hostForm", {
                     hostname: host ? host.hostname || "" : "",
                     ipv4: host ? host.ipv4 || "" : "",
@@ -239,6 +250,7 @@ layui.use(["table", "form", "layer"], function () {
                     memUsage: host ? host.memUsage || "" : "",
                     status: host && host.status === 0 ? "0" : "1"
                 });
+                form.render(null, "hostForm");
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);
                 });
@@ -246,6 +258,90 @@ layui.use(["table", "form", "layer"], function () {
             end: function () {
                 editingHostId = null;
             }
+        });
+    }
+
+    function openImportDialog() {
+        importFile = null;
+        var viewportWidth = window.innerWidth || 560;
+        var dialogWidth = Math.min(560, viewportWidth - 30);
+        var index = layer.open({
+            type: 1,
+            title: "导入主机 CSV",
+            area: [dialogWidth + "px", "380px"],
+            content: AppUtils.getTemplateHtml("hostImportTemplate"),
+            success: function (layero) {
+                var fileInput = layero[0].querySelector("#hostCsvFile");
+                var fileName = layero[0].querySelector("#hostCsvFileName");
+                var submitButton = layero[0].querySelector("#submitImportButton");
+                var closeButton = layero[0].querySelector('[data-action="close"]');
+
+                closeButton.addEventListener("click", function () {
+                    layer.close(index);
+                });
+
+                fileInput.addEventListener("change", function (event) {
+                    importFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                    fileName.textContent = importFile ? ("已选择文件: " + importFile.name) : "尚未选择文件";
+                });
+
+                submitButton.addEventListener("click", function () {
+                    submitImport(submitButton, index);
+                });
+            },
+            end: function () {
+                importFile = null;
+            }
+        });
+    }
+
+    async function submitImport(button, dialogIndex) {
+        if (!importFile) {
+            AppRequest.showMessage("请先选择 CSV 文件", 2);
+            return;
+        }
+        var formData = new FormData();
+        formData.append("file", importFile);
+        button.disabled = true;
+        button.classList.add("layui-btn-disabled");
+        button.textContent = "导入中...";
+        try {
+            var result = await AppRequest.request("/api/host/import", {
+                method: "POST",
+                body: formData
+            }, {
+                successMessage: "导入完成"
+            });
+            layer.close(dialogIndex);
+            table.reload(hostTableId);
+            showImportResult(result.data || {});
+        } catch (error) {
+            button.disabled = false;
+            button.classList.remove("layui-btn-disabled");
+            button.textContent = "开始导入";
+        }
+    }
+
+    function showImportResult(data) {
+        var errors = Array.isArray(data.errorMessages) ? data.errorMessages : [];
+        var content = '<div class="import-result">'
+            + '<div class="import-result-row"><span>成功总数</span><strong>' + Number(data.successCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>新增数量</span><strong>' + Number(data.insertedCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>更新数量</span><strong>' + Number(data.updatedCount || 0) + "</strong></div>"
+            + '<div class="import-result-row"><span>失败数量</span><strong>' + Number(data.failureCount || 0) + "</strong></div>";
+        if (errors.length > 0) {
+            content += '<div class="import-result-errors">';
+            errors.forEach(function (item) {
+                content += '<div class="import-result-error">' + escapeHtml(item) + "</div>";
+            });
+            content += "</div>";
+        }
+        content += "</div>";
+        layer.open({
+            type: 1,
+            title: "导入结果",
+            area: ["560px", "440px"],
+            content: content
         });
     }
 
@@ -282,7 +378,7 @@ layui.use(["table", "form", "layer"], function () {
                             strategy = result.data;
                         }
                     } catch (error) {
-                        // 读取失败时使用默认值填充。
+                        return;
                     }
                     form.val("probeStrategyForm", {
                         enabled: !!strategy.enabled,
@@ -342,12 +438,12 @@ layui.use(["table", "form", "layer"], function () {
             type: 1,
             title: "导出资产清单",
             area: ["320px", "190px"],
-            content: '<div class="popup-form">' +
-                    '<div class="layui-btn-container" style="padding-top: 12px;">' +
-                    '<button type="button" class="layui-btn layui-btn-fluid" data-export-format="json">JSON</button>' +
-                    '<button type="button" class="layui-btn layui-btn-normal layui-btn-fluid" data-export-format="excel">Excel</button>' +
-                    '</div>' +
-                    '</div>',
+            content: '<div class="popup-form">'
+                + '<div class="layui-btn-container" style="padding-top: 12px;">'
+                + '<button type="button" class="layui-btn layui-btn-fluid" data-export-format="json">JSON</button>'
+                + '<button type="button" class="layui-btn layui-btn-normal layui-btn-fluid" data-export-format="excel">Excel</button>'
+                + "</div>"
+                + "</div>",
             success: function (layero, index) {
                 layero.find("[data-export-format]").on("click", function () {
                     var format = this.getAttribute("data-export-format");
@@ -450,19 +546,19 @@ layui.use(["table", "form", "layer"], function () {
     function buildDetailHtml(host) {
         var h = host || {};
         var statusTag = h.status === 1
-                ? '<span class="status-tag success">在线</span>'
-                : '<span class="status-tag fail">离线</span>';
+            ? '<span class="status-tag success">在线</span>'
+            : '<span class="status-tag fail">离线</span>';
         var cores = "";
         if (h.cpuPhysicalCores != null || h.cpuLogicalCores != null) {
             cores = (h.cpuPhysicalCores != null ? h.cpuPhysicalCores : "?") + " 物理核 / "
-                    + (h.cpuLogicalCores != null ? h.cpuLogicalCores : "?") + " 逻辑核";
+                + (h.cpuLogicalCores != null ? h.cpuLogicalCores : "?") + " 逻辑核";
         }
         var sections = [
             {title: "基本信息", items: [
-                {label: "ID", value: h.id, full: false},
-                {label: "主机名", value: h.hostname, full: false},
-                {label: "主IP", value: h.ipv4, full: false},
-                {label: "MAC地址", value: h.macAddress, full: false},
+                {label: "ID", value: h.id},
+                {label: "主机名", value: h.hostname},
+                {label: "IP", value: h.ipv4},
+                {label: "MAC地址", value: h.macAddress},
                 {label: "状态", value: statusTag, raw: true, full: true}
             ]},
             {title: "操作系统", items: [
@@ -491,18 +587,18 @@ layui.use(["table", "form", "layer"], function () {
         var html = '<div class="host-detail">';
         sections.forEach(function (section) {
             html += '<div class="host-detail-section">';
-            html += '<div class="host-detail-section-title">' + section.title + '</div>';
+            html += '<div class="host-detail-section-title">' + section.title + "</div>";
             html += '<div class="host-detail-grid">';
             section.items.forEach(function (item) {
                 var value = item.raw ? item.value : formatValue(item.value);
-                html += '<div class="host-detail-item' + (item.full ? ' full' : '') + '">';
-                html += '<span class="host-detail-label">' + item.label + '</span>';
-                html += '<span class="host-detail-value">' + value + '</span>';
-                html += '</div>';
+                html += '<div class="host-detail-item' + (item.full ? " full" : "") + '">';
+                html += '<span class="host-detail-label">' + item.label + "</span>";
+                html += '<span class="host-detail-value">' + value + "</span>";
+                html += "</div>";
             });
-            html += '</div></div>';
+            html += "</div></div>";
         });
-        html += '</div>';
+        html += "</div>";
         return html;
     }
 
@@ -514,17 +610,17 @@ layui.use(["table", "form", "layer"], function () {
     }
 
     function escapeHtml(text) {
-        return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#39;");
+        return String(text == null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
 
     function confirmDelete(host) {
         var label = host.hostname || host.macAddress;
-        AppDialog.confirm(layer, "确定删除主机“" + label + "”吗？", async function (index) {
+        AppDialog.confirm(layer, '确定删除主机 "' + label + '" 吗？', async function (index) {
             try {
                 await AppRequest.request("/api/host/" + host.id, {
                     method: "DELETE"

@@ -1,0 +1,78 @@
+#patchTable + .layui-table-view .layui-table-cell {
+    font-variant-numeric: tabular-nums;
+}
+
+.patch-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.patch-form .patch-form-fields {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.patch-form .popup-actions {
+    flex: 0 0 auto;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #e6e8ef);
+    background: #fff;
+}
+
+.patch-detail {
+    height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 18px 20px;
+}
+
+.patch-detail-section {
+    margin-bottom: 18px;
+}
+
+.patch-detail-section:last-child {
+    margin-bottom: 0;
+}
+
+.patch-detail-section-title {
+    margin: 0 0 12px;
+    padding-left: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2329;
+    border-left: 3px solid #1e6fff;
+}
+
+.patch-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+.patch-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 9px 12px;
+    background: #f7f8fa;
+    border-radius: 8px;
+}
+
+.patch-detail-item.full {
+    grid-column: 1 / -1;
+}
+
+.patch-detail-label {
+    font-size: 12px;
+    color: #8a8f99;
+}
+
+.patch-detail-value {
+    font-size: 13px;
+    color: #1f2329;
+    word-break: break-all;
+}
