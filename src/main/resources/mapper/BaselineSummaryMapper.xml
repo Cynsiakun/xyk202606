@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.BaselineSummaryMapper">
+
+    <insert id="upsert" parameterType="com.cd.entity.BaselineSummaryEntity">
+        INSERT INTO baseline_summary (host_id, task_id, pass_count, fail_count, score,
+                                      compliance_rate, last_scan_time)
+        VALUES (#{hostId}, #{taskId}, #{passCount}, #{failCount}, #{score},
+                #{complianceRate}, #{lastScanTime})
+        ON DUPLICATE KEY UPDATE
+            pass_count = #{passCount},
+            fail_count = #{failCount},
+            score = #{score},
+            compliance_rate = #{complianceRate},
+            last_scan_time = #{lastScanTime}
+    </insert>
+</mapper>

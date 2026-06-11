@@ -40,6 +40,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\AccountChangeLogControll
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AiController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetExportController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\BaselineTaskController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\CurrentUserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostController.java
@@ -76,6 +77,9 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetOverviewDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetProbeDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRecordDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AssetRiskAnalysisDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineHostDispatchDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskCreateRequestDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskDispatchResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\CsvImportResultDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\EventLogDetailDTO.java
@@ -150,6 +154,13 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountChangeLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AppEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AssetExportLogEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineCheckDataEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineResultEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineRuleEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineRuleItemEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineSummaryEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineTaskEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\BaselineTaskHostEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostPatchRiskEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostPatchStatusEntity.java
@@ -178,6 +189,11 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountChangeLogViewMapper.j
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AppMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AssetExportLogMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\BaselineCheckDataMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\BaselineResultMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\BaselineRuleMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\BaselineSummaryMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\BaselineTaskMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostPatchRiskMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostPatchStatusMapper.java
@@ -209,6 +225,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\UserMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\VulnRuleMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\WindowsEventLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\AssetDataListener.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mq\BaselineResultListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\EventLogMessage.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\HostStatusListener.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mq\PatchScanListener.java
@@ -230,6 +247,9 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetAiAnalysisService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetDataService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetExportService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetQueryService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineCheckDataService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineRuleEngine.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineTaskService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AccountChangeLogViewServiceImpl.java
@@ -237,6 +257,9 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetAiAnalysisService
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetDataServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetExportServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetQueryServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineCheckDataServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineRuleEngineImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineTaskServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashboardServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashScopeAiServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DefaultRuleEnrichmentService.java

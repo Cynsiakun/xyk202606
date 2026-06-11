@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.BaselineResultMapper">
+
+    <insert id="insert" parameterType="com.cd.entity.BaselineResultEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO baseline_result (task_id, task_host_id, host_id, rule_id, rule_version, check_key,
+                                     status, actual_value, expected_value, message, evidence,
+                                     remediation_status, scan_time, create_time)
+        VALUES (#{taskId}, #{taskHostId}, #{hostId}, #{ruleId}, #{ruleVersion}, #{checkKey},
+                #{status}, #{actualValue}, #{expectedValue}, #{message}, #{evidence},
+                #{remediationStatus}, #{scanTime}, #{createTime})
+    </insert>
+
+    <select id="countByTaskHostId" resultType="int">
+        SELECT COUNT(*) FROM baseline_result WHERE task_host_id = #{taskHostId}
+    </select>
+</mapper>

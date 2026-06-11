@@ -26,6 +26,8 @@ public class RabbitMQConfig {
     public static final String SYSINFO_ROUTING_KEY = "sysinfo";
     public static final String VULN_VERIFY_RESULT_QUEUE = "vuln_verify_result_queue";
     public static final String VULN_VERIFY_RESULT_ROUTING_KEY = "vuln_verify_result";
+    public static final String BASELINE_QUEUE = "baseline_queue";
+    public static final String BASELINE_ROUTING_KEY = "baseline";
 
     /** 主机心跳队列：采集端每 3 秒上报一次 {"mac_address":"..."}。 */
     public static final String STATUS_QUEUE = "status_queue";
@@ -92,6 +94,22 @@ public class RabbitMQConfig {
                 Binding.DestinationType.QUEUE,
                 SYSINFO_EXCHANGE,
                 VULN_VERIFY_RESULT_ROUTING_KEY,
+                null
+        );
+    }
+
+    @Bean
+    public Queue baselineQueue() {
+        return new Queue(BASELINE_QUEUE, true);
+    }
+
+    @Bean
+    public Binding baselineBinding() {
+        return new Binding(
+                BASELINE_QUEUE,
+                Binding.DestinationType.QUEUE,
+                SYSINFO_EXCHANGE,
+                BASELINE_ROUTING_KEY,
                 null
         );
     }

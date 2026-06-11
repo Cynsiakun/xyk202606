@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.BaselineRuleMapper">
+
+    <resultMap id="BaselineRuleResultMap" type="com.cd.entity.BaselineRuleEntity">
+        <id column="id" property="id"/>
+        <result column="rule_code" property="ruleCode"/>
+        <result column="rule_name" property="ruleName"/>
+        <result column="category" property="category"/>
+        <result column="description" property="description"/>
+        <result column="severity" property="severity"/>
+        <result column="score" property="score"/>
+        <result column="os_type" property="osType"/>
+        <result column="check_method" property="checkMethod"/>
+        <result column="check_script" property="checkScript"/>
+        <result column="remediation_type" property="remediationType"/>
+        <result column="remediation_script" property="remediationScript"/>
+        <result column="version" property="version"/>
+        <result column="is_mandatory" property="isMandatory"/>
+        <result column="enabled" property="enabled"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="BaselineRuleItemResultMap" type="com.cd.entity.BaselineRuleItemEntity">
+        <id column="id" property="id"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="item_order" property="itemOrder"/>
+        <result column="check_key" property="checkKey"/>
+        <result column="operator" property="operator"/>
+        <result column="expected_value" property="expectedValue"/>
+        <result column="match_type" property="matchType"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectPublishedByIds" resultMap="BaselineRuleResultMap">
+        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
+               check_method, check_script, remediation_type, remediation_script, version,
+               is_mandatory, enabled, status, create_time, update_time
+        FROM baseline_rule
+        WHERE enabled = 1
+          AND status = 'PUBLISHED'
+          AND id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+        ORDER BY FIELD(id,
+          <foreach collection="ids" item="id" separator=",">
+              #{id}
+          </foreach>
+        )
+    </select>
+
+    <select id="selectItemsByRuleIds" resultMap="BaselineRuleItemResultMap">
+        SELECT id, rule_id, item_order, check_key, operator, expected_value, match_type, remark, create_time
+        FROM baseline_rule_item
+        WHERE rule_id IN
+        <foreach collection="ruleIds" item="ruleId" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+        ORDER BY rule_id ASC, item_order ASC, id ASC
+    </select>
+
+    <select id="selectItemsByItemIds" resultMap="BaselineRuleItemResultMap">
+        SELECT id, rule_id, item_order, check_key, operator, expected_value, match_type, remark, create_time
+        FROM baseline_rule_item
+        WHERE id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </select>
+
+    <select id="selectByIds" resultMap="BaselineRuleResultMap">
+        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
+               check_method, check_script, remediation_type, remediation_script, version,
+               is_mandatory, enabled, status, create_time, update_time
+        FROM baseline_rule
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>
