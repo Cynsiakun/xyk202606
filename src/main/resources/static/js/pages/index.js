@@ -38,7 +38,10 @@ layui.use(["element", "layer"], function () {
         "漏洞检测": "展示漏洞规则命中结果，围绕待验证、验证中、已验证和待修复推进处置。",
         "漏洞库管理": "维护漏洞规则库，支持分页查询、条件检索、新增、编辑、查看与批量删除。",
         "漏洞运营仪表盘": "面向安全管理层的漏洞运营驾驶舱，聚焦趋势、效能与资产健康度。",
-        "日志中心": "浏览 Windows 原始事件日志，支持类型切换、关键字与高级筛选、服务端分页与详情查看。"
+        "日志中心": "浏览 Windows 原始事件日志，支持类型切换、关键字与高级筛选、服务端分页与详情查看。",
+        "安全事件": "SIEM 事件中心，按等级与状态研判安全告警，支持确认、处理、批量处置与关联原始日志查看。",
+        "账户变更日志": "审计 Windows 账户管理事件（创建/修改/删除/加组等），支持动作筛选、关键字与高级搜索、服务端分页与详情查看。",
+        "主机日志管理": "从主机维度查看日志，左侧选择主机，右侧切换安全/系统/应用日志类型，服务端分页与详情查看。"
     };
 
     init();
@@ -219,4 +222,20 @@ layui.use(["element", "layer"], function () {
 
         element.render("nav");
     }
+
+    // 供全局告警弹窗「查看详情」调用：切到安全事件页并定位到该告警
+    window.AppShell = {
+        navigateToAlert: function (alertId) {
+            var page = "./pages/security-event.html";
+            var link = sideNav.querySelector('a[data-page="' + page + '"]');
+            if (link) {
+                setActiveMenu(link);
+                pageTitle.textContent = link.dataset.title || "安全事件";
+                pageDescription.textContent = menuDescriptions[link.dataset.title] || "";
+            } else {
+                pageTitle.textContent = "安全事件";
+            }
+            contentFrame.src = page + "?focus=" + encodeURIComponent(alertId);
+        }
+    };
 });

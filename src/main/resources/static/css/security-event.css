@@ -1,0 +1,245 @@
+/* ============ 顶部统计卡片 ============ */
+.evt-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.evt-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 1px solid rgba(15, 23, 42, 0.05);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-soft);
+}
+
+.evt-stat-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 20px;
+    color: #fff;
+}
+
+.stat-critical .evt-stat-icon { background: linear-gradient(135deg, #f43f5e, #be123c); }
+.stat-high .evt-stat-icon { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.stat-medium .evt-stat-icon { background: linear-gradient(135deg, #fbbf24, #d97706); }
+.stat-untreated .evt-stat-icon { background: linear-gradient(135deg, #64748b, #334155); }
+
+.evt-stat-body { display: flex; flex-direction: column; line-height: 1.2; }
+.evt-stat-value { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.evt-stat-label { margin-top: 2px; font-size: 12px; color: var(--text-secondary); }
+
+/* ============ 工具栏 ============ */
+.evt-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.evt-filter-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.evt-level-tabs {
+    display: inline-flex;
+    padding: 4px;
+    background: var(--surface-muted);
+    border-radius: 12px;
+    gap: 2px;
+}
+
+.evt-level-tab {
+    border: none;
+    background: transparent;
+    padding: 7px 16px;
+    border-radius: 9px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.evt-level-tab:hover { color: var(--text-primary); }
+
+.evt-level-tab.is-active {
+    background: #fff;
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.evt-status-filter { min-width: 140px; }
+
+.evt-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+.evt-search-box .layui-input { flex: 1; }
+
+.evt-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ============ 批量操作条 ============ */
+.evt-batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+    padding: 0 2px;
+}
+
+.evt-batch-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+/* ============ 生效筛选条 ============ */
+.active-filter-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 14px;
+    padding: 10px 16px;
+    background: rgba(244, 63, 94, 0.05);
+    border: 1px solid rgba(244, 63, 94, 0.12);
+    border-radius: 12px;
+}
+.active-filter-label { font-size: 13px; color: var(--text-secondary); }
+.filter-chip {
+    padding: 3px 10px;
+    background: #fff;
+    border: 1px solid rgba(244, 63, 94, 0.2);
+    border-radius: 999px;
+    font-size: 12px;
+    color: #be123c;
+}
+
+/* ============ 标签 ============ */
+.evt-tag, .status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.7;
+    font-weight: 600;
+}
+
+.evt-critical { background: #fef2f2; color: #dc2626; }
+.evt-high { background: #fff7ed; color: #ea580c; }
+.evt-medium { background: #fffbeb; color: #b45309; }
+.evt-low { background: #f1f5f9; color: #475569; }
+
+.status-pill { font-weight: 500; }
+.status-new { background: #eff4ff; color: #1d4ed8; }
+.status-acked { background: #f0f9ff; color: #0369a1; }
+.status-resolved { background: #ecfdf3; color: #027a48; }
+.status-other { background: #f1f5f9; color: #475569; }
+
+.host-cell { display: flex; flex-direction: column; line-height: 1.3; }
+.host-cell strong { font-weight: 600; color: var(--text-primary); }
+.host-cell span { font-size: 12px; color: var(--text-secondary); }
+
+.msg-cell {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.evt-op { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+
+#eventTable + .layui-table-view .layui-table-body tr { cursor: pointer; }
+
+/* ============ 高级搜索弹窗 ============ */
+.adv-search-form { padding: 22px 24px 8px 4px; }
+.adv-search-actions { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 6px; }
+.adv-search-actions .layui-btn { margin: 0; }
+
+/* ============ 详情抽屉 ============ */
+.evt-detail-drawer { height: 100%; padding: 4px 18px 18px; overflow-y: auto; }
+.evt-detail-tab { margin-top: 6px; }
+
+.detail-kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+.detail-kv-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    background: var(--surface-muted);
+    border-radius: 12px;
+}
+.detail-kv-label { font-size: 12px; color: var(--text-secondary); }
+.detail-kv-value { font-size: 14px; color: var(--text-primary); word-break: break-all; }
+
+.detail-message-block { margin-top: 16px; }
+.detail-message-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+.detail-message-label.raw-xml-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.detail-message-text {
+    padding: 14px 16px;
+    background: var(--surface-muted);
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+.detail-empty { padding: 40px 0; text-align: center; color: var(--text-secondary); }
+
+.raw-xml-pre {
+    margin: 0;
+    padding: 16px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 12px;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: calc(100vh - 320px);
+    overflow: auto;
+}
+
+@media (max-width: 1100px) {
+    .evt-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

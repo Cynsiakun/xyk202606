@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.LoginSecurityLogViewMapper">
+
+    <sql id="filterConditions">
+        <where>
+            <if test="q.loginResult != null and q.loginResult != ''">
+                AND l.login_result = #{q.loginResult}
+            </if>
+            <if test="q.eventId != null">
+                AND l.event_id = #{q.eventId}
+            </if>
+            <if test="q.hostId != null">
+                AND l.host_id = #{q.hostId}
+            </if>
+            <if test="q.loginType != null">
+                AND l.login_type = #{q.loginType}
+            </if>
+            <if test="q.username != null and q.username != ''">
+                AND l.username LIKE CONCAT('%', #{q.username}, '%')
+            </if>
+            <if test="q.sourceIp != null and q.sourceIp != ''">
+                AND l.source_ip LIKE CONCAT('%', #{q.sourceIp}, '%')
+            </if>
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (l.username LIKE CONCAT('%', #{q.keyword}, '%')
+                     OR l.source_ip LIKE CONCAT('%', #{q.keyword}, '%')
+                     OR l.process_name LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+            <if test="q.startTime != null">
+                AND l.event_time &gt;= #{q.startTime}
+            </if>
+            <if test="q.endTime != null">
+                AND l.event_time &lt;= #{q.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <sql id="itemColumns">
+        SELECT l.id             AS id,
+               l.source_log_id  AS sourceLogId,
+               l.host_id        AS hostId,
+               h.hostname       AS hostname,
+               h.ipv4           AS ipv4,
+               l.event_id       AS eventId,
+               l.event_time     AS eventTime,
+               l.username       AS username,
+               l.login_result   AS loginResult,
+               l.login_type     AS loginType,
+               l.source_ip      AS sourceIp,
+               l.process_name   AS processName,
+               l.is_elevated    AS isElevated
+        FROM login_security_logs l
+        LEFT JOIN hosts h ON h.id = l.host_id
+    </sql>
+
+    <select id="selectPage" resultType="com.cd.dto.LoginSecurityLogItemDTO">
+        <include refid="itemColumns"/>
+        <include refid="filterConditions"/>
+        ORDER BY l.${q.sortColumn} ${q.sortDirection}, l.id DESC
+        LIMIT #{q.size} OFFSET #{q.offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1)
+        FROM login_security_logs l
+        <include refid="filterConditions"/>
+    </select>
+
+    <select id="selectForExport" resultType="com.cd.dto.LoginSecurityLogItemDTO">
+        <include refid="itemColumns"/>
+        <include refid="filterConditions"/>
+        ORDER BY l.${q.sortColumn} ${q.sortDirection}, l.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectDetailById" resultType="com.cd.dto.LoginSecurityLogDetailDTO">
+        SELECT l.id             AS id,
+               l.source_log_id  AS sourceLogId,
+               l.host_id        AS hostId,
+               h.hostname       AS hostname,
+               h.ipv4           AS ipv4,
+               l.event_id       AS eventId,
+               l.event_time     AS eventTime,
+               l.username       AS username,
+               l.login_result   AS loginResult,
+               l.login_type     AS loginType,
+               l.source_ip      AS sourceIp,
+               l.process_name   AS processName,
+               l.is_elevated    AS isElevated,
+               l.create_time    AS createTime,
+               w.message        AS logMessage,
+               w.raw_json       AS rawXml
+        FROM login_security_logs l
+        LEFT JOIN hosts h ON h.id = l.host_id
+        LEFT JOIN windows_event_logs w ON w.id = l.source_log_id
+        WHERE l.id = #{id}
+    </select>
+
+    <select id="countTodayByResult" resultType="long">
+        SELECT COUNT(1)
+        FROM login_security_logs
+        WHERE login_result = #{result}
+          AND DATE(event_time) = CURDATE()
+    </select>
+
+    <select id="countTodayElevated" resultType="long">
+        SELECT COUNT(1)
+        FROM login_security_logs
+        WHERE is_elevated = 1
+          AND DATE(event_time) = CURDATE()
+    </select>
+
+    <select id="selectHostOptions" resultType="com.cd.dto.HostOptionDTO">
+        SELECT h.id       AS id,
+               h.hostname AS hostname,
+               h.ipv4     AS ipv4
+        FROM hosts h
+        ORDER BY h.id ASC
+    </select>
+</mapper>

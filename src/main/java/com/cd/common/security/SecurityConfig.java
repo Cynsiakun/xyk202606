@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/layui/**",
                                 "/pages/**",
                                 "/uploads/**",
+                                "/ws/**",
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
