@@ -1,0 +1,314 @@
+/* 主机合规总览 —— 顶部操作区 */
+.toolbar-search {
+    width: 220px;
+    display: inline-block;
+}
+
+/* 卡片网格容器 */
+.host-grid-card {
+    background: #fff;
+    border: 1px solid #eef0f3;
+    border-radius: 16px;
+    padding: 18px;
+}
+
+.host-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.grid-empty {
+    grid-column: 1 / -1;
+    padding: 60px 0;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.host-grid-pager {
+    margin-top: 18px;
+    text-align: center;
+}
+
+/* 主机卡片 */
+.host-card {
+    border: 1px solid #e8eaf0;
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: box-shadow .15s, border-color .15s;
+}
+
+.host-card:hover {
+    border-color: #c7d7fe;
+    box-shadow: 0 6px 18px rgba(29, 78, 216, 0.08);
+}
+
+.host-card.selected {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+.card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.card-check {
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.card-head .host-id-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.card-head .host-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-head .host-ip {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.card-head .host-os {
+    font-size: 11px;
+    color: #475467;
+    background: #f2f4f7;
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-body {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* 合规率环形图 */
+.rate-ring {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.rate-ring::after {
+    content: "";
+    position: absolute;
+    inset: 9px;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.rate-ring .ring-num {
+    position: relative;
+    z-index: 1;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.rate-ring.good { background: conic-gradient(#12b76a var(--deg), #eef2f6 0); }
+.rate-ring.warn { background: conic-gradient(#f79009 var(--deg), #eef2f6 0); }
+.rate-ring.bad { background: conic-gradient(#f04438 var(--deg), #eef2f6 0); }
+.rate-ring.none { background: conic-gradient(#d0d5dd 0, #eef2f6 0); }
+
+.rate-ring.good .ring-num { color: #027a48; }
+.rate-ring.warn .ring-num { color: #b54708; }
+.rate-ring.bad .ring-num { color: #b42318; }
+.rate-ring.none .ring-num { color: #98a2b3; font-size: 14px; }
+
+.count-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.count-group .count-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.count-group .count-row .c-label { color: var(--text-secondary); }
+.count-group .count-row .c-val { font-weight: 600; color: var(--text-primary); }
+.count-group .count-row .c-val.pass { color: #027a48; }
+.count-group .count-row .c-val.fail { color: #b42318; }
+
+.card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #f0f1f4;
+    padding-top: 10px;
+}
+
+.card-foot .last-scan {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 详情弹窗 */
+.host-detail {
+    padding: 16px 18px 6px;
+}
+
+.detail-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.detail-overview .ov-item {
+    border: 1px solid #eef0f3;
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: #fafbfc;
+}
+
+.detail-overview .ov-item .lab {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.detail-overview .ov-item .val {
+    margin-top: 6px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.detail-overview .ov-item .val.rate.good { color: #027a48; }
+.detail-overview .ov-item .val.rate.warn { color: #b54708; }
+.detail-overview .ov-item .val.rate.bad { color: #b42318; }
+.detail-overview .ov-item .val.fail { color: #b42318; }
+.detail-overview .ov-item .val.pass { color: #027a48; }
+
+.detail-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 18px 0 12px;
+}
+
+.seg {
+    display: inline-flex;
+    border: 1px solid #d0d5dd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.seg-btn {
+    border: none;
+    background: #fff;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.seg-btn.active {
+    background: #2563eb;
+    color: #fff;
+}
+
+.detail-batch { display: flex; gap: 8px; }
+
+/* 结果状态标签 */
+.res-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.res-status.pass { background: #ecfdf3; color: #027a48; }
+.res-status.fail { background: #fef3f2; color: #b42318; }
+.res-status.error { background: #fffaeb; color: #b54708; }
+
+.rmd {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.rmd-progress { color: #175cd3; background: #eff8ff; }
+.rmd-done { color: #027a48; background: #ecfdf3; }
+.rmd-ticket { color: #6941c6; background: #f4f3ff; }
+
+.host-detail .muted { color: #98a2b3; }
+
+.evidence-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.evidence-cell span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.evidence-cell .evidence-btn {
+    flex-shrink: 0;
+}
+
+.evidence-full {
+    margin: 0;
+    padding: 16px 18px;
+    max-height: 470px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #1d2939;
+    background: #f8fafc;
+    font-family: Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.workorder-form { padding: 18px 18px 4px 0; }
+
+.workorder-tip {
+    margin: 0 0 14px 130px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+    .detail-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

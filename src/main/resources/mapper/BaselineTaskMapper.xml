@@ -97,4 +97,13 @@
         WHERE task_id = #{taskId}
           AND status = #{status}
     </select>
+
+    <select id="selectLatestRuleScopeByHost" resultType="string">
+        SELECT t.rule_scope
+        FROM baseline_task t
+        JOIN baseline_task_host th ON th.task_id = t.id
+        WHERE th.host_id = #{hostId}
+        ORDER BY th.id DESC
+        LIMIT 1
+    </select>
 </mapper>

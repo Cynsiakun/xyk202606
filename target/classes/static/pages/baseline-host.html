@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主机合规总览</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/host.css">
+    <link rel="stylesheet" href="../css/baseline-task.css">
+    <link rel="stylesheet" href="../css/baseline-host.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="baselineHostForm">
+            <div class="toolbar-group">
+                <div class="baseline-title">
+                    <div class="section-kicker">Host Compliance</div>
+                    <h1>主机合规总览</h1>
+                </div>
+            </div>
+            <div class="toolbar-group">
+                <select name="level" lay-filter="levelFilter">
+                    <option value="">全部合规等级</option>
+                    <option value="green">达标（≥90%）</option>
+                    <option value="yellow">预警（60-90%）</option>
+                    <option value="red">不达标（&lt;60%）</option>
+                </select>
+                <input type="text" id="keywordInput" class="layui-input toolbar-search" placeholder="搜索主机名 / IP" autocomplete="off">
+                <button type="button" class="layui-btn layui-btn-primary" id="searchButton">
+                    <i class="layui-icon layui-icon-search"></i> 搜索
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn" id="batchScanButton">
+                    <i class="layui-icon layui-icon-play"></i> 批量检测 (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="host-grid-card">
+        <div class="host-card-grid" id="hostCardGrid">
+            <div class="grid-empty">加载中...</div>
+        </div>
+        <div class="host-grid-pager" id="hostPager"></div>
+    </div>
+</div>
+
+<!-- 主机详情弹窗 -->
+<template id="hostDetailTemplate">
+    <div class="host-detail">
+        <div class="detail-overview" id="detailOverview"></div>
+        <div class="detail-toolbar">
+            <div class="seg" id="failSeg">
+                <button type="button" class="seg-btn active" data-fail="true">不合规</button>
+                <button type="button" class="seg-btn" data-fail="false">全部</button>
+            </div>
+            <div class="detail-batch" id="detailBatch">
+                <button type="button" class="layui-btn layui-btn-sm" id="batchFixBtn">批量自动修复</button>
+                <button type="button" class="layui-btn layui-btn-sm layui-btn-warm" id="batchRollbackBtn">批量回滚</button>
+                <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" id="batchRecheckBtn">批量复检</button>
+                <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="batchTicketBtn">批量创建工单</button>
+            </div>
+        </div>
+        <table id="hostResultTable" lay-filter="hostResultTable"></table>
+    </div>
+</template>
+
+<!-- 创建工单弹窗 -->
+<template id="workorderFormTemplate">
+    <form class="layui-form popup-form workorder-form">
+        <div class="workorder-tip" id="workorderTip"></div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">负责人</label>
+            <div class="layui-input-block">
+                <input type="text" name="assignee" autocomplete="off" placeholder="请输入负责人" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">备注</label>
+            <div class="layui-input-block">
+                <textarea name="remark" placeholder="选填" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn" id="submitWorkorderButton">提交</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/baseline-host.js"></script>
+</body>
+</html>

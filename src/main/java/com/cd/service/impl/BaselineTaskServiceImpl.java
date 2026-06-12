@@ -15,6 +15,7 @@ import com.cd.mapper.BaselineRuleMapper;
 import com.cd.mapper.BaselineTaskMapper;
 import com.cd.mapper.HostMapper;
 import com.cd.service.BaselineTaskService;
+import com.cd.util.BaselineWindowsPathNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -191,7 +192,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
             check.put("ruleCode", rule.getRuleCode());
             check.put("ruleVersion", defaultVersion(rule));
             check.put("checkMethod", rule.getCheckMethod());
-            check.put("checkScript", rule.getCheckScript());
+            check.put("checkScript", BaselineWindowsPathNormalizer.normalizeScript(rule.getCheckScript()));
             check.put("items", itemsByRuleId.getOrDefault(rule.getId(), List.of()).stream()
                     .map(item -> buildCheckItem(rule, item))
                     .toList());
@@ -203,7 +204,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     private Map<String, Object> buildCheckItem(BaselineRuleEntity rule, BaselineRuleItemEntity item) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("itemId", item.getId());
-        value.put("checkKey", item.getCheckKey());
+        value.put("checkKey", BaselineWindowsPathNormalizer.normalizeCheckKey(item.getCheckKey()));
         value.put("operator", item.getOperator());
         value.put("expectedValue", item.getExpectedValue());
         value.put("matchType", StringUtils.hasText(item.getMatchType()) ? item.getMatchType() : "EXACT");
@@ -286,6 +287,9 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         if ("true".equalsIgnoreCase(expectedValue) || "false".equalsIgnoreCase(expectedValue)) {
             return "BOOLEAN";
         }
+        if (isNumericLiteral(expectedValue)) {
+            return "NUMBER";
+        }
         String operator = item.getOperator();
         if (List.of(">", ">=", "<", "<=").contains(operator)) {
             return "NUMBER";
@@ -294,6 +298,10 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
             return "STRING";
         }
         return "STRING";
+    }
+
+    private boolean isNumericLiteral(String value) {
+        return StringUtils.hasText(value) && value.trim().matches("-?\\d+(\\.\\d+)?");
     }
 
     private Integer defaultVersion(BaselineRuleEntity rule) {

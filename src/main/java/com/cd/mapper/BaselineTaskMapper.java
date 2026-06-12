@@ -39,4 +39,7 @@ public interface BaselineTaskMapper {
 
     /** 统计某任务下处于指定状态的主机数量。 */
     int countHostsByStatus(@Param("taskId") Long taskId, @Param("status") String status);
+
+    /** 查询某主机最近一次任务的 rule_scope（JSON），用于「立即检测」沿用历史规则。 */
+    String selectLatestRuleScopeByHost(@Param("hostId") Long hostId);
 }

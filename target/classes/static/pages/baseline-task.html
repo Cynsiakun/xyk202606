@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基线任务管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/host.css">
+    <link rel="stylesheet" href="../css/baseline-task.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="baselineSearchForm">
+            <div class="toolbar-group">
+                <div class="baseline-title">
+                    <div class="section-kicker">Compliance Baseline</div>
+                    <h1>基线任务管理</h1>
+                </div>
+            </div>
+            <div class="toolbar-group">
+                <select name="status" lay-filter="statusFilter">
+                    <option value="">全部状态</option>
+                    <option value="PENDING">待执行</option>
+                    <option value="RUNNING">执行中</option>
+                    <option value="FINISHED">已完成</option>
+                    <option value="FAILED">失败</option>
+                </select>
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn" id="addButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新建任务
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="baselineTaskTable" lay-filter="baselineTaskTable"></table>
+    </div>
+</div>
+
+<!-- 新建任务弹窗 -->
+<template id="baselineTaskFormTemplate">
+    <form class="layui-form popup-form baseline-form" lay-filter="baselineTaskForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">任务名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="taskName" autocomplete="off" placeholder="请输入任务名称" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">执行方式</label>
+            <div class="layui-input-block">
+                <input type="radio" name="executeType" value="MANUAL" title="立即执行" lay-filter="executeType" checked>
+                <input type="radio" name="executeType" value="SCHEDULED" title="定时执行" lay-filter="executeType">
+            </div>
+        </div>
+        <div class="layui-form-item" id="cronItem" style="display:none;">
+            <label class="layui-form-label">Cron 表达式</label>
+            <div class="layui-input-block">
+                <input type="text" name="cronExpr" autocomplete="off" placeholder="如 0 0 2 * * ?" class="layui-input">
+            </div>
+        </div>
+
+        <div class="layui-form-item baseline-picker-item">
+            <label class="layui-form-label">选择主机</label>
+            <div class="layui-input-block">
+                <div class="picker">
+                    <div class="picker-toolbar">
+                        <input type="text" class="layui-input picker-search" id="hostSearch" placeholder="搜索主机名 / IP">
+                        <span class="picker-count" id="hostCount">已选 0</span>
+                    </div>
+                    <div class="picker-list" id="hostList">
+                        <div class="picker-empty">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="layui-form-item baseline-picker-item">
+            <label class="layui-form-label">选择规则</label>
+            <div class="layui-input-block">
+                <div class="picker">
+                    <div class="picker-toolbar">
+                        <input type="text" class="layui-input picker-search" id="ruleSearch" placeholder="搜索规则编码 / 名称 / 分类">
+                        <label class="picker-checkall"><input type="checkbox" id="ruleCheckAll" checked> 全选</label>
+                        <span class="picker-count" id="ruleCount">已选 0</span>
+                    </div>
+                    <div class="picker-list" id="ruleList">
+                        <div class="picker-empty">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn" id="submitTaskButton">提交</button>
+        </div>
+    </form>
+</template>
+
+<!-- 查看结果弹窗 -->
+<template id="baselineResultTemplate">
+    <div class="baseline-result">
+        <div class="overview-cards" id="overviewCards"></div>
+        <div class="result-section-title">问题主机</div>
+        <div class="problem-host-wrap">
+            <table id="problemHostTable" lay-filter="problemHostTable"></table>
+            <div class="all-pass" id="allPassTip" style="display:none;">
+                <i class="layui-icon layui-icon-ok-circle"></i>
+                <span>全部合规通过</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/baseline-task.js"></script>
+</body>
+</html>

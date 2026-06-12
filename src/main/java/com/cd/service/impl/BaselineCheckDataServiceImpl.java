@@ -5,6 +5,7 @@ import com.cd.entity.MqErrorLogEntity;
 import com.cd.mapper.BaselineCheckDataMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.service.BaselineCheckDataService;
+import com.cd.service.BaselineRemediationService;
 import com.cd.service.BaselineRuleEngine;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,10 +29,13 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String EXPECTED_TYPE = "baseline_scan_result";
+    private static final String REMEDIATION_RESULT_TYPE = "baseline_remediation_result";
+    private static final String ROLLBACK_RESULT_TYPE = "baseline_rollback_result";
 
     private final BaselineCheckDataMapper baselineCheckDataMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final BaselineRuleEngine baselineRuleEngine;
+    private final BaselineRemediationService baselineRemediationService;
 
     @Override
     public void processBaselineResult(String queueName, String message) {
@@ -44,48 +48,119 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
                 return;
             }
 
-            // 校验 type 字段
+            // 校验 type 字段，按类型分发：扫描结果走入库+规则引擎，修复结果回填修复状态
             JsonNode typeNode = root.path("type");
             if (typeNode.isMissingNode() || typeNode.isNull() || !typeNode.isTextual()) {
                 saveError(queueName, message, "缺少必要字段 type 或其类型不正确");
                 return;
             }
             String type = typeNode.asText();
-            if (!EXPECTED_TYPE.equals(type)) {
-                saveError(queueName, message, "type=" + type + " 与队列 " + queueName + " 不匹配，期望 " + EXPECTED_TYPE);
+            if (EXPECTED_TYPE.equals(type)) {
+                handleScanResult(queueName, message, root);
                 return;
             }
-
-            // 校验 taskId 不为空
-            Long taskId = parseId(root.path("taskId"));
-            if (taskId == null) {
-                saveError(queueName, message, "缺少必要字段 taskId 或其值非法");
+            if (REMEDIATION_RESULT_TYPE.equals(type)) {
+                handleRemediationResult(queueName, message, root);
                 return;
             }
-
-            // 校验 hostId 不为空
-            Long hostId = parseId(root.path("hostId"));
-            if (hostId == null) {
-                saveError(queueName, message, "缺少必要字段 hostId 或其值非法");
+            if (ROLLBACK_RESULT_TYPE.equals(type)) {
+                handleRollbackResult(queueName, message, root);
                 return;
             }
-
-            // 完整消息体原样入库
-            BaselineCheckDataEntity entity = new BaselineCheckDataEntity();
-            entity.setTaskId(taskId);
-            entity.setHostId(hostId);
-            entity.setCheckData(message);
-            entity.setCreateTime(LocalDateTime.now());
-            baselineCheckDataMapper.insert(entity);
-
-            log.info("基线检测回传结果已入库: queue={}, taskId={}, hostId={}", queueName, taskId, hostId);
-
-            // 入库成功后内联触发规则引擎判定；引擎异常已在其内部兜底，不影响 MQ 入库与 ACK
-            triggerRuleEngine(entity);
+            saveError(queueName, message, "type=" + type + " 与队列 " + queueName + " 不匹配，期望 "
+                    + EXPECTED_TYPE + "、" + REMEDIATION_RESULT_TYPE + " 或 " + ROLLBACK_RESULT_TYPE);
         } catch (Exception e) {
             log.error("处理基线检测回传消息异常: queue={}", queueName, e);
             saveError(queueName, message, "服务端异常: " + e.getMessage());
         }
+    }
+
+    /** 扫描结果：完整原样入库后内联触发规则引擎判定。 */
+    private void handleScanResult(String queueName, String message, JsonNode root) {
+        Long taskId = parseId(root.path("taskId"));
+        if (taskId == null) {
+            saveError(queueName, message, "缺少必要字段 taskId 或其值非法");
+            return;
+        }
+        Long hostId = parseId(root.path("hostId"));
+        if (hostId == null) {
+            saveError(queueName, message, "缺少必要字段 hostId 或其值非法");
+            return;
+        }
+
+        BaselineCheckDataEntity entity = new BaselineCheckDataEntity();
+        entity.setTaskId(taskId);
+        entity.setHostId(hostId);
+        entity.setCheckData(message);
+        entity.setCreateTime(LocalDateTime.now());
+        baselineCheckDataMapper.insert(entity);
+
+        log.info("基线检测回传结果已入库: queue={}, taskId={}, hostId={}", queueName, taskId, hostId);
+
+        // 入库成功后内联触发规则引擎判定；引擎异常已在其内部兜底，不影响 MQ 入库与 ACK
+        triggerRuleEngine(entity);
+    }
+
+    /** 修复结果：按 resultId 回填 remediation_status 为 COMPLETED/FAILED。 */
+    private void handleRemediationResult(String queueName, String message, JsonNode root) {
+        Long resultId = parseId(root.path("resultId"));
+        if (resultId == null) {
+            saveError(queueName, message, "缺少必要字段 resultId 或其值非法");
+            return;
+        }
+        Long remediationId = parseId(root.path("remediationId"));
+        boolean success = parseRemediationSuccess(root);
+        baselineRemediationService.handleResult(
+                remediationId,
+                resultId,
+                success,
+                readText(root, "oldValue", "old_value", "beforeValue"),
+                readText(root, "newValue", "new_value", "afterValue"),
+                readText(root, "backupData", "backup_data", "backup"));
+        log.info("基线修复回传已处理: queue={}, remediationId={}, resultId={}, success={}",
+                queueName, remediationId, resultId, success);
+    }
+
+    /** 回滚结果：成功后将 result.remediation_status 置为 ROLLBACK，使前端恢复“自动修复”。 */
+    private void handleRollbackResult(String queueName, String message, JsonNode root) {
+        Long resultId = parseId(root.path("resultId"));
+        if (resultId == null) {
+            saveError(queueName, message, "缺少必要字段 resultId 或其值非法");
+            return;
+        }
+        Long remediationId = parseId(root.path("remediationId"));
+        boolean success = parseRemediationSuccess(root);
+        baselineRemediationService.handleRollbackResult(remediationId, resultId, success);
+        log.info("基线回滚回传已处理: queue={}, remediationId={}, resultId={}, success={}",
+                queueName, remediationId, resultId, success);
+    }
+
+    private boolean parseRemediationSuccess(JsonNode root) {
+        JsonNode statusNode = root.path("status");
+        if (statusNode.isTextual()) {
+            String status = statusNode.asText().trim().toUpperCase();
+            return "COMPLETED".equals(status) || "SUCCESS".equals(status)
+                    || "OK".equals(status) || "PASS".equals(status);
+        }
+        JsonNode successNode = root.path("success");
+        return successNode.isBoolean() && successNode.asBoolean();
+    }
+
+    private String readText(JsonNode root, String... names) {
+        for (String name : names) {
+            JsonNode node = root.path(name);
+            if (node.isMissingNode() || node.isNull()) {
+                continue;
+            }
+            if (node.isTextual()) {
+                return node.asText();
+            }
+            if (node.isNumber() || node.isBoolean()) {
+                return node.asText();
+            }
+            return node.toString();
+        }
+        return null;
     }
 
     /** 入库后内联触发规则引擎判定，失败仅记日志，不回滚已入库的原始数据。 */

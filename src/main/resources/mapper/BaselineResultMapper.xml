@@ -16,4 +16,42 @@
     <select id="countByTaskHostId" resultType="int">
         SELECT COUNT(*) FROM baseline_result WHERE task_host_id = #{taskHostId}
     </select>
+
+    <select id="selectByIds" resultType="com.cd.entity.BaselineResultEntity">
+        SELECT id                 AS id,
+               task_id            AS taskId,
+               task_host_id       AS taskHostId,
+               host_id            AS hostId,
+               rule_id            AS ruleId,
+               rule_version       AS ruleVersion,
+               check_key          AS checkKey,
+               status             AS status,
+               actual_value       AS actualValue,
+               expected_value     AS expectedValue,
+               message            AS message,
+               evidence           AS evidence,
+               remediation_status AS remediationStatus,
+               scan_time          AS scanTime,
+               create_time        AS createTime
+        FROM baseline_result
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="updateRemediationStatus">
+        UPDATE baseline_result
+        SET remediation_status = #{remediationStatus}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateRemediationStatusByIds">
+        UPDATE baseline_result
+        SET remediation_status = #{remediationStatus}
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
 </mapper>

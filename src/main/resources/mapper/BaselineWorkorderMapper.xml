@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.BaselineWorkorderMapper">
+
+    <insert id="insert" parameterType="com.cd.entity.BaselineWorkorderEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO baseline_workorder (host_id, rule_id, result_id, assignee, remark, status, creator)
+        VALUES (#{hostId}, #{ruleId}, #{resultId}, #{assignee}, #{remark}, #{status}, #{creator})
+    </insert>
+</mapper>

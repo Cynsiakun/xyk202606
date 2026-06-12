@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.BaselineRemediationMapper">
+
+    <resultMap id="BaselineRemediationResultMap" type="com.cd.entity.BaselineRemediationEntity">
+        <id column="id" property="id"/>
+        <result column="result_id" property="resultId"/>
+        <result column="host_id" property="hostId"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="remediation_type" property="remediationType"/>
+        <result column="old_value" property="oldValue"/>
+        <result column="new_value" property="newValue"/>
+        <result column="backup_data" property="backupData"/>
+        <result column="execute_script" property="executeScript"/>
+        <result column="status" property="status"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cd.entity.BaselineRemediationEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO baseline_remediation (result_id, host_id, rule_id, remediation_type, old_value, new_value,
+                                          backup_data, execute_script, status, start_time, end_time, create_time)
+        VALUES (#{resultId}, #{hostId}, #{ruleId}, #{remediationType}, #{oldValue}, #{newValue},
+                #{backupData}, #{executeScript}, #{status}, #{startTime}, #{endTime}, #{createTime})
+    </insert>
+
+    <select id="selectById" resultMap="BaselineRemediationResultMap">
+        SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
+               backup_data, execute_script, status, start_time, end_time, create_time
+        FROM baseline_remediation
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectLatestSuccessfulByResultId" resultMap="BaselineRemediationResultMap">
+        SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
+               backup_data, execute_script, status, start_time, end_time, create_time
+        FROM baseline_remediation
+        WHERE result_id = #{resultId}
+          AND status = 'SUCCESS'
+        ORDER BY end_time DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestPendingByResultId" resultMap="BaselineRemediationResultMap">
+        SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
+               backup_data, execute_script, status, start_time, end_time, create_time
+        FROM baseline_remediation
+        WHERE result_id = #{resultId}
+          AND status = 'PENDING'
+        ORDER BY start_time DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <update id="updateStarted">
+        UPDATE baseline_remediation
+        SET status = 'PENDING',
+            start_time = COALESCE(start_time, NOW())
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateResult">
+        UPDATE baseline_remediation
+        SET status = #{status},
+            old_value = COALESCE(#{oldValue}, old_value),
+            new_value = COALESCE(#{newValue}, new_value),
+            backup_data = COALESCE(#{backupData}, backup_data),
+            end_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markRollback">
+        UPDATE baseline_remediation
+        SET status = 'ROLLBACK',
+            end_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markFailed">
+        UPDATE baseline_remediation
+        SET status = 'FAILED',
+            end_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

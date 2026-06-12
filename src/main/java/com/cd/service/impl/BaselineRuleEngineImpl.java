@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -182,8 +183,10 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         entity.setScanTime(scanTime);
         entity.setCreateTime(now);
 
-        // 判定状态与描述
-        if (STATUS_ERROR.equalsIgnoreCase(executeStatus)) {
+        boolean missingRegistryValue = isMissingRegistryValue(agentMessage);
+
+        // 判定状态与描述。注册表值缺失是可比对事实：期望为空则合规，期望非空则不合规。
+        if (STATUS_ERROR.equalsIgnoreCase(executeStatus) && !missingRegistryValue) {
             entity.setStatus(STATUS_ERROR);
             entity.setMessage(StringUtils.hasText(agentMessage) ? agentMessage : "客户端执行失败");
         } else if (item == null) {
@@ -192,7 +195,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         } else {
             boolean pass = compare(item, actualValue);
             entity.setStatus(pass ? STATUS_PASS : STATUS_FAIL);
-            entity.setMessage(buildMessage(pass, item, actualValue, agentMessage));
+            entity.setMessage(buildMessage(pass, item, actualValue, missingRegistryValue ? null : agentMessage));
         }
         return entity;
     }
@@ -233,8 +236,8 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
     }
 
     private boolean compareExact(String operator, String actual, String expected) {
-        Double actualNum = parseDouble(actual);
-        Double expectedNum = parseDouble(expected);
+        Double expectedNum = parseStrictDouble(expected);
+        Double actualNum = expectedNum == null ? null : parseActualDouble(actual);
         boolean numeric = actualNum != null && expectedNum != null;
         switch (operator) {
             case "=":
@@ -390,12 +393,36 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         return node.isValueNode() ? node.asText() : node.toString();
     }
 
-    private Double parseDouble(String value) {
+    private boolean isMissingRegistryValue(String message) {
+        return StringUtils.hasText(message)
+                && (message.contains("注册表路径或值不存在")
+                || message.contains("registry path or value does not exist")
+                || message.contains("The system cannot find the file specified")
+                || message.contains("系统找不到指定的文件"));
+    }
+
+    private Double parseStrictDouble(String value) {
         if (!StringUtils.hasText(value)) {
             return null;
         }
         try {
             return Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Double parseActualDouble(String value) {
+        Double strict = parseStrictDouble(value);
+        if (strict != null || !StringUtils.hasText(value)) {
+            return strict;
+        }
+        Matcher matcher = Pattern.compile("-?\\d+(\\.\\d+)?").matcher(value);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(matcher.group());
         } catch (NumberFormatException e) {
             return null;
         }
