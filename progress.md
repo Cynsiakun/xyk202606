@@ -441,4 +441,235 @@ FAILED=修复失败(可重试)，TICKETED=已派单。
   - `status=SUCCESS` 且存在 `backupData` 且能找到修复记录时，`baseline_remediation.status=SUCCESS`，`baseline_result.remediation_status=COMPLETED`。
   - 修复成功但缺少 `backupData`，或找不到对应修复记录时，平台按失败处理，避免前端出现无法真实回滚的“回滚”按钮。
   - 回滚下发前要求存在最近 `SUCCESS` 修复记录且 `backupData` 非空。
-  - 回滚成功后 `baseline_remediation.status=ROLLBACK`，`baseline_result.remediation_status=ROLLBACK`，前端恢复“自动修复”。
+- 回滚成功后 `baseline_remediation.status=ROLLBACK`，`baseline_result.remediation_status=ROLLBACK`，前端恢复“自动修复”。
+
+## 2026-06-12 主机详情可用性与修复闭环调整
+
+- 修复成功闭环修正：
+  - 客户端回传 `baseline_remediation_result.status=SUCCESS` 后，平台更新 `baseline_remediation.status=SUCCESS`。
+  - 同时更新原 `baseline_result.remediation_status=FIXED`，即“脚本修复已成功执行”。
+  - `backupData` 允许为空；回滚下发仍会带 `oldValue/newValue/checkKey` 供客户端兜底恢复，不能因为空备份把成功修复误判为失败。
+  - 修复成功后平台自动创建小范围复检任务：`hostId + ruleId`。
+  - 复检结果入库时会继承上一条同 `hostId + ruleId + checkKey` 的修复语义：
+    - 复检 `PASS`：新结果 `status=PASS`，`remediation_status=FIXED`。
+    - 复检 `FAIL/ERROR`：新结果 `status=FAIL/ERROR`，`remediation_status=FAILED`。
+- `baseline_remediation` 增加 `operator` 字段，启动时由 `BaselineMenuInitializer` 幂等补列，记录下发修复的操作人。
+- 主机详情页体验调整：
+  - 新增状态筛选：全部、未修复、已修复、FAIL、PASS。
+  - 新增分类筛选：按当前主机结果动态生成分类，如账户安全、日志审计等。
+  - 新增关键字搜索：规则名、检测项、实际值、期望值、证据、修复状态。
+  - 新增详情页刷新按钮。
+  - 表格刷新、轮询、修复/回滚/复检后刷新均保留当前页码和每页数量，不再跳回第一页。
+  - 表格新增“修复状态”“修复信息”列，展示最后一次修复状态、修复方式、操作人、修复时间。
+  - 行操作新增“记录”，可查看该检测结果的全部修复历史，包括状态、方式、操作人、时间、旧值、新值、备份和执行脚本。
+
+## 2026-06-13 当前快照统计与修复记录追溯修正
+
+- 主机合规总览卡片不再使用 `baseline_summary` 最近任务汇总作为统计来源。
+- 新统计方式为“当前状态快照”：
+  - 对每个 `host_id + rule_id + check_key` 只取最新一条 `baseline_result`。
+  - 再聚合当前最新结果：`PASS` 计符合，`FAIL/ERROR` 计不符合。
+  - 复检单条规则不会再导致主机卡片变成 `1/1` 或合规率 `100%`。
+- 修复记录与回滚不再只按当前 `resultId` 查找。
+  - 原因：修复后自动复检会生成新的 `baseline_result.id`，详情页展示的是新结果；如果继续按新 `resultId` 精确查，会找不到旧 result 上的成功修复记录。
+  - 新逻辑：按同一 `host_id + rule_id + check_key` 追溯最近成功修复记录。
+  - “修复信息”“修复记录”“回滚”都会跨复检 result 追溯到同一检测项的历史修复记录。
+
+## 2026-06-13 检测状态与修复状态最终状态机
+
+> 以本节为准；上文早期出现的 `COMPLETED/PENDING/ROLLBACK` 旧状态流转说明已废弃，仅作为历史记录保留。
+
+- `baseline_result.status` 只表示检测结果，只能由检测/复检/定时检测写入：`PASS/FAIL/ERROR/UNKNOWN`。
+- 自动加固和回滚流程禁止直接修改 `baseline_result.status`。
+- `baseline_result.remediation_status` 只表示修复流程状态：
+  - `NONE`：未修复。
+  - `IN_PROGRESS`：修复或回滚执行中。
+  - `FIXED`：修复成功，等待或已经通过复检确认。
+  - `FAILED`：修复后复检仍失败，或修复执行失败。
+  - `ROLLED_BACK`：回滚成功，后续复检结果仍保留该修复状态。
+- 初始检测结果写入 `remediation_status=NONE`。
+- 自动修复下发只更新 `remediation_status=IN_PROGRESS`，不修改 `status`。
+- 修复回传 `SUCCESS`：
+  - 更新对应 `baseline_remediation.status=SUCCESS`，保存 `oldValue/newValue/backupData/message/end_time`。
+  - 更新当前结果 `remediation_status=FIXED`。
+  - 自动下发单规则复检。
+- 修复后复检：
+  - 复检 `PASS`：新结果 `status=PASS`，`remediation_status=FIXED`。
+  - 复检 `FAIL/ERROR`：新结果 `status=FAIL/ERROR`，`remediation_status=FAILED`。
+- 回滚回传 `SUCCESS`：
+  - 不覆盖原自动修复记录。
+  - 新增一条 `baseline_remediation` 记录，`remediation_type=ROLLBACK`，记录回滚时间、结果、message。
+  - 更新当前结果 `remediation_status=ROLLED_BACK`。
+  - 自动下发单规则复检。
+- 回滚后复检：
+  - 复检结果只更新检测 `status`。
+  - `remediation_status` 保持 `ROLLED_BACK`，例如 `status=FAIL + remediation_status=ROLLED_BACK` 表示已回滚且当前检测恢复为不合规。
+
+## 2026-06-13 基线任务管理页面优化
+
+- 任务列表支持按任务名称搜索，按执行方式、任务类型、任务状态筛选。
+- 任务类型使用兼容识别：
+  - `基线复检-*`、`修复后自动复检-*`、`主机即时检测-*` 显示为复检任务。
+  - 其他任务显示为检测任务。
+- 任务列表默认按创建时间/ID 倒序，刷新和轮询保留当前页码、分页大小和筛选条件。
+- 任务执行中显示进度：已完成主机数 / 总主机数 + 百分比进度条。
+- 新建任务弹窗：
+  - 离线主机灰色展示并禁选。
+  - 规则列表显示复选框状态。
+  - 支持按规则分类一键全选。
+  - 实时显示已选主机数和规则数。
+  - 未选择主机或规则时提交按钮禁用。
+- 任务结果由弹窗改为页面内结果面板，避免弹窗套弹窗。
+- 结果统计卡片改为：总主机数、已完成主机数、平均合规率、问题主机数、问题规则数、PASS 规则数、FAIL 规则数、ERROR 规则数。
+- 主机结果列表显示每台主机 PASS/FAIL/ERROR 规则数，并提供：
+  - 查看详情：跳转到 `baseline-host.html?hostId=...`，主机详情页自动打开该主机详情。
+  - 重新检测：复用 `/api/baseline/hosts/scan`。
+- 任务结果面板支持局部刷新和 CSV 导出，导出包含主机、规则、状态、实际值、证据等字段。
+
+## 2026-06-13 基线任务管理页面问题修复
+
+- 查看任务结果时报 `Unknown column 't.id' in 'where clause'` 的根因不是 `baseline_task` 缺少 `id`，而是 MySQL 派生表内不能引用外层 `t.id`。
+- 已修正任务结果概览 SQL：问题主机数子查询改用当前 `taskId` 参数，避免派生表作用域错误。
+- 新建定时任务不再要求用户填写 Cron 表达式。
+  - 前端改为“每天 / 每周 / 每月 + 时间”的直观选择。
+  - 提交时再转换为后端现有 `cronExpr`，不改后端调度协议。
+- 规则选择器改回稳定的原生 checkbox。
+  - 移除自绘 `fake-check`。
+  - 动态主机/规则 checkbox 增加 `lay-ignore`，避免 Layui 动态渲染状态不同步导致“数据选中但视觉不亮/不灭”。
+- 已验证：
+  - `node --check src/main/resources/static/js/pages/baseline-task.js` 通过。
+  - `mvn test` 通过，12 个测试全部成功。
+  - 使用数据库最新任务直接执行任务结果概览 SQL 可正常返回统计。
+
+## 2026-06-13 复检任务结果边界修正
+
+- 任务管理页的“查看结果”必须展示该任务自身的检测结果，不再混入主机合规详情页的当前快照。
+- 新增任务内规则明细接口：
+  - `GET /api/baseline/tasks/{taskId}/hosts/{hostId}/results`
+  - 查询条件固定为 `task_id + host_id`，只返回本次任务产生的 `baseline_result`。
+- 任务结果页点击主机行“查看详情”后，不再跳转到 `baseline-host.html`。
+  - 页面内展开“本次任务规则明细”表。
+  - 复检任务如果只复检了 1 台主机 + 1 条规则，就只展示这一条规则结果。
+  - 规则明细包含规则、分类、状态、期望值、实际值、检测项、证据和检测时间。
+- 规则选择列表继续使用和“全选”一致的原生 checkbox。
+  - 每条规则前都有可见复选框。
+  - 保留 `lay-ignore`，避免 Layui 动态渲染导致勾选视觉状态不同步。
+- 已验证：
+  - `node --check src/main/resources/static/js/pages/baseline-task.js` 通过。
+  - `mvn test` 通过，12 个测试全部成功。
+  - 使用数据库最新任务 `task_id=30` 查询任务内规则结果，只返回该任务该主机的 1 条规则结果。
+
+## 2026-06-13 基线人工工单管理闭环
+
+- 新增安全运维工程师角色：
+  - 角色编码：`SECURITY_OPERATOR`。
+  - 角色名称：安全运维工程师。
+  - 仅授予：`workorder:view`、`workorder:process`、`workorder:complete`。
+  - 不授予用户管理、权限管理、基线规则管理、基线任务管理权限。
+  - 启动初始化会幂等创建演示账号 `operator / 123456` 并绑定该角色，便于验收。
+- 新增工单权限与菜单：
+  - `workorder:view`：查看安全工单。
+  - `workorder:process`：开始处理、重新检测。
+  - `workorder:complete`：完成工单。
+  - 菜单：合规基线 / 安全工单管理，页面为 `baseline-workorder.html`。
+- `baseline_workorder` 按新表结构使用 `assignee_id` 关联用户。
+  - 启动初始化会幂等补齐 `title/advice/assignee_id/priority/close_remark/create_by/start_time/finish_time/update_time` 等必要列。
+  - 旧的手填 `assignee` 模式已废弃。
+- 主机详情页创建工单改造：
+  - 处理人不再手工输入。
+  - 下拉框调用 `/api/baseline/workorders/operators`，只展示拥有 `SECURITY_OPERATOR` 角色且启用的用户。
+  - 后端再次校验 `assigneeId` 必须属于安全运维工程师，不能绕过前端。
+- 创建工单逻辑：
+  - 根据 `resultId` 反查主机、规则、检测项、实际值、期望值。
+  - 自动生成工单标题。
+  - 自动生成修复建议/检测上下文。
+  - 自动继承规则 `severity` 作为优先级，规范为 `LOW/MEDIUM/HIGH/CRITICAL`，缺省为 `MEDIUM`。
+  - 创建后将对应 `baseline_result.remediation_status` 标记为 `TICKETED`。
+- 新增安全工单管理页面：
+  - 支持按工单标题、主机名称/IP 搜索。
+  - 支持按状态、优先级筛选。
+  - 列表字段：工单ID、标题、主机名称、规则名称、处理人、优先级、状态、创建时间、完成时间、操作。
+  - 操作：查看详情、开始处理、完成工单、重新检测。
+  - 页面采用“工单列表 -> 工单详情”的页面内切换，不做弹窗套弹窗。
+- 工单详情展示：
+  - 工单标题、主机信息、规则名称、分类、修复建议、优先级、处理人、状态、创建时间、开始时间、完成时间、创建人、检测状态、检测上下文、处理说明。
+- 状态流转：
+  - `OPEN`：待处理。
+  - `PROCESSING`：处理中。
+  - `DONE`：已完成。
+  - 只有 `OPEN` 允许开始处理，并记录 `start_time`。
+  - 只有 `PROCESSING` 允许完成，完成时必须填写 `close_remark`，并记录 `finish_time`。
+  - 只有 `DONE` 允许重新检测。
+- 权限边界：
+  - 超级管理员与 `SECURITY_ADMIN` 可查看全部工单。
+  - `SECURITY_OPERATOR` 只能查看/处理/完成 `assignee_id` 为自己的工单。
+  - 后端服务层统一裁剪查询和详情访问，禁止通过接口访问其他工程师工单。
+- 重新检测：
+  - 工单完成后点击“重新检测”会创建 `工单复检-*` 基线任务。
+  - 复检范围严格限定为当前工单的 `hostId + ruleId`。
+  - 后续 PASS/FAIL 仍由基线检测结果入库和规则引擎负责。
+- 已验证：
+  - `node --check src/main/resources/static/js/pages/baseline-workorder.js` 通过。
+  - `node --check src/main/resources/static/js/pages/baseline-host.js` 通过。
+  - `mvn test` 通过，12 个测试全部成功。
+  - `mvn clean test` 通过，12 个测试全部成功，确认从干净编译开始无问题。
+
+## 2026-06-13 基线规则管理 CRUD
+
+- 新增菜单：合规基线 / 基线规则管理。
+  - 页面：`baseline-rule.html`。
+  - 脚本：`baseline-rule.js`。
+  - 样式：`baseline-rule.css`。
+- 新增规则管理权限：
+  - `baseline-rule:view`：查看基线规则。
+  - `baseline-rule:create`：新增基线规则。
+  - `baseline-rule:update`：修改、启用、停用基线规则。
+  - `baseline-rule:delete`：归档删除基线规则。
+  - `SECURITY_ADMIN` 自动授予上述权限；`SECURITY_OPERATOR` 不授予。
+- 新增后端 API：
+  - `GET /api/baseline/rule-management`：分页查询规则。
+  - `GET /api/baseline/rule-management/{id}`：查看规则详情。
+  - `POST /api/baseline/rule-management`：新增规则。
+  - `PUT /api/baseline/rule-management/{id}`：编辑规则。
+  - `DELETE /api/baseline/rule-management/{id}`：逻辑删除，设置 `status=ARCHIVED` 且 `enabled=0`。
+  - `PATCH /api/baseline/rule-management/{id}/enabled?enabled=0|1`：启用/停用。
+- 查询支持：
+  - 关键词：`rule_code/rule_name/category`。
+  - 分类：`category`。
+  - 风险等级：`LOW/MEDIUM/HIGH/CRITICAL`。
+  - 状态：`PUBLISHED/DRAFT/ARCHIVED`。
+  - 启用状态：`enabled=1/0`。
+- 规则表单采用右侧抽屉，不使用弹窗嵌套。
+  - 新增必填：`ruleCode/ruleName/category/severity/osType/checkMethod/checkScript/remediationType`。
+  - 编辑时 `ruleCode` 禁止修改。
+  - 可维护：说明、评分、状态、启用、强制项、检测脚本、修复脚本。
+- 规则版本控制：
+  - 新增规则默认 `version=1`。
+  - 每次编辑执行 `version = COALESCE(version, 1) + 1`。
+  - 已被任务引用的规则编辑时，前端抽屉展示风险提示；当前项目默认“直接覆盖当前版本并递增 version”。
+- 删除策略：
+  - 不物理删除规则，避免破坏历史任务引用。
+  - 删除操作实际归档：`status=ARCHIVED`，`enabled=0`。
+- 检测方式约束：
+  - 后端限制 `checkMethod` 只能是 `REGISTRY/SERVICE/POWERSHELL/WMI`。
+  - 客户端仍统一按已约定方式执行脚本类规则；平台不再新增 COMMAND/SCRIPT 语义分支。
+- 与任务联动：
+  - 任务创建页仍使用原 `/api/baseline/rules` 选项接口。
+  - 该接口只返回 `enabled=1 AND status='PUBLISHED'` 的规则，因此停用或归档规则不会再参与新任务选择/下发。
+- 已验证：
+  - `node --check src/main/resources/static/js/pages/baseline-rule.js` 通过。
+  - `mvn clean test` 通过，12 个测试全部成功。
+  - `mvn test` 通过，12 个测试全部成功，并确认新增静态资源已复制到 `target/classes`。
+
+## 2026-06-13 抽屉层级遮挡修复
+
+- 问题：Layui 表格固定操作列（如“查看详情/编辑/停用”）层级高于自定义抽屉，导致抽屉滑出后操作栏仍浮在抽屉上方。
+- 修复位置：`src/main/resources/static/css/common.css`。
+- 修复策略：
+  - 降低 `.layui-table-fixed/.layui-table-fixed-r/.layui-table-fixed-l` 的页面层级。
+  - 全局提高 `.drawer-mask` 层级到 `9000`。
+  - 全局提高常见抽屉容器 `.rule-drawer/.risk-drawer/.host-detail-drawer/.log-detail-drawer/.evt-detail-drawer` 层级到 `9001`。
+- 影响范围：所有使用这些抽屉类名的页面，不只基线规则管理页。
+- 已验证：
+  - `mvn test` 通过，12 个测试全部成功。
+  - `target/classes/static/css/common.css` 已同步更新。

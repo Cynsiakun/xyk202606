@@ -2,6 +2,8 @@ package com.cd.service.impl;
 
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.dto.BaselineActionResponseDTO;
+import com.cd.dto.BaselineRemediationRecordDTO;
+import com.cd.dto.BaselineTaskCreateRequestDTO;
 import com.cd.entity.BaselineRemediationEntity;
 import com.cd.entity.BaselineResultEntity;
 import com.cd.entity.BaselineRuleEntity;
@@ -11,7 +13,9 @@ import com.cd.mapper.BaselineResultMapper;
 import com.cd.mapper.BaselineRuleMapper;
 import com.cd.mapper.HostMapper;
 import com.cd.service.BaselineRemediationService;
+import com.cd.service.BaselineTaskService;
 import com.cd.util.BaselineWindowsPathNormalizer;
+import com.cd.common.security.SecurityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,14 +45,15 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
 
     private static final String TYPE_REMEDIATION = "baseline_remediation";
     private static final String TYPE_ROLLBACK = "baseline_rollback";
-    private static final String RESULT_STATUS_PENDING = "PENDING";
     private static final String RESULT_STATUS_IN_PROGRESS = "IN_PROGRESS";
-    private static final String RESULT_STATUS_COMPLETED = "COMPLETED";
+    private static final String RESULT_STATUS_FIXED = "FIXED";
     private static final String RESULT_STATUS_FAILED = "FAILED";
-    private static final String RESULT_STATUS_ROLLBACK = "ROLLBACK";
+    private static final String RESULT_STATUS_NONE = "NONE";
+    private static final String RESULT_STATUS_ROLLED_BACK = "ROLLED_BACK";
     private static final String REMEDIATION_STATUS_PENDING = "PENDING";
     private static final String REMEDIATION_STATUS_SUCCESS = "SUCCESS";
     private static final String REMEDIATION_STATUS_FAILED = "FAILED";
+    private static final String REMEDIATION_STATUS_ROLLBACK = "ROLLBACK";
     private static final List<String> AUTO_FIX_TYPES = List.of("AUTO", "SEMI");
 
     private final BaselineResultMapper baselineResultMapper;
@@ -58,6 +63,7 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final AmqpAdmin amqpAdmin;
+    private final BaselineTaskService baselineTaskService;
 
     @Override
     @Transactional
@@ -94,8 +100,7 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         int success = 0;
         int failed = 0;
         for (BaselineResultEntity result : results) {
-            BaselineRemediationEntity remediation =
-                    baselineRemediationMapper.selectLatestSuccessfulByResultId(result.getId());
+            BaselineRemediationEntity remediation = findRollbackRemediation(result);
             if (dispatchRollback(result, remediation)) {
                 success++;
             } else {
@@ -142,11 +147,6 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             log.warn("回滚跳过：找不到成功修复记录 resultId={}", result.getId());
             return false;
         }
-        if (!StringUtils.hasText(remediation.getBackupData())) {
-            log.warn("回滚跳过：修复记录缺少备份数据 resultId={}, remediationId={}",
-                    result.getId(), remediation.getId());
-            return false;
-        }
         HostEntity host = hostMapper.selectById(result.getHostId());
         if (!isDispatchable(host)) {
             log.warn("回滚跳过：主机不存在或缺少 MAC resultId={}, hostId={}", result.getId(), result.getHostId());
@@ -169,6 +169,7 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         remediation.setOldValue(result.getActualValue());
         remediation.setNewValue(result.getExpectedValue());
         remediation.setExecuteScript(BaselineWindowsPathNormalizer.normalizeScript(rule.getRemediationScript()));
+        remediation.setOperator(currentUsername());
         remediation.setStatus(REMEDIATION_STATUS_PENDING);
         remediation.setStartTime(LocalDateTime.now());
         remediation.setCreateTime(LocalDateTime.now());
@@ -230,37 +231,57 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
     @Override
     @Transactional
     public void handleResult(Long remediationId, Long resultId, boolean success,
-                             String oldValue, String newValue, String backupData) {
+                             String oldValue, String newValue, String backupData, String message) {
         Long resolvedRemediationId = resolveRemediationId(remediationId, resultId);
-        boolean completed = success && resolvedRemediationId != null && StringUtils.hasText(backupData);
-        if (success && !StringUtils.hasText(backupData)) {
-            log.warn("基线修复成功回传缺少 backupData，按失败处理以避免不可回滚: remediationId={}, resultId={}",
-                    resolvedRemediationId, resultId);
-        }
+        boolean completed = success && resolvedRemediationId != null;
         if (success && resolvedRemediationId == null) {
             log.warn("基线修复成功回传找不到 remediation 记录，按失败处理以避免闭环断裂: resultId={}", resultId);
         }
-        String resultStatus = completed ? RESULT_STATUS_COMPLETED : RESULT_STATUS_FAILED;
+        String resultStatus = completed ? RESULT_STATUS_FIXED : RESULT_STATUS_FAILED;
         String remediationStatus = completed ? REMEDIATION_STATUS_SUCCESS : REMEDIATION_STATUS_FAILED;
         if (resolvedRemediationId != null) {
-            baselineRemediationMapper.updateResult(resolvedRemediationId, remediationStatus, oldValue, newValue, backupData);
+            baselineRemediationMapper.updateResult(resolvedRemediationId, remediationStatus, oldValue, newValue, backupData, message);
         }
         int updated = baselineResultMapper.updateRemediationStatus(resultId, resultStatus);
         log.info("基线修复结果回填: remediationId={}, resultId={}, status={}, updated={}",
                 resolvedRemediationId, resultId, resultStatus, updated);
+        if (completed) {
+            dispatchAutoRecheck(resultId);
+        }
     }
 
     @Override
     @Transactional
-    public void handleRollbackResult(Long remediationId, Long resultId, boolean success) {
+    public void handleRollbackResult(Long remediationId, Long resultId, boolean success, String message) {
         Long resolvedRemediationId = resolveRollbackRemediationId(remediationId, resultId);
-        if (success && resolvedRemediationId != null) {
-            baselineRemediationMapper.markRollback(resolvedRemediationId);
+        BaselineRemediationEntity source = resolvedRemediationId == null ? null : baselineRemediationMapper.selectById(resolvedRemediationId);
+        BaselineRemediationEntity rollbackRecord = null;
+        if (source != null) {
+            rollbackRecord = createRollbackRecord(source, success, message);
         }
-        String resultStatus = success ? RESULT_STATUS_ROLLBACK : RESULT_STATUS_COMPLETED;
+        String resultStatus = success ? RESULT_STATUS_ROLLED_BACK : RESULT_STATUS_FIXED;
         int updated = baselineResultMapper.updateRemediationStatus(resultId, resultStatus);
-        log.info("基线回滚结果回填: remediationId={}, resultId={}, success={}, updated={}",
-                resolvedRemediationId, resultId, success, updated);
+        log.info("基线回滚结果回填: remediationId={}, rollbackRecordId={}, resultId={}, success={}, updated={}",
+                resolvedRemediationId, rollbackRecord == null ? null : rollbackRecord.getId(), resultId, success, updated);
+        if (success) {
+            dispatchAutoRecheck(resultId);
+        }
+    }
+
+    @Override
+    public List<BaselineRemediationRecordDTO> listRecords(Long resultId) {
+        if (resultId == null || resultId < 1) {
+            return List.of();
+        }
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+        if (results.isEmpty()) {
+            return List.of();
+        }
+        BaselineResultEntity result = results.get(0);
+        return baselineRemediationMapper.selectByResultScope(
+                        result.getHostId(), result.getRuleId(), result.getCheckKey()).stream()
+                .map(this::toRecordDTO)
+                .toList();
     }
 
     private boolean sendToAgent(HostEntity host, Map<String, Object> payload, String actionName) {
@@ -289,6 +310,26 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             log.error("{}下发失败: hostId={}", actionName, host.getId(), e);
             return false;
         }
+    }
+
+    private BaselineRemediationRecordDTO toRecordDTO(BaselineRemediationEntity entity) {
+        BaselineRemediationRecordDTO dto = new BaselineRemediationRecordDTO();
+        dto.setId(entity.getId());
+        dto.setResultId(entity.getResultId());
+        dto.setHostId(entity.getHostId());
+        dto.setRuleId(entity.getRuleId());
+        dto.setRemediationType(entity.getRemediationType());
+        dto.setOldValue(entity.getOldValue());
+        dto.setNewValue(entity.getNewValue());
+        dto.setBackupData(entity.getBackupData());
+        dto.setExecuteScript(entity.getExecuteScript());
+        dto.setOperator(entity.getOperator());
+        dto.setMessage(entity.getMessage());
+        dto.setStatus(entity.getStatus());
+        dto.setStartTime(entity.getStartTime());
+        dto.setEndTime(entity.getEndTime());
+        dto.setCreateTime(entity.getCreateTime());
+        return dto;
     }
 
     private boolean isDispatchable(HostEntity host) {
@@ -334,8 +375,69 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (resultId == null) {
             return null;
         }
-        BaselineRemediationEntity remediation = baselineRemediationMapper.selectLatestSuccessfulByResultId(resultId);
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+        if (results.isEmpty()) {
+            return null;
+        }
+        BaselineRemediationEntity remediation = findRollbackRemediation(results.get(0));
         return remediation == null ? null : remediation.getId();
+    }
+
+    private BaselineRemediationEntity findRollbackRemediation(BaselineResultEntity result) {
+        if (result == null) {
+            return null;
+        }
+        BaselineRemediationEntity remediation = baselineRemediationMapper.selectLatestSuccessfulByResultId(result.getId());
+        if (remediation != null) {
+            return remediation;
+        }
+        return baselineRemediationMapper.selectLatestSuccessfulByResultScope(
+                result.getHostId(), result.getRuleId(), result.getCheckKey());
+    }
+
+    private BaselineRemediationEntity createRollbackRecord(BaselineRemediationEntity source,
+                                                           boolean success,
+                                                           String message) {
+        BaselineRemediationEntity rollback = new BaselineRemediationEntity();
+        rollback.setResultId(source.getResultId());
+        rollback.setHostId(source.getHostId());
+        rollback.setRuleId(source.getRuleId());
+        rollback.setRemediationType(REMEDIATION_STATUS_ROLLBACK);
+        rollback.setOldValue(source.getNewValue());
+        rollback.setNewValue(source.getOldValue());
+        rollback.setBackupData(source.getBackupData());
+        rollback.setExecuteScript(source.getExecuteScript());
+        rollback.setOperator(currentUsername());
+        rollback.setMessage(message);
+        rollback.setStatus(success ? REMEDIATION_STATUS_SUCCESS : REMEDIATION_STATUS_FAILED);
+        rollback.setStartTime(LocalDateTime.now());
+        rollback.setEndTime(LocalDateTime.now());
+        rollback.setCreateTime(LocalDateTime.now());
+        baselineRemediationMapper.insert(rollback);
+        return rollback;
+    }
+
+    private void dispatchAutoRecheck(Long resultId) {
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+        if (results.isEmpty()) {
+            return;
+        }
+        BaselineResultEntity result = results.get(0);
+        if (result.getHostId() == null || result.getRuleId() == null) {
+            return;
+        }
+        try {
+            BaselineTaskCreateRequestDTO request = new BaselineTaskCreateRequestDTO();
+            request.setTaskName("修复后自动复检-" + result.getHostId() + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+            request.setExecuteType("MANUAL");
+            request.setHostIds(List.of(result.getHostId()));
+            request.setRuleIds(List.of(result.getRuleId()));
+            baselineTaskService.createAndDispatch(request);
+            log.info("修复成功后自动复检已下发: resultId={}, hostId={}, ruleId={}",
+                    resultId, result.getHostId(), result.getRuleId());
+        } catch (Exception e) {
+            log.warn("修复成功后自动复检下发失败: resultId={}", resultId, e);
+        }
     }
 
     private BaselineActionResponseDTO response(int total, int success, int failed, String successPrefix) {
@@ -371,5 +473,10 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
 
     private String nowText() {
         return OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    private String currentUsername() {
+        String username = SecurityUtils.getCurrentUsername();
+        return StringUtils.hasText(username) ? username : "system";
     }
 }

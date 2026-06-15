@@ -15,8 +15,10 @@ public class BaselineTaskResultOverviewDTO {
     private Integer finishedHostCount;
     /** 平均合规率，可能为 null（尚无结果）。 */
     private BigDecimal avgComplianceRate;
-    /** 合规主机数（fail_count = 0）。 */
-    private Integer passHostCount;
     /** 问题主机数（fail_count > 0）。 */
     private Integer failHostCount;
+    private Integer problemRuleCount;
+    private Integer passRuleCount;
+    private Integer failRuleCount;
+    private Integer errorRuleCount;
 }

@@ -21,5 +21,10 @@ public class BaselineHostResultItemDTO {
     private String status;
     private String remediationType;
     private String remediationStatus;
+    private String latestRemediationStatus;
+    private String latestRemediationType;
+    private String latestRemediationOperator;
+    private LocalDateTime latestRemediationStartTime;
+    private LocalDateTime latestRemediationEndTime;
     private LocalDateTime scanTime;
 }

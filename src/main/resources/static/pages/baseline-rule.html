@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基线规则管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/baseline-rule.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="ruleSearchForm">
+            <div class="toolbar-group">
+                <div class="rule-title">
+                    <div class="section-kicker">Baseline Rules</div>
+                    <h1>基线规则管理</h1>
+                </div>
+            </div>
+            <div class="toolbar-group">
+                <input type="text" id="keywordInput" class="layui-input toolbar-search" placeholder="编码 / 名称 / 分类" autocomplete="off">
+                <input type="text" id="categoryInput" class="layui-input toolbar-category" placeholder="分类" autocomplete="off">
+                <select name="severity" lay-filter="severityFilter">
+                    <option value="">全部风险</option>
+                    <option value="LOW">LOW</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+                <select name="status" lay-filter="statusFilter">
+                    <option value="">全部状态</option>
+                    <option value="PUBLISHED">PUBLISHED</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                </select>
+                <select name="enabled" lay-filter="enabledFilter">
+                    <option value="">全部启用状态</option>
+                    <option value="1">启用</option>
+                    <option value="0">停用</option>
+                </select>
+                <button type="button" class="layui-btn layui-btn-primary" id="searchButton">
+                    <i class="layui-icon layui-icon-search"></i> 搜索
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn" id="addButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增规则
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="baselineRuleTable" lay-filter="baselineRuleTable"></table>
+    </div>
+</div>
+
+<div class="drawer-mask" id="drawerMask" style="display:none;"></div>
+<aside class="rule-drawer" id="ruleDrawer" style="display:none;">
+    <div class="drawer-head">
+        <div>
+            <div class="section-kicker" id="drawerKicker">Rule Form</div>
+            <h2 id="drawerTitle">新增规则</h2>
+            <p id="drawerHint">维护基线检测标准，变更后会影响新建任务。</p>
+        </div>
+        <button type="button" class="drawer-close" id="drawerCloseButton">×</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<template id="ruleFormTemplate">
+    <form class="layui-form rule-form" lay-filter="ruleForm">
+        <div class="risk-warning" id="riskWarning" style="display:none;">
+            已被历史任务引用的规则修改会影响后续新建任务。本项目采用“直接覆盖当前规则并 version +1”的策略。
+        </div>
+        <div class="form-grid">
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则编码</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ruleCode" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ruleName" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">分类</label>
+                <div class="layui-input-block">
+                    <input type="text" name="category" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">风险等级</label>
+                <div class="layui-input-block">
+                    <select name="severity">
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">适用系统</label>
+                <div class="layui-input-block">
+                    <input type="text" name="osType" value="Windows" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">检测方式</label>
+                <div class="layui-input-block">
+                    <select name="checkMethod">
+                        <option value="REGISTRY">REGISTRY</option>
+                        <option value="SERVICE">SERVICE</option>
+                        <option value="POWERSHELL">POWERSHELL</option>
+                        <option value="WMI">WMI</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">修复方式</label>
+                <div class="layui-input-block">
+                    <select name="remediationType">
+                        <option value="AUTO">AUTO</option>
+                        <option value="MANUAL">MANUAL</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">评分</label>
+                <div class="layui-input-block">
+                    <input type="number" name="score" min="1" value="1" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-block">
+                    <select name="status">
+                        <option value="PUBLISHED">PUBLISHED</option>
+                        <option value="DRAFT">DRAFT</option>
+                        <option value="ARCHIVED">ARCHIVED</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">启用</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="enabled" lay-skin="switch" lay-text="启用|停用" checked>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">强制项</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="isMandatory" lay-skin="switch" lay-text="是|否" checked>
+                </div>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">规则说明</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="可选：说明规则目的、风险和判断依据" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">检测脚本</label>
+            <div class="layui-input-block">
+                <textarea name="checkScript" required placeholder="REGISTRY/SERVICE 可填定位或脚本；POWERSHELL/WMI 填实际执行内容" class="layui-textarea script-area"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">修复脚本</label>
+            <div class="layui-input-block">
+                <textarea name="remediationScript" placeholder="AUTO 规则建议填写；MANUAL 可留空" class="layui-textarea script-area"></textarea>
+            </div>
+        </div>
+        <div class="drawer-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn" id="saveRuleButton">保存</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/baseline-rule.js"></script>
+</body>
+</html>

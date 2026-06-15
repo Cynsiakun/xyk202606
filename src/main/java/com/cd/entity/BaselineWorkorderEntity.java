@@ -11,13 +11,18 @@ import java.time.LocalDateTime;
 public class BaselineWorkorderEntity {
 
     private Long id;
+    private Long resultId;
     private Long hostId;
     private Long ruleId;
-    private Long resultId;
-    private String assignee;
-    private String remark;
+    private String title;
+    private String advice;
+    private Long assigneeId;
+    private String priority;
     private String status;
-    private String creator;
+    private String closeRemark;
+    private Long createBy;
     private LocalDateTime createTime;
+    private LocalDateTime startTime;
+    private LocalDateTime finishTime;
     private LocalDateTime updateTime;
 }

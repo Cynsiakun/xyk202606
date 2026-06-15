@@ -14,7 +14,7 @@ public class BaselineWorkorderRequestDTO {
     @NotEmpty(message = "工单目标不能为空")
     private List<Long> resultIds;
 
-    private String assignee;
+    private Long assigneeId;
 
     private String remark;
 }

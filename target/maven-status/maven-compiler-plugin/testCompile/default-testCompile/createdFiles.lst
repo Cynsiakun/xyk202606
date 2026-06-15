@@ -1,2 +1,4 @@
+com\cd\service\impl\BaselineRuleEngineImplTest.class
 com\cd\service\impl\SecurityAlertRuleEngineImplTest.class
 com\cd\util\VersionExpressionParserTest.class
+com\cd\util\BaselineWindowsPathNormalizerTest.class

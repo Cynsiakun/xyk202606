@@ -37,4 +37,43 @@ class BaselineRuleEngineImplTest {
 
         assertThat(missing).isTrue();
     }
+
+    @Test
+    void shouldCompareTextIgnoringCase() {
+        BaselineRuleItemEntity item = new BaselineRuleItemEntity();
+        item.setOperator("=");
+        item.setExpectedValue("Running");
+        item.setMatchType("EXACT");
+
+        boolean result = (boolean) ReflectionTestUtils.invokeMethod(engine, "compare", item, "running");
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void shouldCleanCommandNoiseFromEvidence() {
+        String raw = """
+                The task has completed successfully.
+                See log %windir%\\security\\logs\\scesrv.log for detail info.
+
+                C:\\secedit.cfg:111:SeShutdownPrivilege = *S-1-5-32-544,*S-1-5-32-545
+                """;
+
+        String cleaned = (String) ReflectionTestUtils.invokeMethod(engine, "cleanEvidence", raw, null);
+
+        assertThat(cleaned).isEqualTo("SeShutdownPrivilege = *S-1-5-32-544,*S-1-5-32-545");
+    }
+
+    @Test
+    void shouldBuildReadableMessageFromComparisonResult() {
+        BaselineRuleItemEntity item = new BaselineRuleItemEntity();
+        item.setOperator(">=");
+        item.setExpectedValue("14");
+        item.setMatchType("EXACT");
+
+        Object result = ReflectionTestUtils.invokeMethod(engine, "evaluateItem", item, "90", "90");
+
+        assertThat(ReflectionTestUtils.getField(result, "status")).isEqualTo("PASS");
+        assertThat(ReflectionTestUtils.getField(result, "message").toString()).contains("符合要求").contains("高于或等于要求值");
+    }
 }

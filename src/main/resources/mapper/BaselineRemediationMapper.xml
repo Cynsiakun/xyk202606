@@ -14,6 +14,8 @@
         <result column="new_value" property="newValue"/>
         <result column="backup_data" property="backupData"/>
         <result column="execute_script" property="executeScript"/>
+        <result column="operator" property="operator"/>
+        <result column="message" property="message"/>
         <result column="status" property="status"/>
         <result column="start_time" property="startTime"/>
         <result column="end_time" property="endTime"/>
@@ -22,21 +24,21 @@
 
     <insert id="insert" parameterType="com.cd.entity.BaselineRemediationEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO baseline_remediation (result_id, host_id, rule_id, remediation_type, old_value, new_value,
-                                          backup_data, execute_script, status, start_time, end_time, create_time)
+                                          backup_data, execute_script, operator, message, status, start_time, end_time, create_time)
         VALUES (#{resultId}, #{hostId}, #{ruleId}, #{remediationType}, #{oldValue}, #{newValue},
-                #{backupData}, #{executeScript}, #{status}, #{startTime}, #{endTime}, #{createTime})
+                #{backupData}, #{executeScript}, #{operator}, #{message}, #{status}, #{startTime}, #{endTime}, #{createTime})
     </insert>
 
     <select id="selectById" resultMap="BaselineRemediationResultMap">
         SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
-               backup_data, execute_script, status, start_time, end_time, create_time
+               backup_data, execute_script, operator, message, status, start_time, end_time, create_time
         FROM baseline_remediation
         WHERE id = #{id}
     </select>
 
     <select id="selectLatestSuccessfulByResultId" resultMap="BaselineRemediationResultMap">
         SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
-               backup_data, execute_script, status, start_time, end_time, create_time
+               backup_data, execute_script, operator, message, status, start_time, end_time, create_time
         FROM baseline_remediation
         WHERE result_id = #{resultId}
           AND status = 'SUCCESS'
@@ -44,14 +46,56 @@
         LIMIT 1
     </select>
 
+    <select id="selectLatestSuccessfulByResultScope" resultMap="BaselineRemediationResultMap">
+        SELECT br.id, br.result_id, br.host_id, br.rule_id, br.remediation_type, br.old_value, br.new_value,
+               br.backup_data, br.execute_script, br.operator, br.message, br.status, br.start_time, br.end_time, br.create_time
+        FROM baseline_remediation br
+        LEFT JOIN baseline_result r ON r.id = br.result_id
+        WHERE br.host_id = #{hostId}
+          AND br.rule_id = #{ruleId}
+          AND COALESCE(r.check_key, '') = COALESCE(#{checkKey}, '')
+          AND br.status = 'SUCCESS'
+        ORDER BY br.end_time DESC, br.id DESC
+        LIMIT 1
+    </select>
+
     <select id="selectLatestPendingByResultId" resultMap="BaselineRemediationResultMap">
         SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
-               backup_data, execute_script, status, start_time, end_time, create_time
+               backup_data, execute_script, operator, message, status, start_time, end_time, create_time
         FROM baseline_remediation
         WHERE result_id = #{resultId}
           AND status = 'PENDING'
         ORDER BY start_time DESC, id DESC
         LIMIT 1
+    </select>
+
+    <select id="selectLatestFinishedByResultId" resultMap="BaselineRemediationResultMap">
+        SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
+               backup_data, execute_script, operator, message, status, start_time, end_time, create_time
+        FROM baseline_remediation
+        WHERE result_id = #{resultId}
+          AND status IN ('SUCCESS', 'FAILED', 'ROLLBACK')
+        ORDER BY COALESCE(end_time, create_time) DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectByResultId" resultMap="BaselineRemediationResultMap">
+        SELECT id, result_id, host_id, rule_id, remediation_type, old_value, new_value,
+               backup_data, execute_script, operator, message, status, start_time, end_time, create_time
+        FROM baseline_remediation
+        WHERE result_id = #{resultId}
+        ORDER BY create_time DESC, id DESC
+    </select>
+
+    <select id="selectByResultScope" resultMap="BaselineRemediationResultMap">
+        SELECT br.id, br.result_id, br.host_id, br.rule_id, br.remediation_type, br.old_value, br.new_value,
+               br.backup_data, br.execute_script, br.operator, br.message, br.status, br.start_time, br.end_time, br.create_time
+        FROM baseline_remediation br
+        LEFT JOIN baseline_result r ON r.id = br.result_id
+        WHERE br.host_id = #{hostId}
+          AND br.rule_id = #{ruleId}
+          AND COALESCE(r.check_key, '') = COALESCE(#{checkKey}, '')
+        ORDER BY br.create_time DESC, br.id DESC
     </select>
 
     <update id="updateStarted">
@@ -67,13 +111,7 @@
             old_value = COALESCE(#{oldValue}, old_value),
             new_value = COALESCE(#{newValue}, new_value),
             backup_data = COALESCE(#{backupData}, backup_data),
-            end_time = NOW()
-        WHERE id = #{id}
-    </update>
-
-    <update id="markRollback">
-        UPDATE baseline_remediation
-        SET status = 'ROLLBACK',
+            message = COALESCE(#{message}, message),
             end_time = NOW()
         WHERE id = #{id}
     </update>

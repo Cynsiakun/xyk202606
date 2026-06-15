@@ -84,4 +84,99 @@
             #{id}
         </foreach>
     </select>
+
+    <select id="selectById" resultMap="BaselineRuleResultMap">
+        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
+               check_method, check_script, remediation_type, remediation_script, version,
+               is_mandatory, enabled, status, create_time, update_time
+        FROM baseline_rule
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByRuleCode" resultMap="BaselineRuleResultMap">
+        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
+               check_method, check_script, remediation_type, remediation_script, version,
+               is_mandatory, enabled, status, create_time, update_time
+        FROM baseline_rule
+        WHERE rule_code = #{ruleCode}
+    </select>
+
+    <sql id="manageFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (rule_code LIKE CONCAT('%', #{keyword}, '%')
+                 OR rule_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR category LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="category != null and category != ''">
+            AND category = #{category}
+        </if>
+        <if test="severity != null and severity != ''">
+            AND UPPER(severity) = #{severity}
+        </if>
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="enabled != null">
+            AND enabled = #{enabled}
+        </if>
+    </sql>
+
+    <select id="selectManagePage" resultMap="BaselineRuleResultMap">
+        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
+               check_method, check_script, remediation_type, remediation_script, version,
+               is_mandatory, enabled, status, create_time, update_time
+        FROM baseline_rule
+        WHERE 1 = 1
+        <include refid="manageFilter"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countManagePage" resultType="long">
+        SELECT COUNT(*)
+        FROM baseline_rule
+        WHERE 1 = 1
+        <include refid="manageFilter"/>
+    </select>
+
+    <insert id="insertManage" parameterType="com.cd.entity.BaselineRuleEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO baseline_rule (rule_code, rule_name, category, description, severity, score,
+                                   os_type, check_method, check_script, remediation_type,
+                                   remediation_script, version, is_mandatory, enabled, status)
+        VALUES (#{ruleCode}, #{ruleName}, #{category}, #{description}, #{severity}, #{score},
+                #{osType}, #{checkMethod}, #{checkScript}, #{remediationType},
+                #{remediationScript}, #{version}, #{isMandatory}, #{enabled}, #{status})
+    </insert>
+
+    <update id="updateManage" parameterType="com.cd.entity.BaselineRuleEntity">
+        UPDATE baseline_rule
+        SET rule_name = #{ruleName},
+            category = #{category},
+            description = #{description},
+            severity = #{severity},
+            score = #{score},
+            os_type = #{osType},
+            check_method = #{checkMethod},
+            check_script = #{checkScript},
+            remediation_type = #{remediationType},
+            remediation_script = #{remediationScript},
+            is_mandatory = #{isMandatory},
+            enabled = #{enabled},
+            status = #{status},
+            version = COALESCE(version, 1) + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="archiveById">
+        UPDATE baseline_rule
+        SET status = 'ARCHIVED',
+            enabled = 0
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE baseline_rule
+        SET enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
 </mapper>

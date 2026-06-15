@@ -45,6 +45,49 @@
 .task-status.running { background: #eff8ff; color: #175cd3; }
 .task-status.finished { background: #ecfdf3; color: #027a48; }
 .task-status.failed { background: #fef3f2; color: #b42318; }
+.task-status.error { background: #fff7ed; color: #b54708; }
+
+.toolbar-search {
+    width: 190px;
+    display: inline-block;
+}
+
+.task-type {
+    display: inline-flex;
+    min-width: 64px;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.task-type.scan { color: #175cd3; background: #eff8ff; }
+.task-type.recheck { color: #6941c6; background: #f4f3ff; }
+
+.progress-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.progress-text {
+    color: #475467;
+    font-size: 12px;
+}
+
+.progress-bar {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eef2f6;
+}
+
+.progress-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #12b76a);
+}
 
 /* 新建任务弹窗：主机 / 规则选择器 */
 .baseline-form {
@@ -86,6 +129,12 @@
     cursor: pointer;
 }
 
+.picker-checkall input {
+    width: 16px;
+    height: 16px;
+    accent-color: #2563eb;
+}
+
 .picker-count {
     font-size: 13px;
     color: #175cd3;
@@ -112,8 +161,17 @@
     background: #f5f8ff;
 }
 
+.picker-option.disabled {
+    cursor: not-allowed;
+    opacity: .55;
+    background: #f8fafc;
+}
+
 .picker-option input {
     margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #2563eb;
 }
 
 .picker-option .opt-main {
@@ -134,6 +192,59 @@
     color: #1d4ed8;
 }
 
+.picker-option .opt-tag.online { background: #ecfdf3; color: #027a48; }
+.picker-option .opt-tag.offline { background: #f2f4f7; color: #667085; }
+
+.category-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 280px;
+}
+
+.schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.native-select {
+    height: 38px;
+    min-width: 110px;
+    padding: 0 10px;
+    border: 1px solid #dcdfe6;
+    border-radius: 6px;
+    background: #fff;
+    color: #344054;
+}
+
+.schedule-time {
+    width: 130px;
+}
+
+.schedule-hint {
+    margin-top: 8px;
+    color: #667085;
+    font-size: 12px;
+}
+
+.category-btn {
+    border: 1px solid #d0d5dd;
+    border-radius: 999px;
+    background: #fff;
+    color: #475467;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 9px;
+}
+
+.category-btn:hover {
+    border-color: #2563eb;
+    color: #175cd3;
+    background: #eff8ff;
+}
+
 .picker-empty {
     padding: 22px 14px;
     text-align: center;
@@ -141,14 +252,34 @@
     font-size: 13px;
 }
 
-/* 查看结果弹窗 */
-.baseline-result {
-    padding: 16px 18px 6px;
+/* 任务结果面板 */
+.result-panel {
+    margin-top: 16px;
+}
+
+.result-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.result-panel-head h2 {
+    margin: 2px 0 0;
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+.result-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .overview-cards {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -173,6 +304,7 @@
 
 .overview-card.pass .ov-value { color: #027a48; }
 .overview-card.fail .ov-value { color: #b42318; }
+.overview-card.error .ov-value { color: #b54708; }
 .overview-card.rate .ov-value { color: #175cd3; }
 
 .result-section-title {
@@ -197,6 +329,47 @@
 
 .all-pass span {
     font-size: 15px;
+}
+
+.task-rule-panel {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid #eef0f3;
+}
+
+.task-rule-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.task-rule-head h3 {
+    margin: 2px 0 0;
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.evidence-inline {
+    display: inline-block;
+    max-width: 70%;
+    vertical-align: middle;
+    color: #475467;
+}
+
+.evidence-btn {
+    margin-left: 8px;
+}
+
+.evidence-full {
+    margin: 0;
+    padding: 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #344054;
+    background: #f8fafc;
+    min-height: 420px;
 }
 
 @media (max-width: 900px) {

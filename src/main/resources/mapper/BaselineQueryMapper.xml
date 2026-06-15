@@ -4,23 +4,48 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cd.mapper.BaselineQueryMapper">
 
+    <sql id="taskTypeExpr">
+        CASE
+            WHEN t.task_name LIKE '基线复检-%'
+              OR t.task_name LIKE '修复后自动复检-%'
+              OR t.task_name LIKE '主机即时检测-%'
+            THEN 'RECHECK'
+            ELSE 'SCAN'
+        END
+    </sql>
+
+    <sql id="taskFilter">
+        <if test="keyword != null and keyword != ''">
+            AND t.task_name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <if test="executeType != null and executeType != ''">
+            AND t.execute_type = #{executeType}
+        </if>
+        <if test="status != null and status != ''">
+            AND t.status = #{status}
+        </if>
+        <if test="taskType != null and taskType != ''">
+            AND <include refid="taskTypeExpr"/> = #{taskType}
+        </if>
+    </sql>
+
     <select id="selectTaskPage" resultType="com.cd.dto.BaselineTaskListItemDTO">
-        SELECT t.id                                                              AS id,
-               t.task_name                                                       AS taskName,
-               t.execute_type                                                    AS executeType,
+        SELECT t.id                         AS id,
+               t.task_name                  AS taskName,
+               t.execute_type               AS executeType,
+               <include refid="taskTypeExpr"/> AS taskType,
                COALESCE(JSON_LENGTH(JSON_EXTRACT(t.rule_scope, '$.ruleIds')), 0) AS ruleCount,
-               t.total_host_count                                                AS hostCount,
+               t.total_host_count           AS hostCount,
+               (SELECT COUNT(*) FROM baseline_task_host th
+                WHERE th.task_id = t.id AND th.status = 'FINISHED') AS finishedHostCount,
                (SELECT ROUND(AVG(s.compliance_rate), 2)
                 FROM baseline_summary s
-                WHERE s.task_id = t.id)                                          AS avgPassRate,
-               t.status                                                          AS status,
-               t.create_time                                                     AS createTime
+                WHERE s.task_id = t.id)    AS avgPassRate,
+               t.status                     AS status,
+               t.create_time                AS createTime
         FROM baseline_task t
-        <where>
-            <if test="status != null and status != ''">
-                t.status = #{status}
-            </if>
-        </where>
+        WHERE 1 = 1
+        <include refid="taskFilter"/>
         ORDER BY t.id DESC
         LIMIT #{offset}, #{limit}
     </select>
@@ -28,11 +53,8 @@
     <select id="countTasks" resultType="long">
         SELECT COUNT(*)
         FROM baseline_task t
-        <where>
-            <if test="status != null and status != ''">
-                t.status = #{status}
-            </if>
-        </where>
+        WHERE 1 = 1
+        <include refid="taskFilter"/>
     </select>
 
     <select id="selectResultOverview" resultType="com.cd.dto.BaselineTaskResultOverviewDTO">
@@ -40,35 +62,151 @@
                t.total_host_count AS totalHostCount,
                (SELECT COUNT(*) FROM baseline_task_host h
                 WHERE h.task_id = t.id AND h.status = 'FINISHED')   AS finishedHostCount,
-               (SELECT ROUND(AVG(s.compliance_rate), 2) FROM baseline_summary s
+               (SELECT ROUND(AVG(s.compliance_rate), 2)
+                FROM baseline_summary s
                 WHERE s.task_id = t.id)                             AS avgComplianceRate,
-               (SELECT COUNT(*) FROM baseline_summary s
-                WHERE s.task_id = t.id AND s.fail_count = 0)        AS passHostCount,
-               (SELECT COUNT(*) FROM baseline_summary s
-                WHERE s.task_id = t.id AND s.fail_count > 0)        AS failHostCount
+               (SELECT COUNT(*)
+                FROM (
+                    SELECT r.host_id
+                    FROM baseline_result r
+                    WHERE r.task_id = #{taskId}
+                    GROUP BY r.host_id
+                    HAVING SUM(CASE WHEN r.status IN ('FAIL', 'ERROR') THEN 1 ELSE 0 END) > 0
+                ) problem_hosts)                                    AS failHostCount,
+               (SELECT COUNT(DISTINCT r.rule_id)
+                FROM baseline_result r
+                WHERE r.task_id = t.id AND r.status IN ('FAIL', 'ERROR')) AS problemRuleCount,
+               (SELECT COUNT(*) FROM baseline_result r
+                WHERE r.task_id = t.id AND r.status = 'PASS')       AS passRuleCount,
+               (SELECT COUNT(*) FROM baseline_result r
+                WHERE r.task_id = t.id AND r.status = 'FAIL')       AS failRuleCount,
+               (SELECT COUNT(*) FROM baseline_result r
+                WHERE r.task_id = t.id AND r.status = 'ERROR')      AS errorRuleCount
         FROM baseline_task t
         WHERE t.id = #{taskId}
     </select>
 
     <select id="selectProblemHostPage" resultType="com.cd.dto.BaselineProblemHostDTO">
-        SELECT s.host_id         AS hostId,
-               h.hostname        AS hostName,
-               h.ipv4            AS ipv4,
-               s.compliance_rate AS complianceRate,
-               s.fail_count      AS failRuleCount
-        FROM baseline_summary s
-        LEFT JOIN hosts h ON h.id = s.host_id
-        WHERE s.task_id = #{taskId}
-          AND s.fail_count > 0
-        ORDER BY s.fail_count DESC, s.host_id ASC
+        SELECT agg.host_id        AS hostId,
+               h.hostname         AS hostName,
+               h.ipv4             AS ipv4,
+               agg.complianceRate AS complianceRate,
+               agg.passRuleCount  AS passRuleCount,
+               agg.failRuleCount  AS failRuleCount,
+               agg.errorRuleCount AS errorRuleCount
+        FROM (
+            SELECT r.host_id,
+                   ROUND(SUM(CASE WHEN r.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS complianceRate,
+                   SUM(CASE WHEN r.status = 'PASS' THEN 1 ELSE 0 END) AS passRuleCount,
+                   SUM(CASE WHEN r.status = 'FAIL' THEN 1 ELSE 0 END) AS failRuleCount,
+                   SUM(CASE WHEN r.status = 'ERROR' THEN 1 ELSE 0 END) AS errorRuleCount
+            FROM baseline_result r
+            WHERE r.task_id = #{taskId}
+            GROUP BY r.host_id
+        ) agg
+        LEFT JOIN hosts h ON h.id = agg.host_id
+        ORDER BY (agg.failRuleCount + agg.errorRuleCount) DESC, agg.host_id ASC
         LIMIT #{offset}, #{limit}
     </select>
 
     <select id="countProblemHosts" resultType="long">
         SELECT COUNT(*)
-        FROM baseline_summary s
-        WHERE s.task_id = #{taskId}
-          AND s.fail_count > 0
+        FROM (
+            SELECT r.host_id
+            FROM baseline_result r
+            WHERE r.task_id = #{taskId}
+            GROUP BY r.host_id
+        ) agg
+    </select>
+
+    <select id="selectTaskHostResults" resultType="com.cd.dto.BaselineHostResultItemDTO">
+        SELECT r.id                         AS resultId,
+               r.rule_id                    AS ruleId,
+               ru.rule_name                 AS ruleName,
+               ru.category                  AS category,
+               r.check_key                  AS checkKey,
+               r.expected_value             AS expectedValue,
+               r.actual_value               AS actualValue,
+               COALESCE(r.evidence, r.message) AS evidence,
+               r.status                     AS status,
+               ru.remediation_type          AS remediationType,
+               r.remediation_status         AS remediationStatus,
+               r.scan_time                  AS scanTime
+        FROM baseline_result r
+        LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        WHERE r.task_id = #{taskId}
+          AND r.host_id = #{hostId}
+        ORDER BY r.rule_id ASC, r.id ASC
+    </select>
+
+    <select id="selectTaskExportRows" resultType="com.cd.dto.BaselineTaskExportRowDTO">
+        SELECT r.host_id             AS hostId,
+               h.hostname            AS hostName,
+               h.ipv4                AS ipv4,
+               h.os_name             AS osName,
+               r.rule_id             AS ruleId,
+               ru.rule_name          AS ruleName,
+               ru.category           AS category,
+               ru.severity           AS severity,
+               r.check_key           AS checkKey,
+               r.status              AS status,
+               r.remediation_status  AS remediationStatus,
+               (SELECT w.status
+                FROM baseline_workorder w
+                WHERE w.result_id = r.id
+                ORDER BY w.update_time DESC, w.id DESC
+                LIMIT 1)              AS workorderStatus,
+               r.expected_value      AS expectedValue,
+               r.actual_value        AS actualValue,
+               r.evidence            AS evidence,
+               r.scan_time           AS scanTime
+        FROM baseline_result r
+        LEFT JOIN hosts h ON h.id = r.host_id
+        LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        WHERE r.task_id = #{taskId}
+        ORDER BY r.host_id ASC, r.rule_id ASC, r.id ASC
+    </select>
+
+    <select id="selectHostExportRows" resultType="com.cd.dto.BaselineTaskExportRowDTO">
+        SELECT r.host_id             AS hostId,
+               h.hostname            AS hostName,
+               h.ipv4                AS ipv4,
+               h.os_name             AS osName,
+               r.rule_id             AS ruleId,
+               ru.rule_name          AS ruleName,
+               ru.category           AS category,
+               ru.severity           AS severity,
+               r.check_key           AS checkKey,
+               r.status              AS status,
+               r.remediation_status  AS remediationStatus,
+               (SELECT w.status
+                FROM baseline_workorder w
+                WHERE w.result_id = r.id
+                ORDER BY w.update_time DESC, w.id DESC
+                LIMIT 1)              AS workorderStatus,
+               r.expected_value      AS expectedValue,
+               r.actual_value        AS actualValue,
+               COALESCE(r.evidence, r.message) AS evidence,
+               r.scan_time           AS scanTime
+        FROM baseline_result r
+        LEFT JOIN hosts h ON h.id = r.host_id
+        LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        WHERE r.host_id = #{hostId}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM baseline_result newer
+              WHERE newer.host_id = r.host_id
+                AND newer.rule_id = r.rule_id
+                AND COALESCE(newer.check_key, '') = COALESCE(r.check_key, '')
+                AND (
+                    COALESCE(newer.scan_time, '1970-01-01') &gt; COALESCE(r.scan_time, '1970-01-01')
+                    OR (
+                        COALESCE(newer.scan_time, '1970-01-01') = COALESCE(r.scan_time, '1970-01-01')
+                        AND newer.id &gt; r.id
+                    )
+                )
+          )
+        ORDER BY (r.status = 'PASS') ASC, r.rule_id ASC, r.id ASC
     </select>
 
     <select id="selectRuleOptions" resultType="com.cd.dto.BaselineRuleOptionDTO">
@@ -88,53 +226,89 @@
         ORDER BY id ASC
     </select>
 
-    <sql id="hostOverviewLatest">
-        s.id = (SELECT s2.id FROM baseline_summary s2
-                WHERE s2.host_id = s.host_id
-                ORDER BY s2.last_scan_time DESC, s2.id DESC
-                LIMIT 1)
-    </sql>
-
     <sql id="hostOverviewFilter">
         <if test="keyword != null and keyword != ''">
             AND (h.hostname LIKE CONCAT('%', #{keyword}, '%')
                  OR h.ipv4 LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test='"green".equals(level)'>
-            AND s.compliance_rate &gt;= 90
+            AND snap.compliance_rate &gt;= 90
         </if>
         <if test='"yellow".equals(level)'>
-            AND s.compliance_rate &gt;= 60 AND s.compliance_rate &lt; 90
+            AND snap.compliance_rate &gt;= 60 AND snap.compliance_rate &lt; 90
         </if>
         <if test='"red".equals(level)'>
-            AND s.compliance_rate &lt; 60
+            AND snap.compliance_rate &lt; 60
         </if>
     </sql>
 
     <select id="selectHostOverviewPage" resultType="com.cd.dto.BaselineHostOverviewDTO">
-        SELECT s.host_id                     AS hostId,
-               h.hostname                    AS hostName,
-               h.ipv4                        AS ipv4,
-               h.os_name                     AS osName,
-               s.compliance_rate             AS complianceRate,
-               (s.pass_count + s.fail_count) AS totalCount,
-               s.pass_count                  AS passCount,
-               s.fail_count                  AS failCount,
-               s.last_scan_time              AS lastScanTime,
-               s.task_id                     AS taskId
-        FROM baseline_summary s
-        LEFT JOIN hosts h ON h.id = s.host_id
-        WHERE <include refid="hostOverviewLatest"/>
+        SELECT snap.host_id         AS hostId,
+               h.hostname           AS hostName,
+               h.ipv4               AS ipv4,
+               h.os_name            AS osName,
+               snap.compliance_rate AS complianceRate,
+               snap.total_count     AS totalCount,
+               snap.pass_count      AS passCount,
+               snap.fail_count      AS failCount,
+               snap.last_scan_time  AS lastScanTime,
+               snap.task_id         AS taskId
+        FROM (
+            SELECT latest.host_id,
+                   MAX(latest.task_id) AS task_id,
+                   COUNT(*) AS total_count,
+                   SUM(CASE WHEN latest.status = 'PASS' THEN 1 ELSE 0 END) AS pass_count,
+                   SUM(CASE WHEN latest.status IN ('FAIL', 'ERROR') THEN 1 ELSE 0 END) AS fail_count,
+                   ROUND(SUM(CASE WHEN latest.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS compliance_rate,
+                   MAX(latest.scan_time) AS last_scan_time
+            FROM baseline_result latest
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM baseline_result newer
+                WHERE newer.host_id = latest.host_id
+                  AND newer.rule_id = latest.rule_id
+                  AND COALESCE(newer.check_key, '') = COALESCE(latest.check_key, '')
+                  AND (
+                      COALESCE(newer.scan_time, '1970-01-01') &gt; COALESCE(latest.scan_time, '1970-01-01')
+                      OR (
+                          COALESCE(newer.scan_time, '1970-01-01') = COALESCE(latest.scan_time, '1970-01-01')
+                          AND newer.id &gt; latest.id
+                      )
+                  )
+            )
+            GROUP BY latest.host_id
+        ) snap
+        LEFT JOIN hosts h ON h.id = snap.host_id
+        WHERE 1 = 1
         <include refid="hostOverviewFilter"/>
-        ORDER BY s.compliance_rate ASC, s.host_id ASC
+        ORDER BY snap.compliance_rate ASC, snap.host_id ASC
         LIMIT #{offset}, #{limit}
     </select>
 
     <select id="countHostOverview" resultType="long">
         SELECT COUNT(*)
-        FROM baseline_summary s
-        LEFT JOIN hosts h ON h.id = s.host_id
-        WHERE <include refid="hostOverviewLatest"/>
+        FROM (
+            SELECT latest.host_id,
+                   ROUND(SUM(CASE WHEN latest.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS compliance_rate
+            FROM baseline_result latest
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM baseline_result newer
+                WHERE newer.host_id = latest.host_id
+                  AND newer.rule_id = latest.rule_id
+                  AND COALESCE(newer.check_key, '') = COALESCE(latest.check_key, '')
+                  AND (
+                      COALESCE(newer.scan_time, '1970-01-01') &gt; COALESCE(latest.scan_time, '1970-01-01')
+                      OR (
+                          COALESCE(newer.scan_time, '1970-01-01') = COALESCE(latest.scan_time, '1970-01-01')
+                          AND newer.id &gt; latest.id
+                      )
+                  )
+            )
+            GROUP BY latest.host_id
+        ) snap
+        LEFT JOIN hosts h ON h.id = snap.host_id
+        WHERE 1 = 1
         <include refid="hostOverviewFilter"/>
     </select>
 
@@ -150,9 +324,24 @@
                r.status              AS status,
                ru.remediation_type   AS remediationType,
                r.remediation_status  AS remediationStatus,
+               rem.status            AS latestRemediationStatus,
+               rem.remediation_type  AS latestRemediationType,
+               rem.operator          AS latestRemediationOperator,
+               rem.start_time        AS latestRemediationStartTime,
+               rem.end_time          AS latestRemediationEndTime,
                r.scan_time           AS scanTime
         FROM baseline_result r
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        LEFT JOIN baseline_remediation rem ON rem.id = (
+            SELECT br.id
+            FROM baseline_remediation br
+            LEFT JOIN baseline_result rr ON rr.id = br.result_id
+            WHERE br.host_id = r.host_id
+              AND br.rule_id = r.rule_id
+              AND COALESCE(rr.check_key, '') = COALESCE(r.check_key, '')
+            ORDER BY br.create_time DESC, br.id DESC
+            LIMIT 1
+        )
         WHERE r.host_id = #{hostId}
           AND NOT EXISTS (
               SELECT 1

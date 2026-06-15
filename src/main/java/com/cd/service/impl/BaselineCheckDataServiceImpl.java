@@ -101,7 +101,7 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
         triggerRuleEngine(entity);
     }
 
-    /** 修复结果：按 resultId 回填 remediation_status 为 COMPLETED/FAILED。 */
+    /** 修复结果：按 resultId 回填修复流程状态，并触发单规则复检。 */
     private void handleRemediationResult(String queueName, String message, JsonNode root) {
         Long resultId = parseId(root.path("resultId"));
         if (resultId == null) {
@@ -116,7 +116,8 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
                 success,
                 readText(root, "oldValue", "old_value", "beforeValue"),
                 readText(root, "newValue", "new_value", "afterValue"),
-                readText(root, "backupData", "backup_data", "backup"));
+                readText(root, "backupData", "backup_data", "backup"),
+                readText(root, "message", "msg"));
         log.info("基线修复回传已处理: queue={}, remediationId={}, resultId={}, success={}",
                 queueName, remediationId, resultId, success);
     }
@@ -130,7 +131,7 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
         }
         Long remediationId = parseId(root.path("remediationId"));
         boolean success = parseRemediationSuccess(root);
-        baselineRemediationService.handleRollbackResult(remediationId, resultId, success);
+        baselineRemediationService.handleRollbackResult(remediationId, resultId, success, readText(root, "message", "msg"));
         log.info("基线回滚回传已处理: queue={}, remediationId={}, resultId={}, success={}",
                 queueName, remediationId, resultId, success);
     }

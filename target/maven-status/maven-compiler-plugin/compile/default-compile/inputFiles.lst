@@ -42,6 +42,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\AiController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AssetExportController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\BaselineHostController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\BaselineRuleManagementController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\BaselineTaskController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\CurrentUserController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
@@ -83,14 +84,21 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineActionResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineHostDispatchDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineHostOverviewDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineHostResultItemDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineOperatorOptionDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineProblemHostDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineRemediationRecordDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineRemediationRequestDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineRuleManageRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineRuleOptionDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineScanHostsRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskCreateRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskDispatchResponseDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskExportRowDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskListItemDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineTaskResultOverviewDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineWorkorderCompleteRequestDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineWorkorderDetailDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineWorkorderListItemDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\BaselineWorkorderRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\CsvImportResultDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\DashboardStatisticsDTO.java
@@ -269,6 +277,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineHostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineQueryService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineRemediationService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineRuleEngine.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineRuleManagementService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineTaskService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineWorkorderService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
@@ -283,6 +292,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineHostServiceImp
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineQueryServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineRemediationServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineRuleEngineImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineRuleManagementServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineTaskServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\BaselineWorkorderServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashboardServiceImpl.java

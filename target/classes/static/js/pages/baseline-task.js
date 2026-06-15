@@ -3,86 +3,25 @@ layui.use(["table", "form", "layer"], function () {
     var form = layui.form;
     var layer = layui.layer;
 
-    var tableId = "baselineTaskTable";
-    var currentStatus = "";
+    var taskTableId = "baselineTaskTable";
+    var hostResultTableId = "taskHostResultTable";
+    var ruleResultTableId = "taskRuleResultTable";
+    var taskState = {page: 1, size: 10, keyword: "", executeType: "", taskType: "", status: ""};
+    var resultState = {task: null, page: 1, size: 10, selectedHost: null};
     var hasInProgress = false;
 
-    // 新建任务弹窗内的选择状态
     var allHosts = [];
     var allRules = [];
     var selectedHostIds = {};
     var selectedRuleIds = {};
 
-    renderTaskTable();
-    bindToolbar();
-    startPolling();
+    init();
 
-    function renderTaskTable() {
-        table.render({
-            elem: "#" + tableId,
-            url: "/api/baseline/tasks",
-            method: "GET",
-            headers: {Authorization: "Bearer " + AppAuth.getToken()},
-            page: true,
-            limit: 10,
-            limits: [10, 20, 50],
-            request: {pageName: "page", limitName: "size"},
-            where: {status: currentStatus},
-            parseData: function (res) {
-                if (res.code !== 200) {
-                    AppRequest.showMessage(res.message || "请求失败", 2, 2200);
-                    if ((res.code === 401 || res.code === 403) && window.AppAuth) {
-                        AppAuth.clearLogin();
-                        AppAuth.redirectToLogin();
-                    }
-                }
-                var pageData = res.data || {};
-                return {
-                    code: res.code === 200 ? 0 : res.code,
-                    msg: res.message,
-                    count: pageData.total || 0,
-                    data: pageData.list || []
-                };
-            },
-            cols: [[
-                {field: "taskName", title: "任务名称", minWidth: 180, templet: function (d) {
-                    return escapeHtml(d.taskName || "-");
-                }},
-                {field: "executeType", title: "执行方式", width: 110, templet: function (d) {
-                    return d.executeType === "SCHEDULED" ? "定时" : "立即";
-                }},
-                {field: "ruleCount", title: "规则数", width: 90, align: "center", templet: function (d) {
-                    return d.ruleCount != null ? d.ruleCount : 0;
-                }},
-                {field: "hostCount", title: "主机数", width: 90, align: "center", templet: function (d) {
-                    return d.hostCount != null ? d.hostCount : 0;
-                }},
-                {field: "avgPassRate", title: "平均通过率", width: 120, align: "center", templet: function (d) {
-                    return buildRateCell(d.avgPassRate);
-                }},
-                {field: "status", title: "状态", width: 110, align: "center", templet: function (d) {
-                    return buildStatusTag(d.status);
-                }},
-                {field: "createTime", title: "创建时间", width: 180, templet: function (d) {
-                    return AppUtils.formatDateTime(d.createTime);
-                }},
-                {title: "操作", width: 120, fixed: "right", align: "center", templet: function () {
-                    return '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="result">查看结果</button>';
-                }}
-            ]],
-            done: function (res) {
-                var rows = (res && res.data) || [];
-                hasInProgress = rows.some(function (row) {
-                    return row.status === "PENDING" || row.status === "RUNNING";
-                });
-            }
-        });
-
-        table.on("tool(" + tableId + ")", function (obj) {
-            if (obj.event === "result") {
-                openResultDialog(obj.data);
-            }
-        });
+    function init() {
+        bindToolbar();
+        bindResultPanel();
+        renderTaskTable();
+        startPolling();
     }
 
     function bindToolbar() {
@@ -92,26 +31,155 @@ layui.use(["table", "form", "layer"], function () {
         } else {
             addButton.style.display = "none";
         }
-
+        document.getElementById("searchButton").addEventListener("click", applyFilters);
+        document.getElementById("taskKeywordInput").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                applyFilters();
+            }
+        });
         document.getElementById("refreshButton").addEventListener("click", function () {
-            table.reloadData(tableId, {scrollPos: "fixed"});
+            reloadTaskTable(false);
+        });
+        form.on("select(executeTypeFilter)", function (data) {
+            taskState.executeType = data.value || "";
+            taskState.page = 1;
+            reloadTaskTable(false);
+        });
+        form.on("select(taskTypeFilter)", function (data) {
+            taskState.taskType = data.value || "";
+            taskState.page = 1;
+            reloadTaskTable(false);
+        });
+        form.on("select(statusFilter)", function (data) {
+            taskState.status = data.value || "";
+            taskState.page = 1;
+            reloadTaskTable(false);
+        });
+    }
+
+    function bindResultPanel() {
+        document.getElementById("backToListButton").addEventListener("click", function () {
+            document.getElementById("taskResultPanel").style.display = "none";
+            document.getElementById("taskListPanel").style.display = "";
+            reloadTaskTable(true);
+        });
+        document.getElementById("resultRefreshButton").addEventListener("click", function () {
+            refreshResultPanel();
+        });
+        document.getElementById("exportResultButton").addEventListener("click", function () {
+            if (resultState.task) {
+                openTaskExportMenu(resultState.task.id);
+            }
+        });
+        document.getElementById("closeRulePanelButton").addEventListener("click", function () {
+            hideTaskRulePanel();
+        });
+    }
+
+    function applyFilters() {
+        taskState.keyword = document.getElementById("taskKeywordInput").value.trim();
+        taskState.page = 1;
+        reloadTaskTable(false);
+    }
+
+    function renderTaskTable() {
+        table.render({
+            elem: "#" + taskTableId,
+            id: taskTableId,
+            url: "/api/baseline/tasks",
+            method: "GET",
+            headers: {Authorization: "Bearer " + AppAuth.getToken()},
+            page: true,
+            curr: taskState.page,
+            limit: taskState.size,
+            limits: [10, 20, 50],
+            request: {pageName: "page", limitName: "size"},
+            where: buildTaskQuery(),
+            parseData: parsePageData,
+            cols: [[
+                {field: "taskName", title: "任务名称", minWidth: 190, templet: function (d) {
+                    return escapeHtml(d.taskName || "-");
+                }},
+                {field: "executeType", title: "执行方式", width: 110, templet: function (d) {
+                    return d.executeType === "SCHEDULED" ? "定时任务" : "立即执行";
+                }},
+                {field: "taskType", title: "任务类型", width: 110, templet: function (d) {
+                    return buildTaskTypeTag(d.taskType);
+                }},
+                {field: "ruleCount", title: "规则数", width: 80, align: "center"},
+                {field: "hostCount", title: "主机数", width: 80, align: "center"},
+                {title: "进度", width: 180, templet: buildProgressCell},
+                {field: "avgPassRate", title: "平均合规率", width: 120, align: "center", templet: function (d) {
+                    return buildRateCell(d.avgPassRate);
+                }},
+                {field: "status", title: "状态", width: 100, align: "center", templet: function (d) {
+                    return buildStatusTag(d.status);
+                }},
+                {field: "createTime", title: "创建时间", width: 170, templet: function (d) {
+                    return AppUtils.formatDateTime(d.createTime);
+                }},
+                {title: "操作", width: 110, fixed: "right", align: "center", templet: function () {
+                    return '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="result">查看结果</button>';
+                }}
+            ]],
+            done: function (res, curr) {
+                taskState.page = curr;
+                taskState.size = this.limit || taskState.size;
+                var rows = (res && res.data) || [];
+                hasInProgress = rows.some(function (row) {
+                    return row.status === "PENDING" || row.status === "RUNNING";
+                });
+            }
         });
 
-        form.on("select(statusFilter)", function (data) {
-            currentStatus = data.value || "";
-            AppTable.reload(table, tableId, {status: currentStatus});
+        table.on("tool(" + taskTableId + ")", function (obj) {
+            if (obj.event === "result") {
+                openResultPanel(obj.data);
+            }
         });
+    }
+
+    function reloadTaskTable(silent) {
+        table.reload(taskTableId, {
+            page: {curr: taskState.page},
+            limit: taskState.size,
+            where: buildTaskQuery()
+        }, silent);
+    }
+
+    function buildTaskQuery() {
+        return {
+            keyword: taskState.keyword,
+            executeType: taskState.executeType,
+            taskType: taskState.taskType,
+            status: taskState.status
+        };
+    }
+
+    function parsePageData(res) {
+        if (res.code !== 200) {
+            AppRequest.showMessage(res.message || "请求失败", 2, 2200);
+            if ((res.code === 401 || res.code === 403) && window.AppAuth) {
+                AppAuth.clearLogin();
+                AppAuth.redirectToLogin();
+            }
+        }
+        var pageData = res.data || {};
+        return {code: res.code === 200 ? 0 : res.code, msg: res.message, count: pageData.total || 0, data: pageData.list || []};
     }
 
     function startPolling() {
         setInterval(function () {
-            if (hasInProgress) {
-                table.reloadData(tableId, {scrollPos: "fixed"});
+            if (document.visibilityState !== "visible") {
+                return;
+            }
+            if (resultState.task) {
+                refreshResultPanel(true);
+            } else if (hasInProgress) {
+                reloadTaskTable(true);
             }
         }, 10000);
     }
-
-    /* ============ 新建任务 ============ */
 
     function openTaskDialog() {
         allHosts = [];
@@ -119,11 +187,8 @@ layui.use(["table", "form", "layer"], function () {
         selectedHostIds = {};
         selectedRuleIds = {};
 
-        var viewportHeight = window.innerHeight || 760;
-        var viewportWidth = window.innerWidth || 720;
-        var dialogHeight = Math.min(720, viewportHeight - 30);
-        var dialogWidth = Math.min(720, viewportWidth - 30);
-
+        var dialogHeight = Math.min(760, (window.innerHeight || 760) - 30);
+        var dialogWidth = Math.min(820, (window.innerWidth || 860) - 30);
         var index = layer.open({
             type: 1,
             title: "新建基线任务",
@@ -131,22 +196,20 @@ layui.use(["table", "form", "layer"], function () {
             content: AppUtils.getTemplateHtml("baselineTaskFormTemplate"),
             success: function (layero) {
                 var root = layero[0];
-                form.render("radio", "baselineTaskForm");
-
+                form.render(null, "baselineTaskForm");
                 form.on("radio(executeType)", function (data) {
-                    var cronItem = root.querySelector("#cronItem");
-                    cronItem.style.display = data.value === "SCHEDULED" ? "" : "none";
+                    root.querySelector("#scheduleItem").style.display = data.value === "SCHEDULED" ? "" : "none";
                 });
-
+                initSchedulePicker(root);
                 root.querySelector('[data-action="close"]').addEventListener("click", function () {
                     layer.close(index);
                 });
                 root.querySelector("#submitTaskButton").addEventListener("click", function () {
                     submitTask(root, index, this);
                 });
-
                 bindHostPicker(root);
                 bindRulePicker(root);
+                updateSubmitState(root);
                 loadHosts(root);
                 loadRules(root);
             }
@@ -154,28 +217,22 @@ layui.use(["table", "form", "layer"], function () {
     }
 
     function bindHostPicker(root) {
-        var search = root.querySelector("#hostSearch");
-        search.addEventListener("input", function () {
+        root.querySelector("#hostSearch").addEventListener("input", function () {
             renderHostList(root, this.value.trim().toLowerCase());
         });
         root.querySelector("#hostList").addEventListener("change", function (event) {
             var box = event.target.closest("input[type=checkbox]");
-            if (!box) {
+            if (!box || box.disabled) {
                 return;
             }
-            var id = box.value;
-            if (box.checked) {
-                selectedHostIds[id] = true;
-            } else {
-                delete selectedHostIds[id];
-            }
+            toggleSelection(selectedHostIds, box.value, box.checked);
             updateHostCount(root);
+            updateSubmitState(root);
         });
     }
 
     function bindRulePicker(root) {
-        var search = root.querySelector("#ruleSearch");
-        search.addEventListener("input", function () {
+        root.querySelector("#ruleSearch").addEventListener("input", function () {
             renderRuleList(root, this.value.trim().toLowerCase());
         });
         root.querySelector("#ruleList").addEventListener("change", function (event) {
@@ -183,36 +240,46 @@ layui.use(["table", "form", "layer"], function () {
             if (!box) {
                 return;
             }
-            var id = box.value;
-            if (box.checked) {
-                selectedRuleIds[id] = true;
-            } else {
-                delete selectedRuleIds[id];
-            }
+            toggleSelection(selectedRuleIds, box.value, box.checked);
             syncRuleCheckAll(root);
             updateRuleCount(root);
+            updateSubmitState(root);
         });
         root.querySelector("#ruleCheckAll").addEventListener("change", function () {
             var checked = this.checked;
             allRules.forEach(function (rule) {
-                if (checked) {
+                toggleSelection(selectedRuleIds, rule.id, checked);
+            });
+            renderRuleList(root, root.querySelector("#ruleSearch").value.trim().toLowerCase());
+            syncRuleCheckAll(root);
+            updateRuleCount(root);
+            updateSubmitState(root);
+        });
+        root.querySelector("#ruleCategoryActions").addEventListener("click", function (event) {
+            var btn = event.target.closest("[data-category]");
+            if (!btn) {
+                return;
+            }
+            var category = btn.getAttribute("data-category");
+            allRules.forEach(function (rule) {
+                if ((rule.category || "未分类") === category) {
                     selectedRuleIds[rule.id] = true;
-                } else {
-                    delete selectedRuleIds[rule.id];
                 }
             });
             renderRuleList(root, root.querySelector("#ruleSearch").value.trim().toLowerCase());
+            syncRuleCheckAll(root);
             updateRuleCount(root);
+            updateSubmitState(root);
         });
     }
 
     function loadHosts(root) {
         AppRequest.request("/api/host/list?page=1&size=500", {method: "GET"}, {showErrorMessage: false})
             .then(function (res) {
-                var data = res.data || {};
-                allHosts = data.list || [];
+                allHosts = (res.data || {}).list || [];
                 renderHostList(root, "");
                 updateHostCount(root);
+                updateSubmitState(root);
             })
             .catch(function () {
                 root.querySelector("#hostList").innerHTML = '<div class="picker-empty">主机加载失败</div>';
@@ -223,13 +290,14 @@ layui.use(["table", "form", "layer"], function () {
         AppRequest.request("/api/baseline/rules", {method: "GET"}, {showErrorMessage: false})
             .then(function (res) {
                 allRules = res.data || [];
-                // 默认全选
                 allRules.forEach(function (rule) {
                     selectedRuleIds[rule.id] = true;
                 });
+                renderRuleCategoryActions(root);
                 renderRuleList(root, "");
                 syncRuleCheckAll(root);
                 updateRuleCount(root);
+                updateSubmitState(root);
             })
             .catch(function () {
                 root.querySelector("#ruleList").innerHTML = '<div class="picker-empty">规则加载失败</div>';
@@ -237,59 +305,63 @@ layui.use(["table", "form", "layer"], function () {
     }
 
     function renderHostList(root, keyword) {
-        var listEl = root.querySelector("#hostList");
         var filtered = allHosts.filter(function (host) {
-            if (!keyword) {
-                return true;
-            }
             var text = ((host.hostname || "") + " " + (host.ipv4 || "")).toLowerCase();
-            return text.indexOf(keyword) > -1;
+            return !keyword || text.indexOf(keyword) > -1;
         });
-        if (filtered.length === 0) {
+        var listEl = root.querySelector("#hostList");
+        if (!filtered.length) {
             listEl.innerHTML = '<div class="picker-empty">没有匹配的主机</div>';
             return;
         }
         listEl.innerHTML = filtered.map(function (host) {
+            var online = isHostOnline(host);
             var checked = selectedHostIds[host.id] ? "checked" : "";
-            return '<label class="picker-option">'
-                + '<input type="checkbox" value="' + host.id + '" ' + checked + '>'
+            return '<label class="picker-option ' + (online ? "" : "disabled") + '">'
+                + '<input type="checkbox" value="' + host.id + '" lay-ignore ' + checked + (online ? "" : " disabled") + '>'
                 + '<span class="opt-main">' + escapeHtml(host.hostname || ("主机#" + host.id)) + '</span>'
                 + '<span class="opt-sub">' + escapeHtml(host.ipv4 || "-") + '</span>'
+                + '<span class="opt-tag ' + (online ? "online" : "offline") + '">' + (online ? "在线" : "离线") + '</span>'
                 + '</label>';
         }).join("");
     }
 
-    function renderRuleList(root, keyword) {
-        var listEl = root.querySelector("#ruleList");
-        var filtered = allRules.filter(function (rule) {
-            if (!keyword) {
-                return true;
+    function renderRuleCategoryActions(root) {
+        var categories = [];
+        allRules.forEach(function (rule) {
+            var category = rule.category || "未分类";
+            if (categories.indexOf(category) === -1) {
+                categories.push(category);
             }
-            var text = ((rule.ruleCode || "") + " " + (rule.ruleName || "") + " " + (rule.category || "")).toLowerCase();
-            return text.indexOf(keyword) > -1;
         });
-        if (filtered.length === 0) {
+        root.querySelector("#ruleCategoryActions").innerHTML = categories.sort().map(function (category) {
+            return '<button type="button" class="category-btn" data-category="' + escapeHtml(category) + '">' + escapeHtml(category) + '</button>';
+        }).join("");
+    }
+
+    function renderRuleList(root, keyword) {
+        var filtered = allRules.filter(function (rule) {
+            var text = ((rule.ruleCode || "") + " " + (rule.ruleName || "") + " " + (rule.category || "")).toLowerCase();
+            return !keyword || text.indexOf(keyword) > -1;
+        });
+        var listEl = root.querySelector("#ruleList");
+        if (!filtered.length) {
             listEl.innerHTML = '<div class="picker-empty">没有匹配的规则</div>';
             return;
         }
         listEl.innerHTML = filtered.map(function (rule) {
             var checked = selectedRuleIds[rule.id] ? "checked" : "";
-            var sub = escapeHtml(rule.ruleCode || "") + (rule.category ? " · " + escapeHtml(rule.category) : "");
             return '<label class="picker-option">'
-                + '<input type="checkbox" value="' + rule.id + '" ' + checked + '>'
+                + '<input type="checkbox" value="' + rule.id + '" lay-ignore ' + checked + '>'
                 + '<span class="opt-main">' + escapeHtml(rule.ruleName || ("规则#" + rule.id)) + '</span>'
-                + '<span class="opt-sub">' + sub + '</span>'
+                + '<span class="opt-sub">' + escapeHtml(rule.ruleCode || "") + (rule.category ? " · " + escapeHtml(rule.category) : "") + '</span>'
                 + (rule.severity ? '<span class="opt-tag">' + escapeHtml(rule.severity) + '</span>' : "")
                 + '</label>';
         }).join("");
     }
 
     function syncRuleCheckAll(root) {
-        var checkAll = root.querySelector("#ruleCheckAll");
-        if (!checkAll) {
-            return;
-        }
-        checkAll.checked = allRules.length > 0 && allRules.every(function (rule) {
+        root.querySelector("#ruleCheckAll").checked = allRules.length > 0 && allRules.every(function (rule) {
             return selectedRuleIds[rule.id];
         });
     }
@@ -302,44 +374,40 @@ layui.use(["table", "form", "layer"], function () {
         root.querySelector("#ruleCount").textContent = "已选 " + Object.keys(selectedRuleIds).length;
     }
 
+    function updateSubmitState(root) {
+        var submit = root.querySelector("#submitTaskButton");
+        var enabled = Object.keys(selectedHostIds).length > 0 && Object.keys(selectedRuleIds).length > 0;
+        submit.disabled = !enabled;
+        submit.classList.toggle("layui-btn-disabled", !enabled);
+    }
+
     function submitTask(root, dialogIndex, button) {
         var taskName = (root.querySelector('input[name="taskName"]').value || "").trim();
         var executeType = root.querySelector('input[name="executeType"]:checked').value;
-        var cronExpr = (root.querySelector('input[name="cronExpr"]').value || "").trim();
+        var cronExpr = executeType === "SCHEDULED" ? buildCronExpr(root) : null;
         var hostIds = Object.keys(selectedHostIds).map(Number);
         var ruleIds = Object.keys(selectedRuleIds).map(Number);
-
         if (!taskName) {
             AppRequest.showMessage("请输入任务名称", 2);
             return;
         }
         if (executeType === "SCHEDULED" && !cronExpr) {
-            AppRequest.showMessage("定时执行需填写 Cron 表达式", 2);
+            AppRequest.showMessage("请设置定时执行计划", 2);
             return;
         }
-        if (hostIds.length === 0) {
-            AppRequest.showMessage("请至少选择一台主机", 2);
+        if (!hostIds.length || !ruleIds.length) {
+            AppRequest.showMessage("请选择主机和规则", 2);
             return;
         }
-        if (ruleIds.length === 0) {
-            AppRequest.showMessage("请至少选择一条规则", 2);
-            return;
-        }
-
-        var payload = {
-            taskName: taskName,
-            executeType: executeType,
-            cronExpr: executeType === "SCHEDULED" ? cronExpr : null,
-            hostIds: hostIds,
-            ruleIds: ruleIds
-        };
-
         button.disabled = true;
         button.classList.add("layui-btn-disabled");
-        AppRequest.request("/api/baseline/tasks", {method: "POST", body: payload}, {successMessage: "任务已创建并下发"})
+        AppRequest.request("/api/baseline/tasks", {
+            method: "POST",
+            body: {taskName: taskName, executeType: executeType, cronExpr: executeType === "SCHEDULED" ? cronExpr : null, hostIds: hostIds, ruleIds: ruleIds}
+        }, {successMessage: "任务已创建并下发"})
             .then(function () {
                 layer.close(dialogIndex);
-                table.reloadData(tableId, {scrollPos: "fixed"});
+                reloadTaskTable(false);
             })
             .catch(function () {
                 button.disabled = false;
@@ -347,93 +415,333 @@ layui.use(["table", "form", "layer"], function () {
             });
     }
 
-    /* ============ 查看结果 ============ */
+    function initSchedulePicker(root) {
+        var monthDay = root.querySelector('select[name="scheduleMonthDay"]');
+        monthDay.innerHTML = Array.from({length: 28}, function (_, index) {
+            var day = index + 1;
+            return '<option value="' + day + '">' + day + '日</option>';
+        }).join("");
+        ["scheduleFrequency", "scheduleWeekday", "scheduleMonthDay", "scheduleTime"].forEach(function (name) {
+            root.querySelector('[name="' + name + '"]').addEventListener("change", function () {
+                updateSchedulePicker(root);
+            });
+        });
+        updateSchedulePicker(root);
+    }
 
-    function openResultDialog(task) {
-        var viewportHeight = window.innerHeight || 720;
-        var viewportWidth = window.innerWidth || 860;
-        var dialogHeight = Math.min(700, viewportHeight - 30);
-        var dialogWidth = Math.min(900, viewportWidth - 30);
+    function updateSchedulePicker(root) {
+        var frequency = root.querySelector('select[name="scheduleFrequency"]').value;
+        var time = root.querySelector('input[name="scheduleTime"]').value || "02:00";
+        root.querySelector(".schedule-weekly").style.display = frequency === "WEEKLY" ? "" : "none";
+        root.querySelector(".schedule-monthly").style.display = frequency === "MONTHLY" ? "" : "none";
+        var text = "每天 " + time + " 执行";
+        if (frequency === "WEEKLY") {
+            text = root.querySelector('select[name="scheduleWeekday"] option:checked').textContent + " " + time + " 执行";
+        } else if (frequency === "MONTHLY") {
+            text = "每月 " + root.querySelector('select[name="scheduleMonthDay"]').value + " 日 " + time + " 执行";
+        }
+        root.querySelector("#scheduleHint").textContent = text;
+    }
 
-        layer.open({
-            type: 1,
-            title: "任务结果 - " + (task.taskName || ("#" + task.id)),
-            area: [dialogWidth + "px", dialogHeight + "px"],
-            content: AppUtils.getTemplateHtml("baselineResultTemplate"),
-            success: function (layero) {
-                var root = layero[0];
-                loadOverview(root, task.id);
+    function buildCronExpr(root) {
+        var frequency = root.querySelector('select[name="scheduleFrequency"]').value;
+        var time = root.querySelector('input[name="scheduleTime"]').value || "";
+        var parts = time.split(":");
+        if (parts.length !== 2) {
+            return "";
+        }
+        var hour = Number(parts[0]);
+        var minute = Number(parts[1]);
+        if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+            return "";
+        }
+        if (frequency === "WEEKLY") {
+            return "0 " + minute + " " + hour + " ? * " + root.querySelector('select[name="scheduleWeekday"]').value;
+        }
+        if (frequency === "MONTHLY") {
+            return "0 " + minute + " " + hour + " " + root.querySelector('select[name="scheduleMonthDay"]').value + " * ?";
+        }
+        return "0 " + minute + " " + hour + " * * ?";
+    }
+
+    function openResultPanel(task) {
+        resultState.task = task;
+        resultState.page = 1;
+        resultState.selectedHost = null;
+        document.getElementById("taskListPanel").style.display = "none";
+        document.getElementById("taskResultPanel").style.display = "";
+        document.getElementById("resultTaskTitle").textContent = task.taskName || ("任务#" + task.id);
+        hideTaskRulePanel();
+        refreshResultPanel();
+    }
+
+    function refreshResultPanel(silent) {
+        if (!resultState.task) {
+            return;
+        }
+        var taskId = resultState.task.id;
+        AppRequest.request("/api/baseline/tasks/" + taskId + "/result", {method: "GET"}, {showErrorMessage: !silent})
+            .then(function (res) {
+                renderOverviewCards(res.data || {});
+                renderTaskHostTable(taskId);
+            });
+    }
+
+    function renderOverviewCards(ov) {
+        var cards = [
+            {label: "总主机数", value: ov.totalHostCount || 0, cls: ""},
+            {label: "已完成主机", value: ov.finishedHostCount || 0, cls: ""},
+            {label: "平均合规率", value: formatRate(ov.avgComplianceRate), cls: "rate"},
+            {label: "问题主机数", value: ov.failHostCount || 0, cls: "fail"},
+            {label: "问题规则数", value: ov.problemRuleCount || 0, cls: "fail"},
+            {label: "PASS 规则", value: ov.passRuleCount || 0, cls: "pass"},
+            {label: "FAIL 规则", value: ov.failRuleCount || 0, cls: "fail"},
+            {label: "ERROR 规则", value: ov.errorRuleCount || 0, cls: "error"}
+        ];
+        document.getElementById("overviewCards").innerHTML = cards.map(function (card) {
+            return '<div class="overview-card ' + card.cls + '"><div class="ov-label">' + card.label + '</div><div class="ov-value">' + card.value + '</div></div>';
+        }).join("");
+    }
+
+    function renderTaskHostTable(taskId) {
+        table.render({
+            elem: "#taskHostResultTable",
+            id: hostResultTableId,
+            url: "/api/baseline/tasks/" + taskId + "/problem-hosts",
+            method: "GET",
+            headers: {Authorization: "Bearer " + AppAuth.getToken()},
+            page: true,
+            curr: resultState.page,
+            limit: resultState.size,
+            limits: [10, 20, 50],
+            request: {pageName: "page", limitName: "size"},
+            parseData: parsePageData,
+            cols: [[
+                {field: "hostName", title: "主机名称", minWidth: 170, templet: function (d) {
+                    return escapeHtml(d.hostName || ("主机#" + d.hostId));
+                }},
+                {field: "ipv4", title: "IP 地址", width: 150, templet: function (d) {
+                    return escapeHtml(d.ipv4 || "-");
+                }},
+                {field: "complianceRate", title: "合规率", width: 110, align: "center", templet: function (d) {
+                    return buildRateCell(d.complianceRate);
+                }},
+                {field: "passRuleCount", title: "PASS", width: 90, align: "center"},
+                {field: "failRuleCount", title: "FAIL", width: 90, align: "center"},
+                {field: "errorRuleCount", title: "ERROR", width: 90, align: "center"},
+                {title: "操作", width: 170, align: "center", fixed: "right", templet: function () {
+                    return '<button class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">查看详情</button>'
+                        + '<button class="layui-btn layui-btn-xs" lay-event="recheck">重新检测</button>';
+                }}
+            ]],
+            done: function (res, curr) {
+                resultState.page = curr;
+                resultState.size = this.limit || resultState.size;
+            }
+        });
+        table.on("tool(" + hostResultTableId + ")", function (obj) {
+            if (obj.event === "detail") {
+                openTaskRulePanel(obj.data);
+            } else if (obj.event === "recheck") {
+                recheckHost(obj.data.hostId);
             }
         });
     }
 
-    function loadOverview(root, taskId) {
-        AppRequest.request("/api/baseline/tasks/" + taskId + "/result", {method: "GET"}, {showErrorMessage: false})
-            .then(function (res) {
-                var ov = res.data || {};
-                renderOverviewCards(root, ov);
-                if ((ov.failHostCount || 0) > 0) {
-                    renderProblemHostTable(root, taskId);
-                } else {
-                    root.querySelector("#problemHostTable").style.display = "none";
-                    root.querySelector("#allPassTip").style.display = "";
+    function openTaskRulePanel(host) {
+        if (!resultState.task || !host) {
+            return;
+        }
+        resultState.selectedHost = host;
+        document.getElementById("taskRulePanel").style.display = "";
+        document.getElementById("taskRuleTitle").textContent = "本次任务规则明细：" + (host.hostName || ("主机#" + host.hostId));
+        table.render({
+            elem: "#taskRuleResultTable",
+            id: ruleResultTableId,
+            url: "/api/baseline/tasks/" + encodeURIComponent(resultState.task.id)
+                + "/hosts/" + encodeURIComponent(host.hostId) + "/results",
+            method: "GET",
+            headers: {Authorization: "Bearer " + AppAuth.getToken()},
+            page: false,
+            parseData: function (res) {
+                if (res.code !== 200) {
+                    AppRequest.showMessage(res.message || "规则明细加载失败", 2, 2200);
                 }
-            })
-            .catch(function () {
-                root.querySelector("#overviewCards").innerHTML = '<div class="picker-empty">结果加载失败</div>';
-            });
-    }
-
-    function renderOverviewCards(root, ov) {
-        var cards = [
-            {label: "总主机数", value: ov.totalHostCount != null ? ov.totalHostCount : 0, cls: ""},
-            {label: "已完成主机", value: ov.finishedHostCount != null ? ov.finishedHostCount : 0, cls: ""},
-            {label: "平均合规率", value: formatRate(ov.avgComplianceRate), cls: "rate"},
-            {label: "PASS 主机", value: ov.passHostCount != null ? ov.passHostCount : 0, cls: "pass"},
-            {label: "FAIL 主机", value: ov.failHostCount != null ? ov.failHostCount : 0, cls: "fail"}
-        ];
-        root.querySelector("#overviewCards").innerHTML = cards.map(function (card) {
-            return '<div class="overview-card ' + card.cls + '">'
-                + '<div class="ov-label">' + card.label + '</div>'
-                + '<div class="ov-value">' + card.value + '</div>'
-                + '</div>';
-        }).join("");
-    }
-
-    function renderProblemHostTable(root, taskId) {
-        AppTable.renderPageTable(table, {
-            elem: root.querySelector("#problemHostTable"),
-            url: "/api/baseline/tasks/" + taskId + "/problem-hosts",
-            limit: 10,
-            limits: [10, 20, 50],
+                return {code: res.code === 200 ? 0 : res.code, msg: res.message, count: (res.data || []).length, data: res.data || []};
+            },
             cols: [[
-                {field: "hostName", title: "主机名称", minWidth: 180, templet: function (d) {
-                    return escapeHtml(d.hostName || ("主机#" + d.hostId));
+                {field: "ruleName", title: "规则", minWidth: 180, templet: function (d) {
+                    return escapeHtml(d.ruleName || ("规则#" + d.ruleId));
                 }},
-                {field: "ipv4", title: "IP 地址", width: 160, templet: function (d) {
-                    return escapeHtml(d.ipv4 || "-");
+                {field: "category", title: "分类", width: 120, templet: function (d) {
+                    return escapeHtml(d.category || "-");
                 }},
-                {field: "complianceRate", title: "合规率", width: 120, align: "center", templet: function (d) {
-                    return buildRateCell(d.complianceRate);
+                {field: "status", title: "状态", width: 90, align: "center", templet: function (d) {
+                    return buildResultStatusTag(d.status);
                 }},
-                {field: "failRuleCount", title: "失败规则数", width: 120, align: "center", templet: function (d) {
-                    return '<span class="status-tag fail">' + (d.failRuleCount != null ? d.failRuleCount : 0) + '</span>';
+                {field: "expectedValue", title: "期望值", width: 130, templet: function (d) {
+                    return escapeHtml(shortText(d.expectedValue, 32));
+                }},
+                {field: "actualValue", title: "实际值", width: 130, templet: function (d) {
+                    return escapeHtml(shortText(d.actualValue, 32));
+                }},
+                {field: "checkKey", title: "检测项", minWidth: 180, templet: function (d) {
+                    return escapeHtml(shortText(d.checkKey, 60));
+                }},
+                {field: "evidence", title: "证据", minWidth: 180, templet: function (d) {
+                    return buildEvidenceCell(d);
+                }},
+                {field: "scanTime", title: "检测时间", width: 170, templet: function (d) {
+                    return AppUtils.formatDateTime(d.scanTime);
                 }}
             ]]
         });
+        table.on("tool(" + ruleResultTableId + ")", function (obj) {
+            if (obj.event === "evidence") {
+                showEvidence(obj.data);
+            }
+        });
+        setTimeout(function () {
+            document.getElementById("taskRulePanel").scrollIntoView({behavior: "smooth", block: "start"});
+        }, 80);
     }
 
-    /* ============ 工具函数 ============ */
+    function hideTaskRulePanel() {
+        resultState.selectedHost = null;
+        document.getElementById("taskRulePanel").style.display = "none";
+        document.getElementById("taskRuleTitle").textContent = "本次任务规则明细";
+        try {
+            table.reload(ruleResultTableId, {data: []});
+        } catch (ignore) {
+            // table may not have been rendered yet
+        }
+    }
+
+    function recheckHost(hostId) {
+        AppRequest.request("/api/baseline/hosts/scan", {method: "POST", body: {hostIds: [hostId]}}, {showErrorMessage: true})
+            .then(function (res) {
+                AppRequest.showMessage((res.data || {}).message || "重新检测已下发", 1, 2200);
+                refreshResultPanel(true);
+            });
+    }
+
+    async function exportTaskResult(taskId) {
+        var url = "/api/baseline/tasks/" + encodeURIComponent(taskId) + "/export";
+        var res = await fetch(url, {headers: {Authorization: "Bearer " + AppAuth.getToken()}});
+        if (!res.ok) {
+            AppRequest.showMessage("导出失败", 2);
+            return;
+        }
+        var blob = await res.blob();
+        var link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "baseline_task_" + taskId + "_results.csv";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+    }
+
+    function openTaskExportMenu(taskId) {
+        layer.open({
+            type: 1,
+            title: "导出结果",
+            area: ["260px", "220px"],
+            content: '<div class="export-menu">'
+                + '<button type="button" class="layui-btn layui-btn-fluid" data-format="csv">导出 CSV</button>'
+                + '<button type="button" class="layui-btn layui-btn-normal layui-btn-fluid" data-format="pdf">导出 PDF</button>'
+                + '<button type="button" class="layui-btn layui-btn-primary layui-btn-fluid" data-format="html">导出 HTML</button>'
+                + '</div>',
+            success: function (layero, index) {
+                layero.find("[data-format]").on("click", function () {
+                    var format = this.getAttribute("data-format");
+                    layer.close(index);
+                    exportTaskResult(taskId, format);
+                });
+            }
+        });
+    }
+
+    async function exportTaskResult(taskId, format) {
+        var safeFormat = format || "csv";
+        var url = "/api/baseline/tasks/" + encodeURIComponent(taskId) + "/export?format=" + encodeURIComponent(safeFormat);
+        var loading = layer.load(2);
+        try {
+            var res = await fetch(url, {headers: {Authorization: "Bearer " + AppAuth.getToken()}});
+            if (!res.ok) {
+                AppRequest.showMessage("导出失败", 2);
+                return;
+            }
+            var blob = await res.blob();
+            triggerDownload(blob, "baseline_task_" + taskId + "_results_" + timestamp() + "." + safeFormat);
+            AppRequest.showMessage("导出成功", 1);
+        } catch (e) {
+            AppRequest.showMessage(e.message || "导出失败", 2);
+        } finally {
+            layer.close(loading);
+        }
+    }
+
+    function triggerDownload(blob, fileName) {
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function timestamp() {
+        var now = new Date();
+        function p(n) { return n < 10 ? "0" + n : String(n); }
+        return now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate())
+            + p(now.getHours()) + p(now.getMinutes()) + p(now.getSeconds());
+    }
+
+    function buildProgressCell(d) {
+        var total = Number(d.hostCount || 0);
+        var done = Number(d.finishedHostCount || 0);
+        var pct = total > 0 ? Math.round(done * 100 / total) : 0;
+        return '<div class="progress-cell"><div class="progress-text">' + done + ' / ' + total + ' (' + pct + '%)</div>'
+            + '<div class="progress-bar"><span style="width:' + pct + '%"></span></div></div>';
+    }
+
+    function buildTaskTypeTag(type) {
+        var isRecheck = type === "RECHECK";
+        return '<span class="task-type ' + (isRecheck ? "recheck" : "scan") + '">' + (isRecheck ? "复检任务" : "检测任务") + '</span>';
+    }
 
     function buildStatusTag(status) {
-        var map = {
-            PENDING: {cls: "pending", text: "待执行"},
-            RUNNING: {cls: "running", text: "执行中"},
-            FINISHED: {cls: "finished", text: "已完成"},
-            FAILED: {cls: "failed", text: "失败"}
-        };
-        var item = map[status] || {cls: "pending", text: status || "-"};
-        return '<span class="task-status ' + item.cls + '">' + item.text + '</span>';
+        var map = {PENDING: ["pending", "待执行"], RUNNING: ["running", "执行中"], FINISHED: ["finished", "已完成"], FAILED: ["failed", "失败"]};
+        var item = map[status] || ["pending", status || "-"];
+        return '<span class="task-status ' + item[0] + '">' + item[1] + '</span>';
+    }
+
+    function buildResultStatusTag(status) {
+        var normalized = String(status || "").toUpperCase();
+        var map = {PASS: ["finished", "PASS"], FAIL: ["failed", "FAIL"], ERROR: ["error", "ERROR"]};
+        var item = map[normalized] || ["pending", status || "-"];
+        return '<span class="task-status ' + item[0] + '">' + item[1] + '</span>';
+    }
+
+    function buildEvidenceCell(row) {
+        var text = row.evidence || "";
+        if (!text) {
+            return "-";
+        }
+        return '<span class="evidence-inline">' + escapeHtml(shortText(text, 52)) + '</span>'
+            + '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs evidence-btn" lay-event="evidence">完整</button>';
+    }
+
+    function showEvidence(row) {
+        layer.open({
+            type: 1,
+            title: "检测证据",
+            area: ["720px", "520px"],
+            content: '<pre class="evidence-full">' + escapeHtml(row.evidence || "暂无证据") + '</pre>'
+        });
     }
 
     function buildRateCell(rate) {
@@ -445,11 +753,35 @@ layui.use(["table", "form", "layer"], function () {
         return '<span class="rate-cell ' + cls + '">' + formatRate(rate) + '</span>';
     }
 
+    function isHostOnline(host) {
+        var value = String(host.online != null ? host.online : (host.status || host.agentStatus || host.onlineStatus || "")).toUpperCase();
+        if (host.online === true || host.status === 1 || value === "ONLINE" || value === "1" || value === "TRUE") {
+            return true;
+        }
+        return false;
+    }
+
+    function toggleSelection(map, id, checked) {
+        if (checked) {
+            map[id] = true;
+        } else {
+            delete map[id];
+        }
+    }
+
     function formatRate(rate) {
         if (rate == null || rate === "") {
             return "-";
         }
         return Number(rate).toFixed(2) + "%";
+    }
+
+    function shortText(text, maxLength) {
+        var value = String(text == null ? "" : text);
+        if (value.length <= maxLength) {
+            return value || "-";
+        }
+        return value.slice(0, maxLength) + "...";
     }
 
     function escapeHtml(text) {

@@ -4,6 +4,7 @@ import com.cd.dto.BaselineHostOverviewDTO;
 import com.cd.dto.BaselineHostResultItemDTO;
 import com.cd.dto.BaselineProblemHostDTO;
 import com.cd.dto.BaselineRuleOptionDTO;
+import com.cd.dto.BaselineTaskExportRowDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
 import org.apache.ibatis.annotations.Param;
@@ -15,11 +16,17 @@ import java.util.List;
  */
 public interface BaselineQueryMapper {
 
-    List<BaselineTaskListItemDTO> selectTaskPage(@Param("status") String status,
+    List<BaselineTaskListItemDTO> selectTaskPage(@Param("keyword") String keyword,
+                                                 @Param("executeType") String executeType,
+                                                 @Param("taskType") String taskType,
+                                                 @Param("status") String status,
                                                  @Param("offset") int offset,
                                                  @Param("limit") int limit);
 
-    long countTasks(@Param("status") String status);
+    long countTasks(@Param("keyword") String keyword,
+                    @Param("executeType") String executeType,
+                    @Param("taskType") String taskType,
+                    @Param("status") String status);
 
     BaselineTaskResultOverviewDTO selectResultOverview(@Param("taskId") Long taskId);
 
@@ -28,6 +35,13 @@ public interface BaselineQueryMapper {
                                                        @Param("limit") int limit);
 
     long countProblemHosts(@Param("taskId") Long taskId);
+
+    List<BaselineHostResultItemDTO> selectTaskHostResults(@Param("taskId") Long taskId,
+                                                          @Param("hostId") Long hostId);
+
+    List<BaselineTaskExportRowDTO> selectTaskExportRows(@Param("taskId") Long taskId);
+
+    List<BaselineTaskExportRowDTO> selectHostExportRows(@Param("hostId") Long hostId);
 
     List<BaselineRuleOptionDTO> selectRuleOptions(@Param("keyword") String keyword);
 

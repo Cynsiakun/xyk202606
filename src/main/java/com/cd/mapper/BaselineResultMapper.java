@@ -15,7 +15,12 @@ public interface BaselineResultMapper {
     /** 按主键批量查询结果，供修复/工单按 resultId 反查主机与规则。 */
     List<BaselineResultEntity> selectByIds(@Param("ids") List<Long> ids);
 
-    /** 更新单条结果的修复状态（IN_PROGRESS/COMPLETED/FAILED/TICKETED）。 */
+    BaselineResultEntity selectLatestBefore(@Param("hostId") Long hostId,
+                                            @Param("ruleId") Long ruleId,
+                                            @Param("checkKey") String checkKey,
+                                            @Param("beforeId") Long beforeId);
+
+    /** 更新单条结果的修复状态（NONE/IN_PROGRESS/FIXED/FAILED/ROLLED_BACK/TICKETED）。 */
     int updateRemediationStatus(@Param("id") Long id,
                                 @Param("remediationStatus") String remediationStatus);
 

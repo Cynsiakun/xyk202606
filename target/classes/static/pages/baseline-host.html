@@ -53,6 +53,28 @@
 <template id="hostDetailTemplate">
     <div class="host-detail">
         <div class="detail-overview" id="detailOverview"></div>
+        <div class="detail-filter layui-form" lay-filter="baselineHostDetailFilter">
+            <select id="detailStatusFilter" lay-filter="detailStatusFilter">
+                <option value="ALL">全部状态</option>
+                <option value="UNFIXED">未修复</option>
+                <option value="FIXED">已修复</option>
+                <option value="FAIL">FAIL</option>
+                <option value="PASS">PASS</option>
+            </select>
+            <select id="detailCategoryFilter" lay-filter="detailCategoryFilter">
+                <option value="">全部分类</option>
+            </select>
+            <input type="text" id="detailKeywordInput" class="layui-input detail-search" placeholder="搜索规则 / 检测项 / 证据" autocomplete="off">
+            <button type="button" class="layui-btn layui-btn-primary layui-btn-sm" id="detailSearchBtn">
+                <i class="layui-icon layui-icon-search"></i> 搜索
+            </button>
+            <button type="button" class="layui-btn layui-btn-primary layui-btn-sm" id="detailRefreshBtn">
+                <i class="layui-icon layui-icon-refresh"></i> 刷新
+            </button>
+            <button type="button" class="layui-btn layui-btn-warm layui-btn-sm" id="detailExportBtn">
+                <i class="layui-icon layui-icon-export"></i> 导出
+            </button>
+        </div>
         <div class="detail-toolbar">
             <div class="seg" id="failSeg">
                 <button type="button" class="seg-btn active" data-fail="true">不合规</button>
@@ -76,7 +98,9 @@
         <div class="layui-form-item">
             <label class="layui-form-label">负责人</label>
             <div class="layui-input-block">
-                <input type="text" name="assignee" autocomplete="off" placeholder="请输入负责人" class="layui-input">
+                <select name="assigneeId" id="workorderAssigneeSelect" lay-ignore>
+                    <option value="">加载安全运维工程师...</option>
+                </select>
             </div>
         </div>
         <div class="layui-form-item">

@@ -14,5 +14,7 @@ public class BaselineProblemHostDTO {
     private String hostName;
     private String ipv4;
     private BigDecimal complianceRate;
+    private Integer passRuleCount;
     private Integer failRuleCount;
+    private Integer errorRuleCount;
 }

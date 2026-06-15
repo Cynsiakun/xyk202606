@@ -40,6 +40,31 @@
         </foreach>
     </select>
 
+    <select id="selectLatestBefore" resultType="com.cd.entity.BaselineResultEntity">
+        SELECT id                 AS id,
+               task_id            AS taskId,
+               task_host_id       AS taskHostId,
+               host_id            AS hostId,
+               rule_id            AS ruleId,
+               rule_version       AS ruleVersion,
+               check_key          AS checkKey,
+               status             AS status,
+               actual_value       AS actualValue,
+               expected_value     AS expectedValue,
+               message            AS message,
+               evidence           AS evidence,
+               remediation_status AS remediationStatus,
+               scan_time          AS scanTime,
+               create_time        AS createTime
+        FROM baseline_result
+        WHERE host_id = #{hostId}
+          AND rule_id = #{ruleId}
+          AND COALESCE(check_key, '') = COALESCE(#{checkKey}, '')
+          AND id &lt; #{beforeId}
+        ORDER BY scan_time DESC, id DESC
+        LIMIT 1
+    </select>
+
     <update id="updateRemediationStatus">
         UPDATE baseline_result
         SET remediation_status = #{remediationStatus}

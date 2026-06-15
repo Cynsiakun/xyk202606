@@ -5,7 +5,156 @@
 <mapper namespace="com.cd.mapper.BaselineWorkorderMapper">
 
     <insert id="insert" parameterType="com.cd.entity.BaselineWorkorderEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO baseline_workorder (host_id, rule_id, result_id, assignee, remark, status, creator)
-        VALUES (#{hostId}, #{ruleId}, #{resultId}, #{assignee}, #{remark}, #{status}, #{creator})
+        INSERT INTO baseline_workorder (result_id, host_id, rule_id, title, advice, assignee_id,
+                                        priority, status, close_remark, create_by)
+        VALUES (#{resultId}, #{hostId}, #{ruleId}, #{title}, #{advice}, #{assigneeId},
+                #{priority}, #{status}, #{closeRemark}, #{createBy})
     </insert>
+
+    <sql id="workorderFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (w.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR h.hostname LIKE CONCAT('%', #{keyword}, '%')
+                 OR h.ipv4 LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null and status != ''">
+            AND w.status = #{status}
+        </if>
+        <if test="priority != null and priority != ''">
+            AND w.priority = #{priority}
+        </if>
+        <if test="assigneeId != null">
+            AND w.assignee_id = #{assigneeId}
+        </if>
+    </sql>
+
+    <select id="selectPage" resultType="com.cd.dto.BaselineWorkorderListItemDTO">
+        SELECT w.id            AS id,
+               w.title         AS title,
+               w.host_id       AS hostId,
+               h.hostname      AS hostName,
+               h.ipv4          AS ipv4,
+               w.rule_id       AS ruleId,
+               r.rule_name     AS ruleName,
+               w.assignee_id   AS assigneeId,
+               u.user_name     AS assigneeName,
+               w.priority      AS priority,
+               w.status        AS status,
+               w.create_time   AS createTime,
+               w.start_time    AS startTime,
+               w.finish_time   AS finishTime
+        FROM baseline_workorder w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN baseline_rule r ON r.id = w.rule_id
+        LEFT JOIN user u ON u.id = w.assignee_id
+        WHERE 1 = 1
+        <include refid="workorderFilter"/>
+        ORDER BY FIELD(w.status, 'OPEN', 'PROCESSING', 'DONE'), w.id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(*)
+        FROM baseline_workorder w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        WHERE 1 = 1
+        <include refid="workorderFilter"/>
+    </select>
+
+    <select id="selectDetail" resultType="com.cd.dto.BaselineWorkorderDetailDTO">
+        SELECT w.id                         AS id,
+               w.result_id                  AS resultId,
+               w.host_id                    AS hostId,
+               h.hostname                   AS hostName,
+               h.ipv4                       AS ipv4,
+               h.mac_address                AS macAddress,
+               w.rule_id                    AS ruleId,
+               r.rule_name                  AS ruleName,
+               r.rule_code                  AS ruleCode,
+               r.category                   AS category,
+               w.title                      AS title,
+               w.advice                     AS advice,
+               w.assignee_id                AS assigneeId,
+               assignee.user_name           AS assigneeName,
+               w.priority                   AS priority,
+               w.status                     AS status,
+               w.close_remark               AS closeRemark,
+               w.create_by                  AS createBy,
+               creator.user_name            AS creatorName,
+               w.create_time                AS createTime,
+               w.start_time                 AS startTime,
+               w.finish_time                AS finishTime,
+               br.check_key                 AS checkKey,
+               br.expected_value            AS expectedValue,
+               br.actual_value              AS actualValue,
+               COALESCE(br.evidence, br.message) AS evidence,
+               br.status                    AS resultStatus
+        FROM baseline_workorder w
+        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN baseline_rule r ON r.id = w.rule_id
+        LEFT JOIN baseline_result br ON br.id = w.result_id
+        LEFT JOIN user assignee ON assignee.id = w.assignee_id
+        LEFT JOIN user creator ON creator.id = w.create_by
+        WHERE w.id = #{id}
+    </select>
+
+    <select id="selectEntityById" resultType="com.cd.entity.BaselineWorkorderEntity">
+        SELECT id            AS id,
+               result_id     AS resultId,
+               host_id       AS hostId,
+               rule_id       AS ruleId,
+               title         AS title,
+               advice        AS advice,
+               assignee_id   AS assigneeId,
+               priority      AS priority,
+               status        AS status,
+               close_remark  AS closeRemark,
+               create_by     AS createBy,
+               create_time   AS createTime,
+               start_time    AS startTime,
+               finish_time   AS finishTime,
+               update_time   AS updateTime
+        FROM baseline_workorder
+        WHERE id = #{id}
+    </select>
+
+    <update id="markProcessing">
+        UPDATE baseline_workorder
+        SET status = 'PROCESSING',
+            start_time = COALESCE(start_time, NOW())
+        WHERE id = #{id}
+          AND status = 'OPEN'
+    </update>
+
+    <update id="markDone">
+        UPDATE baseline_workorder
+        SET status = 'DONE',
+            close_remark = #{closeRemark},
+            finish_time = NOW()
+        WHERE id = #{id}
+          AND status = 'PROCESSING'
+    </update>
+
+    <select id="userHasRole" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM sys_user_role ur
+        JOIN sys_role r ON r.id = ur.role_id
+        JOIN user u ON u.id = ur.user_id
+        WHERE ur.user_id = #{userId}
+          AND r.role_code = #{roleCode}
+          AND r.status = 1
+          AND u.status = 1
+    </select>
+
+    <select id="selectOperatorOptions" resultType="com.cd.dto.BaselineOperatorOptionDTO">
+        SELECT DISTINCT u.id AS id,
+               u.user_name   AS userName
+        FROM user u
+        JOIN sys_user_role ur ON ur.user_id = u.id
+        JOIN sys_role r ON r.id = ur.role_id
+        WHERE r.role_code = 'SECURITY_OPERATOR'
+          AND r.status = 1
+          AND u.status = 1
+        ORDER BY u.user_name ASC, u.id ASC
+    </select>
 </mapper>

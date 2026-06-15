@@ -10,6 +10,7 @@ layui.use(["layer", "laypage", "table", "form"], function () {
     var selectedHostIds = {};
     var canRemediate = AppAuth.hasPermission("baseline:remediate");
     var canScan = AppAuth.hasPermission("baseline:create");
+    var autoOpenHostId = getQueryParam("hostId");
 
     init();
 
@@ -74,6 +75,7 @@ layui.use(["layer", "laypage", "table", "form"], function () {
                 });
                 renderGrid();
                 renderPager();
+                tryAutoOpenHost();
             })
             .catch(function () {
                 if (!silent) {
@@ -227,7 +229,16 @@ layui.use(["layer", "laypage", "table", "form"], function () {
         var dialogHeight = Math.min(720, viewportHeight - 30);
         var dialogWidth = Math.min(1000, viewportWidth - 30);
 
-        var ctx = {hostId: host.hostId, onlyFail: true, rows: [], pollTimer: null};
+        var ctx = {
+            hostId: host.hostId,
+            onlyFail: false,
+            rows: [],
+            filteredRows: [],
+            pollTimer: null,
+            tablePage: 1,
+            tableLimit: 10,
+            filters: {status: "FAIL", category: "", keyword: ""}
+        };
 
         layer.open({
             type: 1,
@@ -248,6 +259,8 @@ layui.use(["layer", "laypage", "table", "form"], function () {
                         recheck(ctx, [obj.data.resultId]);
                     } else if (obj.event === "evidence") {
                         openEvidenceDialog(obj.data);
+                    } else if (obj.event === "records") {
+                        openRemediationRecords(obj.data);
                     } else if (obj.event === "ticket") {
                         openWorkorderDialog(ctx, [obj.data.resultId]);
                     }
@@ -266,6 +279,15 @@ layui.use(["layer", "laypage", "table", "form"], function () {
                 }
             }
         });
+    }
+
+    function tryAutoOpenHost() {
+        if (!autoOpenHostId) {
+            return;
+        }
+        var hostId = Number(autoOpenHostId);
+        autoOpenHostId = "";
+        openDetailDialog(hostMap[hostId] || {hostId: hostId, hostName: "主机#" + hostId});
     }
 
     function renderDetailOverview(root, host) {
@@ -290,9 +312,43 @@ layui.use(["layer", "laypage", "table", "form"], function () {
                     b.classList.remove("active");
                 });
                 this.classList.add("active");
-                ctx.onlyFail = this.getAttribute("data-fail") === "true";
-                loadResults(root, ctx);
+                ctx.filters.status = this.getAttribute("data-fail") === "true" ? "FAIL" : "ALL";
+                root.querySelector("#detailStatusFilter").value = ctx.filters.status;
+                form.render("select");
+                ctx.tablePage = 1;
+                renderResultTable(root, ctx);
             });
+        });
+
+        root.querySelector("#detailStatusFilter").value = ctx.filters.status;
+        form.on("select(detailStatusFilter)", function (data) {
+            ctx.filters.status = data.value || "ALL";
+            syncFailSegment(root, ctx.filters.status);
+            ctx.tablePage = 1;
+            renderResultTable(root, ctx);
+        });
+        form.on("select(detailCategoryFilter)", function (data) {
+            ctx.filters.category = data.value || "";
+            ctx.tablePage = 1;
+            renderResultTable(root, ctx);
+        });
+        root.querySelector("#detailSearchBtn").addEventListener("click", function () {
+            ctx.filters.keyword = root.querySelector("#detailKeywordInput").value.trim();
+            ctx.tablePage = 1;
+            renderResultTable(root, ctx);
+        });
+        root.querySelector("#detailKeywordInput").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                ctx.filters.keyword = this.value.trim();
+                ctx.tablePage = 1;
+                renderResultTable(root, ctx);
+            }
+        });
+        root.querySelector("#detailRefreshBtn").addEventListener("click", function () {
+            loadResults(root, ctx, false, true);
+        });
+        root.querySelector("#detailExportBtn").addEventListener("click", function () {
+            openHostExportMenu(ctx.hostId);
         });
 
         var batch = root.querySelector("#detailBatch");
@@ -327,20 +383,24 @@ layui.use(["layer", "laypage", "table", "form"], function () {
     }
 
     function loadResults(root, ctx, silent) {
-        var url = "/api/baseline/hosts/" + ctx.hostId + "/results?onlyFail=" + ctx.onlyFail;
+        var url = "/api/baseline/hosts/" + ctx.hostId + "/results?onlyFail=false";
         AppRequest.request(url, {method: "GET"}, {showErrorMessage: !silent})
             .then(function (res) {
                 ctx.rows = res.data || [];
+                renderCategoryOptions(root, ctx);
                 renderResultTable(root, ctx);
             });
     }
 
     function renderResultTable(root, ctx) {
+        ctx.filteredRows = filterRows(ctx.rows, ctx.filters);
         table.render({
             elem: root.querySelector("#hostResultTable"),
-            data: ctx.rows,
+            id: "hostResultTable",
+            data: ctx.filteredRows,
             page: true,
-            limit: 10,
+            curr: ctx.tablePage,
+            limit: ctx.tableLimit,
             limits: [10, 20, 50],
             cols: [[
                 {type: "checkbox", width: 45},
@@ -362,11 +422,87 @@ layui.use(["layer", "laypage", "table", "form"], function () {
                 {field: "status", title: "状态", width: 80, align: "center", templet: function (d) {
                     return buildResultStatus(d.status);
                 }},
+                {field: "remediationStatus", title: "修复状态", width: 100, align: "center", templet: function (d) {
+                    return buildRemediationStatus(d.remediationStatus);
+                }},
+                {title: "修复信息", minWidth: 180, templet: function (d) {
+                    return buildRemediationInfo(d);
+                }},
                 {field: "evidence", title: "证据", minWidth: 180, templet: function (d) {
                     return buildEvidenceCell(d);
                 }},
-                {title: "操作", width: 210, align: "center", fixed: "right", templet: buildRowActions}
-            ]]
+                {title: "操作", width: 250, align: "center", fixed: "right", templet: buildRowActions}
+            ]],
+            done: function (res, curr, count) {
+                ctx.tablePage = curr;
+                var config = this;
+                ctx.tableLimit = config.limit || ctx.tableLimit;
+                if (count > 0 && ctx.tablePage > Math.ceil(count / ctx.tableLimit)) {
+                    ctx.tablePage = Math.max(1, Math.ceil(count / ctx.tableLimit));
+                    renderResultTable(root, ctx);
+                }
+            }
+        });
+    }
+
+    function renderCategoryOptions(root, ctx) {
+        var select = root.querySelector("#detailCategoryFilter");
+        var current = ctx.filters.category || "";
+        var categories = [];
+        (ctx.rows || []).forEach(function (row) {
+            var category = row.category || "";
+            if (category && categories.indexOf(category) === -1) {
+                categories.push(category);
+            }
+        });
+        categories.sort();
+        select.innerHTML = '<option value="">全部分类</option>' + categories.map(function (category) {
+            return '<option value="' + escapeHtml(category) + '">' + escapeHtml(category) + '</option>';
+        }).join("");
+        select.value = categories.indexOf(current) >= 0 ? current : "";
+        ctx.filters.category = select.value;
+        form.render("select");
+    }
+
+    function filterRows(rows, filters) {
+        var statusFilter = filters.status || "ALL";
+        var category = filters.category || "";
+        var keyword = (filters.keyword || "").toLowerCase();
+        return (rows || []).filter(function (row) {
+            var status = (row.status || "").toUpperCase();
+            var remediationStatus = (row.remediationStatus || "PENDING").toUpperCase();
+            if (statusFilter === "FAIL" && status !== "FAIL" && status !== "ERROR") {
+                return false;
+            }
+            if (statusFilter === "PASS" && status !== "PASS") {
+                return false;
+            }
+            if (statusFilter === "FIXED" && !isFixedStatus(remediationStatus)) {
+                return false;
+            }
+            if (statusFilter === "UNFIXED" && (isFixedStatus(remediationStatus) || remediationStatus === "IN_PROGRESS")) {
+                return false;
+            }
+            if (category && row.category !== category) {
+                return false;
+            }
+            if (keyword) {
+                var haystack = [
+                    row.ruleName, row.category, row.checkKey, row.expectedValue,
+                    row.actualValue, row.evidence, row.message, row.remediationStatus
+                ].join(" ").toLowerCase();
+                if (haystack.indexOf(keyword) === -1) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
+
+    function syncFailSegment(root, status) {
+        root.querySelectorAll("#failSeg .seg-btn").forEach(function (btn) {
+            var isFail = btn.getAttribute("data-fail") === "true";
+            btn.classList.toggle("active", isFail ? status === "FAIL" : status === "ALL");
         });
     }
 
@@ -380,13 +516,18 @@ layui.use(["layer", "laypage", "table", "form"], function () {
             if (canScan) {
                 afterFixBtns.push('<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="recheck">复检</button>');
             }
+            afterFixBtns.push('<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="records">记录</button>');
             return afterFixBtns.length ? afterFixBtns.join(" ") : '<span class="rmd rmd-done">已修复</span>';
         }
         if (d.status === "PASS") {
-            return '<span class="muted">—</span>';
+            return '<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="records">记录</button>';
         }
         if (rs === "IN_PROGRESS") {
             return '<span class="rmd rmd-progress">修复中</span>';
+        }
+        if (d.status === "ERROR") {
+            return (canScan ? '<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="recheck">复检</button> ' : '')
+                + '<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="records">记录</button>';
         }
         if (rs === "TICKETED") {
             return '<span class="rmd rmd-ticket">已派单</span>';
@@ -402,6 +543,7 @@ layui.use(["layer", "laypage", "table", "form"], function () {
         if (type === "MANUAL" || type === "SEMI") {
             btns.push('<button class="layui-btn layui-btn-xs layui-btn-normal" lay-event="ticket">创建工单</button>');
         }
+        btns.push('<button class="layui-btn layui-btn-xs layui-btn-primary" lay-event="records">记录</button>');
         return btns.length ? btns.join(" ") : '<span class="muted">—</span>';
     }
 
@@ -416,6 +558,41 @@ layui.use(["layer", "laypage", "table", "form"], function () {
             + '<span title="' + escapeHtml(text) + '">' + escapeHtml(preview) + '</span>'
             + '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs evidence-btn" lay-event="evidence">完整</button>'
             + '</div>';
+    }
+
+    function buildRemediationStatus(status) {
+        var value = (status || "PENDING").toUpperCase();
+        var map = {
+            FIXED: {cls: "fixed", text: "已修复"},
+            COMPLETED: {cls: "fixed", text: "已修复"},
+            SUCCESS: {cls: "fixed", text: "已修复"},
+            IN_PROGRESS: {cls: "progress", text: "处理中"},
+            FAILED: {cls: "failed", text: "修复失败"},
+            ROLLED_BACK: {cls: "rollback", text: "已回滚"},
+            ROLLBACK: {cls: "rollback", text: "已回滚"},
+            TICKETED: {cls: "ticket", text: "已派单"},
+            PENDING: {cls: "pending", text: "未修复"},
+            NONE: {cls: "pending", text: "未修复"}
+        };
+        var item = map[value] || {cls: "pending", text: value};
+        return '<span class="rmd-status ' + item.cls + '">' + item.text + '</span>';
+    }
+
+    function buildRemediationInfo(d) {
+        var status = (d.latestRemediationStatus || "").toUpperCase();
+        if (!status) {
+            return '<span class="muted">暂无修复记录</span>';
+        }
+        var parts = [];
+        parts.push('<div class="rem-info-main">' + escapeHtml(statusText(status)) + ' / ' + escapeHtml(d.latestRemediationType || d.remediationType || "-") + '</div>');
+        parts.push('<div class="rem-info-sub">操作人：' + escapeHtml(d.latestRemediationOperator || "-") + '</div>');
+        parts.push('<div class="rem-info-sub">时间：' + escapeHtml(AppUtils.formatDateTime(d.latestRemediationEndTime || d.latestRemediationStartTime)) + '</div>');
+        return '<div class="rem-info">' + parts.join("") + '</div>';
+    }
+
+    function statusText(status) {
+        var map = {SUCCESS: "成功", FAILED: "失败", ROLLBACK: "回滚", PENDING: "进行中"};
+        return map[status] || status;
     }
 
     /* ============ 加固动作 ============ */
@@ -525,6 +702,56 @@ layui.use(["layer", "laypage", "table", "form"], function () {
         });
     }
 
+    function openRemediationRecords(row) {
+        AppRequest.request("/api/baseline/results/" + row.resultId + "/remediations", {method: "GET"},
+            {showErrorMessage: true})
+            .then(function (res) {
+                var records = res.data || [];
+                layer.open({
+                    type: 1,
+                    title: "修复记录 - " + (row.ruleName || ("规则#" + row.ruleId)),
+                    area: ["820px", "560px"],
+                    content: buildRecordsHtml(records)
+                });
+            });
+    }
+
+    function buildRecordsHtml(records) {
+        if (!records.length) {
+            return '<div class="records-empty">暂无修复记录</div>';
+        }
+        return '<div class="rem-records">' + records.map(function (r) {
+            return '<div class="rem-record">'
+                + '<div class="rem-record-head">'
+                + '<span class="rmd-status ' + recordStatusClass(r.status) + '">' + escapeHtml(statusText((r.status || "").toUpperCase())) + '</span>'
+                + '<strong>' + escapeHtml(r.remediationType || "-") + '</strong>'
+                + '<span>操作人：' + escapeHtml(r.operator || "-") + '</span>'
+                + '<span>' + escapeHtml(AppUtils.formatDateTime(r.endTime || r.startTime || r.createTime)) + '</span>'
+                + '</div>'
+                + '<div class="rem-record-grid">'
+                + '<div><label>旧值</label><p>' + escapeHtml(r.oldValue || "-") + '</p></div>'
+                + '<div><label>新值</label><p>' + escapeHtml(r.newValue || "-") + '</p></div>'
+                + '<div><label>备份</label><p>' + escapeHtml(r.backupData || "无") + '</p></div>'
+                + '</div>'
+                + '<details><summary>执行脚本</summary><pre>' + escapeHtml(r.executeScript || "-") + '</pre></details>'
+                + '</div>';
+        }).join("") + '</div>';
+    }
+
+    function recordStatusClass(status) {
+        var value = (status || "").toUpperCase();
+        if (value === "SUCCESS") {
+            return "fixed";
+        }
+        if (value === "FAILED") {
+            return "failed";
+        }
+        if (value === "ROLLBACK") {
+            return "rollback";
+        }
+        return "pending";
+    }
+
     function openWorkorderDialog(ctx, resultIds) {
         var idx = layer.open({
             type: 1,
@@ -534,21 +761,22 @@ layui.use(["layer", "laypage", "table", "form"], function () {
             success: function (layero) {
                 var root = layero[0];
                 root.querySelector("#workorderTip").textContent = "将为 " + resultIds.length + " 项不合规规则创建工单";
+                loadWorkorderOperators(root);
                 root.querySelector('[data-action="close"]').addEventListener("click", function () {
                     layer.close(idx);
                 });
                 root.querySelector("#submitWorkorderButton").addEventListener("click", function () {
-                    var assignee = (root.querySelector('input[name="assignee"]').value || "").trim();
+                    var assigneeId = root.querySelector('select[name="assigneeId"]').value;
                     var remark = (root.querySelector('textarea[name="remark"]').value || "").trim();
-                    if (!assignee) {
-                        AppRequest.showMessage("请输入负责人", 2);
+                    if (!assigneeId) {
+                        AppRequest.showMessage("请选择安全运维工程师", 2);
                         return;
                     }
                     var btn = this;
                     btn.disabled = true;
                     btn.classList.add("layui-btn-disabled");
                     AppRequest.request("/api/baseline/workorders",
-                        {method: "POST", body: {resultIds: resultIds, assignee: assignee, remark: remark}},
+                        {method: "POST", body: {resultIds: resultIds, assigneeId: Number(assigneeId), remark: remark}},
                         {showErrorMessage: true})
                         .then(function (res) {
                             var d = res.data || {};
@@ -565,6 +793,24 @@ layui.use(["layer", "laypage", "table", "form"], function () {
         });
     }
 
+    function loadWorkorderOperators(root) {
+        var select = root.querySelector("#workorderAssigneeSelect");
+        AppRequest.request("/api/baseline/workorders/operators", {method: "GET"}, {showErrorMessage: true})
+            .then(function (res) {
+                var operators = res.data || [];
+                if (!operators.length) {
+                    select.innerHTML = '<option value="">暂无安全运维工程师，请先给用户分配 SECURITY_OPERATOR 角色</option>';
+                    return;
+                }
+                select.innerHTML = '<option value="">请选择安全运维工程师</option>' + operators.map(function (item) {
+                    return '<option value="' + item.id + '">' + escapeHtml(item.userName || ("用户#" + item.id)) + '</option>';
+                }).join("");
+            })
+            .catch(function () {
+                select.innerHTML = '<option value="">工程师加载失败</option>';
+            });
+    }
+
     function reloadDialogResults(ctx) {
         if (ctx.root) {
             loadResults(ctx.root, ctx, true);
@@ -573,6 +819,64 @@ layui.use(["layer", "laypage", "table", "form"], function () {
     }
 
     /* ============ 工具函数 ============ */
+
+    function openHostExportMenu(hostId) {
+        layer.open({
+            type: 1,
+            title: "导出报告",
+            area: ["260px", "220px"],
+            content: '<div class="export-menu">'
+                + '<button type="button" class="layui-btn layui-btn-fluid" data-format="csv">导出 CSV</button>'
+                + '<button type="button" class="layui-btn layui-btn-normal layui-btn-fluid" data-format="pdf">导出 PDF</button>'
+                + '<button type="button" class="layui-btn layui-btn-primary layui-btn-fluid" data-format="html">导出 HTML</button>'
+                + '</div>',
+            success: function (layero, index) {
+                layero.find("[data-format]").on("click", function () {
+                    var format = this.getAttribute("data-format");
+                    layer.close(index);
+                    exportHostResult(hostId, format);
+                });
+            }
+        });
+    }
+
+    async function exportHostResult(hostId, format) {
+        var safeFormat = format || "csv";
+        var url = "/api/baseline/hosts/" + encodeURIComponent(hostId) + "/export?format=" + encodeURIComponent(safeFormat);
+        var loading = layer.load(2);
+        try {
+            var res = await fetch(url, {headers: {Authorization: "Bearer " + AppAuth.getToken()}});
+            if (!res.ok) {
+                AppRequest.showMessage("导出失败", 2);
+                return;
+            }
+            var blob = await res.blob();
+            triggerDownload(blob, "baseline_host_" + hostId + "_results_" + timestamp() + "." + safeFormat);
+            AppRequest.showMessage("导出成功", 1);
+        } catch (e) {
+            AppRequest.showMessage(e.message || "导出失败", 2);
+        } finally {
+            layer.close(loading);
+        }
+    }
+
+    function triggerDownload(blob, fileName) {
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function timestamp() {
+        var now = new Date();
+        function p(n) { return n < 10 ? "0" + n : String(n); }
+        return now.getFullYear() + p(now.getMonth() + 1) + p(now.getDate())
+            + p(now.getHours()) + p(now.getMinutes()) + p(now.getSeconds());
+    }
 
     function hasInProgress(rows) {
         return (rows || []).some(function (r) {
@@ -617,5 +921,10 @@ layui.use(["layer", "laypage", "table", "form"], function () {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
+    }
+
+    function getQueryParam(name) {
+        var params = new URLSearchParams(window.location.search || "");
+        return params.get(name);
     }
 });

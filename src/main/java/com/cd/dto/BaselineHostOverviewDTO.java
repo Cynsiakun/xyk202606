@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 主机合规总览卡片：取该主机最近一次基线汇总。
+ * 主机合规总览卡片：按每个规则/检测项的最新结果聚合当前状态快照。
  */
 @Data
 public class BaselineHostOverviewDTO {

@@ -55,7 +55,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
     private static final String HOST_STATUS_FINISHED = "FINISHED";
     private static final String HOST_STATUS_FAILED = "FAILED";
     private static final String TASK_STATUS_FINISHED = "FINISHED";
-    private static final String REMEDIATION_PENDING = "PENDING";
+    private static final String REMEDIATION_NONE = "NONE";
 
     private static final String MATCH_EXACT = "EXACT";
     private static final String MATCH_CONTAINS = "CONTAINS";
@@ -121,6 +121,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         for (JsonNode result : results) {
             BaselineResultEntity entity = buildResult(result, taskId, taskHostId, hostId, itemMap, scanTime, now);
             baselineResultMapper.insert(entity);
+            inheritRemediationStatus(entity);
             switch (entity.getStatus()) {
                 case STATUS_PASS -> {
                     passCount++;
@@ -157,10 +158,10 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         Long ruleId = longValue(result.path("ruleId"));
         Long itemId = longValue(result.path("itemId"));
         Integer ruleVersion = intValue(result.path("ruleVersion"));
-        String actualValue = textValue(result.path("actualValue"));
+        String rawActualValue = textValue(result.path("actualValue"));
         String executeStatus = textValue(result.path("executeStatus"));
         String agentMessage = textValue(result.path("message"));
-        String evidence = textValue(result.path("evidence"));
+        String rawEvidence = textValue(result.path("evidence"));
         String checkKey = textValue(result.path("checkKey"));
 
         BaselineRuleItemEntity item = itemId == null ? null : itemMap.get(itemId);
@@ -169,6 +170,12 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         }
         String expectedValue = item == null ? null : item.getExpectedValue();
 
+        boolean missingRegistryValue = isMissingRegistryValue(agentMessage) || isMissingRegistryValue(rawActualValue) || isMissingRegistryValue(rawEvidence);
+        boolean permissionDenied = isPermissionDenied(agentMessage) || isPermissionDenied(rawActualValue) || isPermissionDenied(rawEvidence);
+        String actualForCompare = comparableActualValue(rawActualValue, missingRegistryValue, permissionDenied);
+        String actualForDisplay = normalizeActualValue(rawActualValue, missingRegistryValue, permissionDenied);
+        String evidence = cleanEvidence(rawEvidence, actualForDisplay);
+
         BaselineResultEntity entity = new BaselineResultEntity();
         entity.setTaskId(taskId);
         entity.setTaskHostId(taskHostId);
@@ -176,28 +183,47 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         entity.setRuleId(ruleId != null ? ruleId : (item != null ? item.getRuleId() : 0L));
         entity.setRuleVersion(ruleVersion != null ? ruleVersion : 1);
         entity.setCheckKey(checkKey);
-        entity.setActualValue(actualValue);
+        entity.setActualValue(actualForDisplay);
         entity.setExpectedValue(expectedValue);
         entity.setEvidence(evidence);
-        entity.setRemediationStatus(REMEDIATION_PENDING);
+        entity.setRemediationStatus(REMEDIATION_NONE);
         entity.setScanTime(scanTime);
         entity.setCreateTime(now);
 
-        boolean missingRegistryValue = isMissingRegistryValue(agentMessage);
-
-        // 判定状态与描述。注册表值缺失是可比对事实：期望为空则合规，期望非空则不合规。
         if (STATUS_ERROR.equalsIgnoreCase(executeStatus) && !missingRegistryValue) {
             entity.setStatus(STATUS_ERROR);
-            entity.setMessage(StringUtils.hasText(agentMessage) ? agentMessage : "客户端执行失败");
+            entity.setMessage(buildExecuteErrorMessage(agentMessage, permissionDenied));
         } else if (item == null) {
             entity.setStatus(STATUS_UNKNOWN);
-            entity.setMessage("未找到规则项 itemId=" + itemId + "，无法比对");
+            entity.setMessage("未找到规则项 itemId=" + itemId + "，无法完成平台侧比较。");
         } else {
-            boolean pass = compare(item, actualValue);
-            entity.setStatus(pass ? STATUS_PASS : STATUS_FAIL);
-            entity.setMessage(buildMessage(pass, item, actualValue, missingRegistryValue ? null : agentMessage));
+            ComparisonResult comparison = evaluateItem(item, actualForCompare, actualForDisplay);
+            entity.setStatus(comparison.status());
+            entity.setMessage(comparison.message());
         }
         return entity;
+    }
+    private void inheritRemediationStatus(BaselineResultEntity entity) {
+        if (entity.getId() == null || entity.getHostId() == null || entity.getRuleId() == null) {
+            return;
+        }
+        BaselineResultEntity previous = baselineResultMapper.selectLatestBefore(
+                entity.getHostId(), entity.getRuleId(), entity.getCheckKey(), entity.getId());
+        if (previous == null || !StringUtils.hasText(previous.getRemediationStatus())) {
+            return;
+        }
+        String previousStatus = previous.getRemediationStatus().toUpperCase();
+        if (!List.of("FIXED", "COMPLETED", "SUCCESS", "FAILED", "ROLLED_BACK", "ROLLBACK").contains(previousStatus)) {
+            return;
+        }
+        String nextRemediationStatus;
+        if ("ROLLED_BACK".equals(previousStatus) || "ROLLBACK".equals(previousStatus)) {
+            nextRemediationStatus = "ROLLED_BACK";
+        } else {
+            nextRemediationStatus = STATUS_PASS.equals(entity.getStatus()) ? "FIXED" : "FAILED";
+        }
+        entity.setRemediationStatus(nextRemediationStatus);
+        baselineResultMapper.updateRemediationStatus(entity.getId(), nextRemediationStatus);
     }
 
     /**
@@ -216,15 +242,22 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         String actual = actualValue == null ? "" : actualValue;
         String exp = expected == null ? "" : expected;
 
+        if ("CONTAINS".equalsIgnoreCase(operator)) {
+            return actual.toLowerCase().contains(exp.toLowerCase());
+        }
+        if ("NOT_CONTAINS".equalsIgnoreCase(operator)) {
+            return !actual.toLowerCase().contains(exp.toLowerCase());
+        }
+
         return switch (matchType) {
             case MATCH_CONTAINS -> {
-                boolean contains = actual.contains(exp);
+                boolean contains = actual.toLowerCase().contains(exp.toLowerCase());
                 yield "!=".equals(operator) ? !contains : contains;
             }
             case MATCH_REGEX -> {
                 boolean matches;
                 try {
-                    matches = Pattern.compile(exp).matcher(actual).find();
+                    matches = Pattern.compile(exp, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(actual).find();
                 } catch (Exception e) {
                     log.warn("基线规则正则非法: itemId={}, expr={}", item.getId(), exp);
                     matches = false;
@@ -259,15 +292,64 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
     }
 
     private String buildMessage(boolean pass, BaselineRuleItemEntity item, String actualValue, String agentMessage) {
-        if (StringUtils.hasText(agentMessage)) {
-            return limit(agentMessage, 2000);
-        }
-        String text = (pass ? "合规：" : "不合规：") + "实际值[" + (actualValue == null ? "" : actualValue) + "]"
-                + " " + safe(item.getOperator()) + " 期望值[" + safe(item.getExpectedValue()) + "]"
-                + "（match=" + safe(item.getMatchType()) + "）";
-        return limit(text, 2000);
+        return buildReadableMessage(pass, item, actualValue);
     }
 
+    private ComparisonResult evaluateItem(BaselineRuleItemEntity item, String actualForCompare, String actualForDisplay) {
+        boolean pass = compare(item, actualForCompare);
+        return new ComparisonResult(pass ? STATUS_PASS : STATUS_FAIL, buildReadableMessage(pass, item, actualForDisplay));
+    }
+
+    private String buildReadableMessage(boolean pass, BaselineRuleItemEntity item, String actualValue) {
+        String prefix = pass ? "符合要求：" : "不符合要求：";
+        String operator = StringUtils.hasText(item.getOperator()) ? item.getOperator().trim().toUpperCase() : "=";
+        String matchType = StringUtils.hasText(item.getMatchType()) ? item.getMatchType().trim().toUpperCase() : MATCH_EXACT;
+        String expected = displayValue(item.getExpectedValue());
+        String actual = displayValue(actualValue);
+        String message;
+        if (MATCH_CONTAINS.equals(matchType) || "CONTAINS".equals(operator)) {
+            message = pass
+                    ? "当前结果已包含要求内容 " + expected + "。"
+                    : "当前结果未包含要求内容 " + expected + "。";
+        } else if ("NOT_CONTAINS".equals(operator) || "!=".equals(operator)) {
+            message = pass
+                    ? "当前值 " + actual + " 未命中禁止值 " + expected + "。"
+                    : "当前值 " + actual + " 命中了禁止值 " + expected + "。";
+        } else if (">=".equals(operator)) {
+            message = pass
+                    ? "当前值 " + actual + "，高于或等于要求值 " + expected + "。"
+                    : "当前值 " + actual + "，低于要求值 " + expected + "。";
+        } else if (">".equals(operator)) {
+            message = pass
+                    ? "当前值 " + actual + "，高于要求值 " + expected + "。"
+                    : "当前值 " + actual + "，未高于要求值 " + expected + "。";
+        } else if ("<=".equals(operator)) {
+            message = pass
+                    ? "当前值 " + actual + "，不超过要求值 " + expected + "。"
+                    : "当前值 " + actual + "，超过要求值 " + expected + "。";
+        } else if ("<".equals(operator)) {
+            message = pass
+                    ? "当前值 " + actual + "，低于要求值 " + expected + "。"
+                    : "当前值 " + actual + "，未低于要求值 " + expected + "。";
+        } else if (MATCH_REGEX.equals(matchType)) {
+            message = pass
+                    ? "当前值符合规则表达式要求。"
+                    : "当前值不符合规则表达式要求。";
+        } else {
+            message = pass
+                    ? "当前值与标准值一致。"
+                    : "当前值 " + actual + " 与标准值 " + expected + " 不一致。";
+        }
+        return limit(prefix + message, 2000);
+    }
+
+    private String buildExecuteErrorMessage(String agentMessage, boolean permissionDenied) {
+        if (permissionDenied) {
+            return "检测执行失败：权限不足，无法读取该配置项。";
+        }
+        String cleaned = cleanEvidence(agentMessage, null);
+        return StringUtils.hasText(cleaned) ? "检测执行失败：" + cleaned : "检测执行失败：客户端未返回有效结果。";
+    }
     private void writeSummary(Long hostId, Long taskId, int passCount, int failCount, int score, LocalDateTime scanTime) {
         BaselineSummaryEntity summary = new BaselineSummaryEntity();
         summary.setHostId(hostId);
@@ -346,6 +428,130 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
             }
         }
         return values;
+    }
+
+    private String comparableActualValue(String rawValue, boolean missingValue, boolean permissionDenied) {
+        if (missingValue || permissionDenied) {
+            return "";
+        }
+        String cleaned = cleanEvidence(rawValue, null);
+        return StringUtils.hasText(cleaned) ? normalizeScalar(cleaned) : "";
+    }
+
+    private String normalizeActualValue(String rawValue, boolean missingValue, boolean permissionDenied) {
+        if (permissionDenied) {
+            return "权限不足";
+        }
+        if (missingValue) {
+            return "不存在";
+        }
+        String cleaned = cleanEvidence(rawValue, null);
+        if (!StringUtils.hasText(cleaned)) {
+            return "空值";
+        }
+        return normalizeScalar(cleaned);
+    }
+
+    private String normalizeScalar(String value) {
+        String text = collapseWhitespace(value);
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        if ("TRUE".equalsIgnoreCase(text)) {
+            return "True";
+        }
+        if ("FALSE".equalsIgnoreCase(text)) {
+            return "False";
+        }
+        if ("RUNNING".equalsIgnoreCase(text)) {
+            return "Running";
+        }
+        if ("STOPPED".equalsIgnoreCase(text)) {
+            return "Stopped";
+        }
+        return text;
+    }
+
+    private String cleanEvidence(String rawEvidence, String fallback) {
+        if (!StringUtils.hasText(rawEvidence)) {
+            return StringUtils.hasText(fallback) ? fallback : null;
+        }
+        List<String> lines = new ArrayList<>();
+        for (String rawLine : rawEvidence.replace('\r', '\n').split("\n")) {
+            String line = sanitizeEvidenceLine(rawLine);
+            if (!StringUtils.hasText(line) || isNoiseEvidenceLine(line)) {
+                continue;
+            }
+            if (!lines.contains(line)) {
+                lines.add(line);
+            }
+        }
+        if (lines.isEmpty()) {
+            String scalar = normalizeScalar(rawEvidence);
+            return StringUtils.hasText(scalar) && !isNoiseEvidenceLine(scalar) ? limit(scalar, 2000) : fallback;
+        }
+        return limit(String.join("\n", lines), 2000);
+    }
+
+    private String sanitizeEvidenceLine(String rawLine) {
+        if (rawLine == null) {
+            return "";
+        }
+        String line = rawLine.trim();
+        Matcher secedit = Pattern.compile("^[A-Za-z]:\\\\[^:]+:\\d+:(.+)$").matcher(line);
+        if (secedit.find()) {
+            line = secedit.group(1).trim();
+        }
+        line = line.replaceAll("\\s+", " ").trim();
+        return line;
+    }
+
+    private boolean isNoiseEvidenceLine(String line) {
+        if (!StringUtils.hasText(line)) {
+            return true;
+        }
+        String lower = line.toLowerCase();
+        return lower.equals("the task has completed successfully.")
+                || lower.startsWith("see log ")
+                || lower.startsWith("ps ")
+                || lower.startsWith("cmdlet ")
+                || lower.startsWith("at line:")
+                || lower.contains("remove-item")
+                || lower.contains("secedit.cfg")
+                || lower.contains("completed successfully")
+                || lower.contains("successfully.")
+                || lower.contains("powershell")
+                || line.matches("^-{2,}$")
+                || line.equalsIgnoreCase("Name Enabled Description")
+                || line.equalsIgnoreCase("Name Status")
+                || line.equalsIgnoreCase("----");
+    }
+
+    private boolean isPermissionDenied(String text) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+        String lower = text.toLowerCase();
+        return lower.contains("access is denied")
+                || lower.contains("permission denied")
+                || lower.contains("unauthorized")
+                || lower.contains("拒绝访问")
+                || lower.contains("权限不足")
+                || lower.contains("未授权");
+    }
+
+    private String displayValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "空值";
+        }
+        return value;
+    }
+
+    private String collapseWhitespace(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\r', ' ').replace('\n', ' ').replaceAll("\\s+", " ").trim();
     }
 
     private LocalDateTime parseScanTime(JsonNode node) {
@@ -437,5 +643,8 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private record ComparisonResult(String status, String message) {
     }
 }

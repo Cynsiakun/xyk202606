@@ -19,6 +19,8 @@ public class BaselineRemediationEntity {
     private String newValue;
     private String backupData;
     private String executeScript;
+    private String operator;
+    private String message;
     private String status;
     private LocalDateTime startTime;
     private LocalDateTime endTime;

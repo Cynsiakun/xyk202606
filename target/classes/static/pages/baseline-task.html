@@ -20,6 +20,17 @@
                 </div>
             </div>
             <div class="toolbar-group">
+                <input type="text" id="taskKeywordInput" class="layui-input toolbar-search" placeholder="搜索任务名称" autocomplete="off">
+                <select name="executeType" lay-filter="executeTypeFilter">
+                    <option value="">全部执行方式</option>
+                    <option value="MANUAL">立即执行</option>
+                    <option value="SCHEDULED">定时任务</option>
+                </select>
+                <select name="taskType" lay-filter="taskTypeFilter">
+                    <option value="">全部任务类型</option>
+                    <option value="SCAN">检测任务</option>
+                    <option value="RECHECK">复检任务</option>
+                </select>
                 <select name="status" lay-filter="statusFilter">
                     <option value="">全部状态</option>
                     <option value="PENDING">待执行</option>
@@ -27,6 +38,9 @@
                     <option value="FINISHED">已完成</option>
                     <option value="FAILED">失败</option>
                 </select>
+                <button type="button" class="layui-btn layui-btn-primary" id="searchButton">
+                    <i class="layui-icon layui-icon-search"></i> 搜索
+                </button>
                 <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
                     <i class="layui-icon layui-icon-refresh"></i> 刷新
                 </button>
@@ -37,8 +51,39 @@
         </form>
     </div>
 
-    <div class="table-card">
+    <div class="table-card" id="taskListPanel">
         <table id="baselineTaskTable" lay-filter="baselineTaskTable"></table>
+    </div>
+
+    <div class="table-card result-panel" id="taskResultPanel" style="display:none;">
+        <div class="result-panel-head">
+            <div>
+                <div class="section-kicker">Task Result</div>
+                <h2 id="resultTaskTitle">任务结果</h2>
+            </div>
+            <div class="result-actions">
+                <button type="button" class="layui-btn layui-btn-primary" id="backToListButton">返回列表</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resultRefreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新结果
+                </button>
+                <button type="button" class="layui-btn layui-btn-warm" id="exportResultButton">
+                    <i class="layui-icon layui-icon-export"></i> 导出结果
+                </button>
+            </div>
+        </div>
+        <div class="overview-cards" id="overviewCards"></div>
+        <div class="result-section-title">主机检测概览</div>
+        <table id="taskHostResultTable" lay-filter="taskHostResultTable"></table>
+        <div class="task-rule-panel" id="taskRulePanel" style="display:none;">
+            <div class="task-rule-head">
+                <div>
+                    <div class="section-kicker">Task Scope Detail</div>
+                    <h3 id="taskRuleTitle">本次任务规则明细</h3>
+                </div>
+                <button type="button" class="layui-btn layui-btn-primary layui-btn-sm" id="closeRulePanelButton">收起</button>
+            </div>
+            <table id="taskRuleResultTable" lay-filter="taskRuleResultTable"></table>
+        </div>
     </div>
 </div>
 
@@ -58,10 +103,28 @@
                 <input type="radio" name="executeType" value="SCHEDULED" title="定时执行" lay-filter="executeType">
             </div>
         </div>
-        <div class="layui-form-item" id="cronItem" style="display:none;">
-            <label class="layui-form-label">Cron 表达式</label>
+        <div class="layui-form-item" id="scheduleItem" style="display:none;">
+            <label class="layui-form-label">执行计划</label>
             <div class="layui-input-block">
-                <input type="text" name="cronExpr" autocomplete="off" placeholder="如 0 0 2 * * ?" class="layui-input">
+                <div class="schedule-row">
+                    <select name="scheduleFrequency" class="native-select" lay-ignore>
+                        <option value="DAILY">每天</option>
+                        <option value="WEEKLY">每周</option>
+                        <option value="MONTHLY">每月</option>
+                    </select>
+                    <select name="scheduleWeekday" class="native-select schedule-extra schedule-weekly" lay-ignore style="display:none;">
+                        <option value="MON">周一</option>
+                        <option value="TUE">周二</option>
+                        <option value="WED">周三</option>
+                        <option value="THU">周四</option>
+                        <option value="FRI">周五</option>
+                        <option value="SAT">周六</option>
+                        <option value="SUN">周日</option>
+                    </select>
+                    <select name="scheduleMonthDay" class="native-select schedule-extra schedule-monthly" lay-ignore style="display:none;"></select>
+                    <input type="time" name="scheduleTime" value="02:00" class="layui-input schedule-time" lay-ignore>
+                </div>
+                <div class="schedule-hint" id="scheduleHint">每天 02:00 执行</div>
             </div>
         </div>
 
@@ -86,7 +149,8 @@
                 <div class="picker">
                     <div class="picker-toolbar">
                         <input type="text" class="layui-input picker-search" id="ruleSearch" placeholder="搜索规则编码 / 名称 / 分类">
-                        <label class="picker-checkall"><input type="checkbox" id="ruleCheckAll" checked> 全选</label>
+                        <label class="picker-checkall"><input type="checkbox" id="ruleCheckAll" checked lay-ignore> 全选</label>
+                        <div class="category-actions" id="ruleCategoryActions"></div>
                         <span class="picker-count" id="ruleCount">已选 0</span>
                     </div>
                     <div class="picker-list" id="ruleList">
@@ -101,21 +165,6 @@
             <button type="button" class="layui-btn" id="submitTaskButton">提交</button>
         </div>
     </form>
-</template>
-
-<!-- 查看结果弹窗 -->
-<template id="baselineResultTemplate">
-    <div class="baseline-result">
-        <div class="overview-cards" id="overviewCards"></div>
-        <div class="result-section-title">问题主机</div>
-        <div class="problem-host-wrap">
-            <table id="problemHostTable" lay-filter="problemHostTable"></table>
-            <div class="all-pass" id="allPassTip" style="display:none;">
-                <i class="layui-icon layui-icon-ok-circle"></i>
-                <span>全部合规通过</span>
-            </div>
-        </div>
-    </div>
 </template>
 
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
