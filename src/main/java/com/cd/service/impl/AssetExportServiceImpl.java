@@ -60,7 +60,7 @@ public class AssetExportServiceImpl implements AssetExportService {
 
     @Override
     public AssetExportDTO exportJson(Long hostId, String ipAddress) {
-        licenseGuard.requireFeature(LicenseFeature.ASSET_EXPORT);
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
         AssetExportDTO exportData = buildExportData(hostId);
         recordExport(hostId, "json", ipAddress);
         return exportData;
@@ -68,7 +68,7 @@ public class AssetExportServiceImpl implements AssetExportService {
 
     @Override
     public AssetExportFileDTO exportExcel(Long hostId, String ipAddress) {
-        licenseGuard.requireFeature(LicenseFeature.ASSET_EXPORT);
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
         AssetExportDTO exportData = buildExportData(hostId);
         byte[] content = buildExcel(exportData);
         recordExport(hostId, "excel", ipAddress);

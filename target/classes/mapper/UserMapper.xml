@@ -166,6 +166,26 @@
           AND tenant_id = #{tenantId}
     </select>
 
+    <select id="selectByUserPhoneAndTenantExcludingId" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_phone = #{userPhone}
+          AND tenant_id = #{tenantId}
+          <if test="id != null">
+              AND id &lt;&gt; #{id}
+          </if>
+    </select>
+
+    <select id="selectByUserEmailAndTenantExcludingId" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_email = #{userEmail}
+          AND tenant_id = #{tenantId}
+          <if test="id != null">
+              AND id &lt;&gt; #{id}
+          </if>
+    </select>
+
     <update id="updateLastLoginTime">
         UPDATE user
         SET last_login_time = NOW()

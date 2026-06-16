@@ -1,20 +1,23 @@
 package com.cd.common.license;
 
 import com.cd.common.exception.LicenseAccessDeniedException;
+import com.cd.common.security.PermissionChecker;
 import com.cd.common.security.TenantContextHolder;
 import com.cd.entity.LicenseEntity;
+import com.cd.entity.LicensePlanEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.LicenseMapper;
+import com.cd.mapper.LicensePlanMapper;
 import com.cd.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.util.EnumSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component("licenseGuard")
 @RequiredArgsConstructor
@@ -24,50 +27,18 @@ public class LicenseGuard {
     public static final String STANDARD = "STANDARD";
     public static final String PROFESSIONAL = "PROFESSIONAL";
 
-    private static final Plan TRIAL_PLAN = new Plan(1, 10, EnumSet.of(LicenseFeature.HOST_VIEW));
-    private static final Plan STANDARD_PLAN = new Plan(5, 100, EnumSet.of(
-            LicenseFeature.HOST_VIEW,
-            LicenseFeature.HOST_MANAGE,
-            LicenseFeature.ASSET_MANAGE,
-            LicenseFeature.ASSET_EXPORT,
-            LicenseFeature.PATCH,
-            LicenseFeature.VULN,
-            LicenseFeature.LOG,
-            LicenseFeature.BASELINE,
-            LicenseFeature.USER_MANAGE,
-            LicenseFeature.ROLE_MANAGE
-    ));
-    private static final Plan PROFESSIONAL_PLAN = new Plan(20, 500, EnumSet.of(
-            LicenseFeature.HOST_VIEW,
-            LicenseFeature.HOST_MANAGE,
-            LicenseFeature.ASSET_MANAGE,
-            LicenseFeature.ASSET_EXPORT,
-            LicenseFeature.PATCH,
-            LicenseFeature.VULN,
-            LicenseFeature.LOG,
-            LicenseFeature.BASELINE,
-            LicenseFeature.USER_MANAGE,
-            LicenseFeature.ROLE_MANAGE,
-            LicenseFeature.AI_ANALYSIS,
-            LicenseFeature.AI_REMEDIATION,
-            LicenseFeature.AI_REPORT
-    ));
-    private static final Map<String, Plan> PLANS = Map.of(
-            TRIAL, TRIAL_PLAN,
-            STANDARD, STANDARD_PLAN,
-            PROFESSIONAL, PROFESSIONAL_PLAN
-    );
-
     private final LicenseMapper licenseMapper;
+    private final LicensePlanMapper licensePlanMapper;
     private final HostMapper hostMapper;
     private final UserMapper userMapper;
+    private final PermissionChecker permissionChecker;
 
     public boolean hasFeature(String featureName) {
         if (!StringUtils.hasText(featureName)) {
             return false;
         }
         try {
-            return hasFeature(LicenseFeature.valueOf(featureName.trim().toUpperCase(Locale.ROOT)));
+            return hasFeature(LicenseFeature.valueOf(normalizeFeatureName(featureName)));
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -161,11 +132,15 @@ public class LicenseGuard {
     }
 
     private Plan planOf(String edition) {
-        Plan plan = PLANS.get(edition);
+        LicensePlanEntity plan = licensePlanMapper.selectByCode(edition);
         if (plan == null) {
             throw new LicenseAccessDeniedException("Unsupported License edition: " + edition);
         }
-        return plan;
+        return new Plan(
+                plan.getUserLimit() == null ? 0 : plan.getUserLimit(),
+                plan.getHostLimit() == null ? 0 : plan.getHostLimit(),
+                parseFeatures(plan.getFeatureFlags())
+        );
     }
 
     private String normalizeEdition(String edition) {
@@ -176,7 +151,7 @@ public class LicenseGuard {
     }
 
     private boolean isPlatformTenant() {
-        return currentTenantId() == 0L;
+        return permissionChecker.isSuperAdmin();
     }
 
     private Long currentTenantId() {
@@ -185,5 +160,27 @@ public class LicenseGuard {
     }
 
     private record Plan(int userLimit, int hostLimit, Set<LicenseFeature> features) {
+    }
+
+    private Set<LicenseFeature> parseFeatures(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return Set.of();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(value -> LicenseFeature.valueOf(normalizeFeatureName(value)))
+                .collect(Collectors.toSet());
+    }
+
+    private String normalizeFeatureName(String raw) {
+        String value = raw.trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "HOST_VIEW", "HOST_MANAGE", "HOST_AUTH" -> "HOST";
+            case "ASSET_MANAGE", "ASSET_EXPORT" -> "ASSET";
+            case "USER_MANAGE", "ROLE_MANAGE" -> "USER";
+            case "AI_ANALYSIS", "AI_REMEDIATION", "AI_REPORT" -> "AI";
+            default -> value;
+        };
     }
 }

@@ -172,12 +172,42 @@
             </div>
         </div>
         <div class="layui-form-item">
-            <label class="layui-form-label">探测内容</label>
+            <label class="layui-form-label">资产探测</label>
             <div class="layui-input-block">
                 <input type="checkbox" name="account" title="账号" lay-skin="primary">
                 <input type="checkbox" name="service" title="服务" lay-skin="primary">
                 <input type="checkbox" name="process" title="进程" lay-skin="primary">
                 <input type="checkbox" name="app" title="应用" lay-skin="primary">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">端口扫描</label>
+            <div class="layui-input-block">
+                <input type="checkbox" name="portScan" title="端口扫描" lay-skin="primary">
+            </div>
+        </div>
+        <div class="probe-strategy-port-scan-options" style="display:none;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">扫描范围</label>
+                <div class="layui-input-block">
+                    <select name="portScanRange">
+                        <option value="common">常用端口</option>
+                        <option value="full">全端口(1-65535)</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item probe-strategy-custom-ports" style="display:none;">
+                <label class="layui-form-label">自定义端口</label>
+                <div class="layui-input-block">
+                    <input type="text" name="portScanCustomPorts" placeholder="22,80,443,3306,6379,8080" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">指纹识别</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="fingerprint" title="抓取Banner识别资产" lay-skin="primary">
+                </div>
             </div>
         </div>
         <div class="popup-actions">
@@ -196,12 +226,42 @@
             </div>
         </div>
         <div class="layui-form-item">
-            <label class="layui-form-label">探测项</label>
+            <label class="layui-form-label">资产探测</label>
             <div class="layui-input-block">
                 <input type="checkbox" name="account" title="探测账号" lay-skin="primary">
                 <input type="checkbox" name="service" title="探测服务" lay-skin="primary">
                 <input type="checkbox" name="process" title="探测进程" lay-skin="primary">
                 <input type="checkbox" name="app" title="探测安装的软件" lay-skin="primary">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">端口探测</label>
+            <div class="layui-input-block">
+                <input type="checkbox" name="portScan" title="端口探测" lay-skin="primary">
+            </div>
+        </div>
+        <div class="probe-port-scan-options" style="display:none;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">扫描范围</label>
+                <div class="layui-input-block">
+                    <select name="portScanRange">
+                        <option value="common">常用端口</option>
+                        <option value="full">全端口(1-65535)</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item probe-custom-ports" style="display:none;">
+                <label class="layui-form-label">自定义端口</label>
+                <div class="layui-input-block">
+                    <input type="text" name="portScanCustomPorts" placeholder="22,80,443,3306,6379,8080" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">指纹识别</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="grabBanner" title="抓取Banner识别资产" lay-skin="primary">
+                </div>
             </div>
         </div>
         <div class="popup-actions">

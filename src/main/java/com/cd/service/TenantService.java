@@ -1,13 +1,15 @@
 package com.cd.service;
 
 import com.cd.common.PageResult;
+import com.cd.dto.TenantCreateDTO;
+import com.cd.dto.TenantOptionDTO;
 import com.cd.entity.TenantEntity;
 
 import java.util.List;
 
 public interface TenantService {
 
-    TenantEntity create(TenantEntity entity);
+    TenantEntity create(TenantCreateDTO dto);
 
     TenantEntity update(Long id, TenantEntity entity);
 
@@ -16,6 +18,8 @@ public interface TenantService {
     TenantEntity getById(Long id);
 
     List<TenantEntity> listAll();
+
+    List<TenantOptionDTO> options();
 
     PageResult<TenantEntity> page(int page, int size, String keyword, Integer status);
 

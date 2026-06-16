@@ -55,6 +55,9 @@ public class RabbitMQConfig {
     public static final String PATCH_SCAN_ROUTING_KEY = "patch_scan";
     public static final String PATCH_SCAN_QUEUE = "patch_scan_queue";
 
+    /** 端口扫描结果队列。 */
+    public static final String PORT_SCAN_QUEUE = "port_scan_queue";
+
     /**
      * Windows 事件日志队列：采集端通过 {@code log_exchange} + 路由键 {@code security_log}
      * 投递，消费后批量写入 {@code windows_event_logs}。
@@ -163,6 +166,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding patchScanBinding() {
         return BindingBuilder.bind(patchScanQueue()).to(patchScanExchange()).with(PATCH_SCAN_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue portScanQueue() {
+        return new Queue(PORT_SCAN_QUEUE, true);
     }
 
     /**

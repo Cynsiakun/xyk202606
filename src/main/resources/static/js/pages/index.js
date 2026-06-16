@@ -17,27 +17,53 @@ layui.use(["element", "layer"], function () {
     var API_CONFIG = {
         currentUser: "/api/current-user",
         logout: "/api/user/logout",
-        currentMenus: "/api/rbac/menu/current",
         currentPermissions: "/api/rbac/permission/current",
-        currentLicense: "/api/license/current"
+        currentLicense: "/api/license/current",
+        currentAccess: "/api/access/effective"
     };
 
-    var pageFeatureMap = [
-        {pattern: "host.html", feature: "HOST_VIEW"},
-        {pattern: "user.html", feature: "USER_MANAGE"},
-        {pattern: "role.html", feature: "ROLE_MANAGE"},
-        {pattern: "permission.html", feature: "ROLE_MANAGE"},
-        {pattern: "asset-", feature: "ASSET_MANAGE"},
-        {pattern: "patch-", feature: "PATCH"},
-        {pattern: "cve-", feature: "PATCH"},
-        {pattern: "vuln-", feature: "VULN"},
-        {pattern: "log.html", feature: "LOG"},
-        {pattern: "security-log", feature: "LOG"},
-        {pattern: "security-event", feature: "LOG"},
-        {pattern: "account-change-log", feature: "LOG"},
-        {pattern: "login-security-log", feature: "LOG"},
-        {pattern: "host-log", feature: "LOG"},
-        {pattern: "baseline-", feature: "BASELINE"}
+    var MENU_SCHEMA = [
+        {title: "仪表盘", page: "./pages/dashboard.html", icon: "layui-icon-chart", policyKey: "COMMON_DASHBOARD_VIEW"},
+        {title: "主机管理", page: "./pages/host.html", icon: "layui-icon-component", policyKey: "TENANT_HOST_VIEW"},
+        {title: "授权主机", page: "./pages/tenant-machine.html", icon: "layui-icon-auz", policyKey: "TENANT_HOST_AUTHORIZE"},
+        {title: "资产管理", icon: "layui-icon-tabs", children: [
+            {title: "账号资产", page: "./pages/asset-account.html", icon: "layui-icon-user", policyKey: "TENANT_ASSET_VIEW"},
+            {title: "服务资产", page: "./pages/asset-service.html", icon: "layui-icon-engine", policyKey: "TENANT_ASSET_VIEW"},
+            {title: "进程资产", page: "./pages/asset-process.html", icon: "layui-icon-console", policyKey: "TENANT_ASSET_VIEW"},
+            {title: "应用资产", page: "./pages/asset-app.html", icon: "layui-icon-app", policyKey: "TENANT_ASSET_VIEW"}
+        ]},
+        {title: "补丁安全", icon: "layui-icon-vercode", children: [
+            {title: "补丁风险", page: "./pages/patch-security.html", icon: "layui-icon-shield", policyKey: "TENANT_PATCH_VIEW"},
+            {title: "补丁管理", page: "./pages/patch-management.html", icon: "layui-icon-list", policyKey: "TENANT_PATCH_VIEW"}
+        ]},
+        {title: "漏洞管理", icon: "layui-icon-search", children: [
+            {title: "漏洞检测", page: "./pages/vuln-detection.html", icon: "layui-icon-search", policyKey: "TENANT_VULN_VIEW"},
+            {title: "漏洞运营仪表盘", page: "./pages/vuln-ops-dashboard.html", icon: "layui-icon-chart-screen", policyKey: "TENANT_VULN_DASHBOARD_VIEW"}
+        ]},
+        {title: "日志与事件", icon: "layui-icon-log", children: [
+            {title: "安全日志中心", page: "./pages/security-log-center.html", icon: "layui-icon-log", policyKey: "TENANT_LOG_VIEW"},
+            {title: "登录日志", page: "./pages/log.html", icon: "layui-icon-date", policyKey: "TENANT_LOG_VIEW"},
+            {title: "登录安全", page: "./pages/login-security-log.html", icon: "layui-icon-password", policyKey: "TENANT_LOG_VIEW"},
+            {title: "账号变更", page: "./pages/account-change-log.html", icon: "layui-icon-user", policyKey: "TENANT_LOG_VIEW"},
+            {title: "安全事件", page: "./pages/security-event.html", icon: "layui-icon-notice", policyKey: "TENANT_LOG_VIEW"},
+            {title: "主机日志", page: "./pages/host-log.html", icon: "layui-icon-file-b", policyKey: "TENANT_LOG_VIEW"}
+        ]},
+        {title: "基线合规", icon: "layui-icon-survey", children: [
+            {title: "主机合规总览", page: "./pages/baseline-host.html", icon: "layui-icon-survey", policyKey: "TENANT_BASELINE_VIEW"},
+            {title: "基线任务", page: "./pages/baseline-task.html", icon: "layui-icon-template", policyKey: "TENANT_BASELINE_VIEW"},
+            {title: "整改工单", page: "./pages/baseline-workorder.html", icon: "layui-icon-form", policyKey: "TENANT_BASELINE_VIEW"}
+        ]},
+        {title: "用户管理", page: "./pages/user.html", icon: "layui-icon-username", policyKey: "TENANT_USER_VIEW"},
+        {title: "套餐中心", page: "./pages/license-center.html", icon: "layui-icon-diamond", policyKey: "COMMON_PROFILE_VIEW"},
+        {title: "平台管理", icon: "layui-icon-component", children: [
+            {title: "租户管理", page: "./pages/platform-tenant.html", icon: "layui-icon-template-1", policyKey: "PLATFORM_TENANT_VIEW"},
+            {title: "CVE 管理", page: "./pages/cve-management.html", icon: "layui-icon-dialogue", policyKey: "PLATFORM_CVE_VIEW"},
+            {title: "漏洞库管理", page: "./pages/vuln-rule-management.html", icon: "layui-icon-table", policyKey: "PLATFORM_VULN_RULE_VIEW"},
+            {title: "基线规则管理", page: "./pages/baseline-rule.html", icon: "layui-icon-list", policyKey: "PLATFORM_BASELINE_RULE_VIEW"},
+            {title: "角色管理", page: "./pages/role.html", icon: "layui-icon-group", policyKey: "PLATFORM_RBAC_VIEW"},
+            {title: "权限管理", page: "./pages/permission.html", icon: "layui-icon-auz", policyKey: "PLATFORM_RBAC_VIEW"}
+        ]},
+        {title: "个人中心", page: "./pages/profile.html", icon: "layui-icon-user", policyKey: "COMMON_PROFILE_VIEW"}
     ];
 
     init();
@@ -51,13 +77,14 @@ layui.use(["element", "layer"], function () {
         bindSidebarToggle();
         bindLogout();
         bindProfileButton();
+        bindLicenseStatus();
         bindFrameGuard();
         fillCurrentUser();
         renderLicenseStatus(null);
 
         await syncCurrentUserFromApi();
         await loadPermissions();
-        await loadCurrentLicense();
+        await loadCurrentAccess();
         await loadMenus();
     }
 
@@ -81,10 +108,22 @@ layui.use(["element", "layer"], function () {
         }
     }
 
+    async function loadCurrentAccess() {
+        try {
+            var result = await AppRequest.request(API_CONFIG.currentAccess, {method: "GET"}, {showErrorMessage: false});
+            var info = result.data || null;
+            AppAuth.setAccessInfo(info);
+            AppAuth.setLicenseInfo(info);
+            renderLicenseStatus(info);
+        } catch (error) {
+            AppAuth.setAccessInfo(null);
+            await loadCurrentLicense();
+        }
+    }
+
     async function loadMenus() {
         try {
-            var result = await AppRequest.request(API_CONFIG.currentMenus, {method: "GET"});
-            var menus = normalizeMenus(result.data || []);
+            var menus = normalizeMenus(MENU_SCHEMA);
             renderMenus(menus);
             bindMenuEvents();
             element.render("nav");
@@ -95,53 +134,54 @@ layui.use(["element", "layer"], function () {
     }
 
     function normalizeMenus(menus) {
-        var filtered = filterMenusByLicense(menus);
-        if (AppAuth.isSuperAdmin()) {
-            filtered.push({
-                title: "\u5e73\u53f0\u7ba1\u7406",
-                icon: "layui-icon-component",
-                children: [
-                    {
-                        title: "\u79df\u6237\u7ba1\u7406",
-                        page: "./pages/platform-tenant.html",
-                        icon: "layui-icon-template-1"
-                    }
-                ]
-            });
-        }
+        var filtered = filterMenusByPolicy(menus);
+        logMenuSnapshot(filtered);
         return filtered;
     }
 
-    function filterMenusByLicense(menus) {
+    function filterMenusByPolicy(menus) {
         return (menus || []).map(function (menu) {
             var copied = Object.assign({}, menu);
             if (Array.isArray(menu.children) && menu.children.length > 0) {
-                copied.children = filterMenusByLicense(menu.children);
+                copied.children = filterMenusByPolicy(menu.children);
                 return copied.children.length > 0 ? copied : null;
             }
-            return isMenuAllowed(copied) ? copied : null;
+            return isPolicyAllowed(copied.policyKey) ? copied : null;
         }).filter(Boolean);
     }
 
-    function isMenuAllowed(menu) {
-        var page = String(menu.page || "");
-        if (!page) {
+    function isPolicyAllowed(policyKey) {
+        if (!policyKey) {
             return true;
         }
-        if (page.indexOf("dashboard.html") > -1 || page.indexOf("profile.html") > -1) {
-            return true;
-        }
-        var feature = findRequiredFeature(page);
-        return !feature || AppAuth.hasFeature(feature);
+        return AppAuth.canPolicy(policyKey);
     }
 
-    function findRequiredFeature(page) {
-        for (var i = 0; i < pageFeatureMap.length; i++) {
-            if (page.indexOf(pageFeatureMap[i].pattern) > -1) {
-                return pageFeatureMap[i].feature;
-            }
+    function logMenuSnapshot(menus) {
+        if (!window.console || !console.info) {
+            return;
         }
-        return null;
+        var access = AppAuth.getAccessInfo() || {};
+        console.info("[ACCESS MENU SNAPSHOT]", {
+            tenant: access.tenantName || access.tenantId || "-",
+            edition: access.edition || "-",
+            allowedPolicies: access.allowedPolicies || [],
+            visibleMenus: flattenMenuTitles(menus)
+        });
+    }
+
+    function flattenMenuTitles(menus) {
+        var result = [];
+        (menus || []).forEach(function (menu) {
+            if (menu.children && menu.children.length) {
+                menu.children.forEach(function (child) {
+                    result.push(menu.title + " / " + child.title);
+                });
+            } else {
+                result.push(menu.title);
+            }
+        });
+        return result;
     }
 
     function bindMenuEvents() {
@@ -178,6 +218,12 @@ layui.use(["element", "layer"], function () {
         });
     }
 
+    function bindLicenseStatus() {
+        document.getElementById("licenseStrip").addEventListener("click", function () {
+            openLicenseStatusDialog();
+        });
+    }
+
     function bindFrameGuard() {
         contentFrame.addEventListener("load", function () {
             try {
@@ -202,6 +248,9 @@ layui.use(["element", "layer"], function () {
             if (result && result.data) {
                 currentUserName.textContent = result.data.userName || currentUserName.textContent;
                 localStorage.setItem("currentUserName", currentUserName.textContent);
+                if (result.data.tenantName) {
+                    AppAuth.setTenantName(result.data.tenantName);
+                }
             }
         } catch (error) {
             return null;
@@ -262,6 +311,17 @@ layui.use(["element", "layer"], function () {
         contentFrame.src = page;
     }
 
+    function navigateToPage(page, title) {
+        var link = sideNav.querySelector('a[data-page="' + page + '"]');
+        if (link) {
+            switchTo(link);
+            return;
+        }
+        pageTitle.textContent = title || "";
+        pageDescription.textContent = "";
+        contentFrame.src = page;
+    }
+
     function setActiveMenu(link) {
         sideNav.querySelectorAll(".layui-nav-item, .layui-nav-child dd").forEach(function (item) {
             item.classList.remove("layui-this");
@@ -283,7 +343,8 @@ layui.use(["element", "layer"], function () {
 
     function renderLicenseStatus(info) {
         var tenantId = AppAuth.getTenantId();
-        tenantBadge.textContent = tenantId == null ? "Tenant -" : "Tenant " + tenantId;
+        var tenantName = info && info.tenantName ? info.tenantName : AppAuth.getTenantName();
+        tenantBadge.textContent = tenantName || (tenantId == null ? "租户 -" : "租户 " + tenantId);
         setPillState(tenantBadge, "muted");
 
         if (!info) {
@@ -292,6 +353,11 @@ layui.use(["element", "layer"], function () {
             setPillState(licenseBadge, "muted");
             setPillState(quotaBadge, "muted");
             return;
+        }
+
+        if (info.tenantName) {
+            AppAuth.setTenantName(info.tenantName);
+            tenantBadge.textContent = info.tenantName;
         }
 
         if (info.effective === false) {
@@ -305,7 +371,7 @@ layui.use(["element", "layer"], function () {
         licenseBadge.textContent = formatEdition(info.edition) + formatExpire(info.expireTime);
         quotaBadge.textContent = "\u4e3b\u673a " + formatQuota(info.hostUsed, info.hostLimit)
             + " / \u7528\u6237 " + formatQuota(info.userUsed, info.userLimit);
-        setPillState(licenseBadge, info.edition === "TRIAL" ? "warn" : "");
+        setPillState(licenseBadge, getExpireLevel(info.expireTime) || (info.edition === "TRIAL" ? "warn" : ""));
         setPillState(quotaBadge, quotaIsNearLimit(info) ? "warn" : "");
     }
 
@@ -332,6 +398,100 @@ layui.use(["element", "layer"], function () {
             return "";
         }
         return " · " + AppUtils.formatDateTime(expireTime).slice(0, 10);
+    }
+
+    function openLicenseStatusDialog() {
+        var info = AppAuth.getAccessInfo() || AppAuth.getLicenseInfo() || {};
+        var expireLevel = getExpireLevel(info.expireTime);
+        var html = '<div class="license-status-dialog">'
+            + '<div class="license-status-grid">'
+            + statusItem("当前版本", formatEdition(info.edition))
+            + statusItem("到期时间", info.expireTime ? AppUtils.formatDateTime(info.expireTime) : "长期有效")
+            + statusItem("状态", formatLicenseState(info))
+            + statusItem("主机配额", formatQuota(info.hostUsed, info.hostLimit))
+            + statusItem("用户配额", formatQuota(info.userUsed, info.userLimit))
+            + statusItem("租户", info.tenantName || AppAuth.getTenantName() || "-")
+            + "</div>"
+            + expireAlertHtml(info.expireTime, expireLevel)
+            + '<div class="license-status-actions">'
+            + '<button type="button" class="layui-btn layui-btn-primary" data-action="license-center">套餐中心</button>'
+            + purchaseButtonsHtml()
+            + "</div>"
+            + "</div>";
+        var index = layer.open({
+            type: 1,
+            title: "License 状态",
+            area: ["620px", "430px"],
+            content: html,
+            success: function (layero) {
+                layero.find('[data-action="license-center"]').on("click", function () {
+                    layer.close(index);
+                    navigateToPage("./pages/license-center.html", "套餐中心");
+                });
+                layero.find('[data-action="license-contact"]').on("click", function () {
+                    layer.msg("请联系销售或管理员开通服务", {icon: 0});
+                });
+            }
+        });
+    }
+
+    function purchaseButtonsHtml() {
+        if (AppAuth.isSuperAdmin() || !AppAuth.isTenantAdmin()) {
+            return "";
+        }
+        return '<button type="button" class="layui-btn" data-action="license-contact">升级套餐</button>'
+            + '<button type="button" class="layui-btn layui-btn-normal" data-action="license-contact">续费</button>'
+            + '<button type="button" class="layui-btn layui-btn-warm" data-action="license-contact">联系销售</button>';
+    }
+
+    function statusItem(label, value) {
+        return '<div class="license-status-item">'
+            + '<div class="license-status-label">' + escapeHtml(label) + '</div>'
+            + '<div class="license-status-value">' + escapeHtml(value == null || value === "" ? "-" : value) + '</div>'
+            + '</div>';
+    }
+
+    function formatLicenseState(info) {
+        if (!info || info.effective === false) {
+            return info && info.message ? info.message : "未授权";
+        }
+        if (info.status === 0) {
+            return "已禁用";
+        }
+        return "有效";
+    }
+
+    function expireAlertHtml(expireTime, level) {
+        var days = daysUntilExpire(expireTime);
+        if (!level || days == null) {
+            return "";
+        }
+        return '<div class="license-status-alert ' + level + '">授权将在 ' + days + ' 天后到期，请及时续费。</div>';
+    }
+
+    function getExpireLevel(expireTime) {
+        var days = daysUntilExpire(expireTime);
+        if (days == null) {
+            return "";
+        }
+        if (days <= 7) {
+            return "danger";
+        }
+        if (days <= 30) {
+            return "warn";
+        }
+        return "";
+    }
+
+    function daysUntilExpire(expireTime) {
+        if (!expireTime) {
+            return null;
+        }
+        var expire = new Date(expireTime).getTime();
+        if (Number.isNaN(expire)) {
+            return null;
+        }
+        return Math.ceil((expire - Date.now()) / 86400000);
     }
 
     function formatQuota(used, limit) {

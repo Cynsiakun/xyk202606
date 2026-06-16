@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
-@PreAuthorize("@licenseGuard.hasFeature('AI_ANALYSIS')")
+@PreAuthorize("@licenseGuard.hasFeature('AI')")
 public class AiController {
 
     private final AiService aiService;

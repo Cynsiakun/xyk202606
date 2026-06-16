@@ -56,6 +56,30 @@
                 </select>
             </div>
         </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x7ba1;&#x7406;&#x5458;</label>
+            <div class="layui-input-block">
+                <input type="text" name="adminUserName" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x521d;&#x59cb;&#x5bc6;&#x7801;</label>
+            <div class="layui-input-block">
+                <input type="password" name="adminPassword" required lay-verify="required" autocomplete="new-password" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x7ba1;&#x7406;&#x5458;&#x624b;&#x673a;</label>
+            <div class="layui-input-block">
+                <input type="text" name="adminPhone" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x7ba1;&#x7406;&#x5458;&#x90ae;&#x7bb1;</label>
+            <div class="layui-input-block">
+                <input type="text" name="adminEmail" autocomplete="off" class="layui-input">
+            </div>
+        </div>
         <div class="popup-actions">
             <button type="button" class="layui-btn layui-btn-primary" data-action="close">&#x53d6;&#x6d88;</button>
             <button type="submit" class="layui-btn" lay-submit lay-filter="saveTenant">&#x4fdd;&#x5b58;</button>
@@ -86,12 +110,10 @@
 <template id="licenseFormTemplate">
     <form class="layui-form popup-form" lay-filter="licenseForm">
         <div class="layui-form-item">
-            <label class="layui-form-label">&#x7248;&#x672c;</label>
+            <label class="layui-form-label">&#x5957;&#x9910;</label>
             <div class="layui-input-block">
-                <select name="edition" required lay-verify="required">
-                    <option value="TRIAL">Trial</option>
-                    <option value="STANDARD">Standard</option>
-                    <option value="PROFESSIONAL">Professional</option>
+                <select name="planCode" id="licensePlanSelect" required lay-verify="required">
+                    <option value="">&#x8bf7;&#x9009;&#x62e9;&#x5957;&#x9910;</option>
                 </select>
             </div>
         </div>
@@ -111,12 +133,6 @@
             <label class="layui-form-label">&#x5230;&#x671f;&#x65f6;&#x95f4;</label>
             <div class="layui-input-block">
                 <input type="text" name="expireTime" id="licenseExpireTime" required lay-verify="required" autocomplete="off" class="layui-input">
-            </div>
-        </div>
-        <div class="layui-form-item">
-            <label class="layui-form-label">MachineId</label>
-            <div class="layui-input-block">
-                <input type="text" name="machineId" autocomplete="off" class="layui-input">
             </div>
         </div>
         <div class="layui-form-item">

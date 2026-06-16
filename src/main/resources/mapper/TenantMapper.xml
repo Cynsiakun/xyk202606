@@ -9,6 +9,8 @@
         <result column="name" property="name"/>
         <result column="contact" property="contact"/>
         <result column="status" property="status"/>
+        <result column="license_edition" property="licenseEdition"/>
+        <result column="license_status" property="licenseStatus"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
@@ -51,6 +53,17 @@
         ORDER BY id ASC
     </select>
 
+    <select id="selectOptions" resultMap="TenantEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM tenant
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY id ASC
+    </select>
+
     <select id="selectPage" resultMap="TenantEntityResultMap">
         SELECT <include refid="baseColumns"/>
         FROM tenant
@@ -64,6 +77,44 @@
             </if>
         </where>
         ORDER BY id ASC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectPageWithLicense" resultMap="TenantEntityResultMap">
+        SELECT t.id,
+               t.name,
+               t.contact,
+               t.status,
+               t.created_at,
+               CASE
+                   WHEN t.id = 0 THEN 'PROFESSIONAL'
+                   ELSE COALESCE(l.edition, 'NONE')
+               END AS license_edition,
+               CASE
+                   WHEN t.id = 0 THEN 'EFFECTIVE'
+                   WHEN l.id IS NULL THEN 'NONE'
+                   ELSE 'EFFECTIVE'
+               END AS license_status
+        FROM tenant t
+        LEFT JOIN license l ON l.id = (
+            SELECT li.id
+            FROM license li
+            WHERE li.tenant_id = t.id
+              AND li.status = 1
+              AND li.expire_time &gt; NOW()
+            ORDER BY li.id DESC
+            LIMIT 1
+        )
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (t.name LIKE CONCAT('%', #{keyword}, '%')
+                 OR t.contact LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null">
+                AND t.status = #{status}
+            </if>
+        </where>
+        ORDER BY t.id ASC
         LIMIT #{size} OFFSET #{offset}
     </select>
 

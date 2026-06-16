@@ -58,11 +58,7 @@ public class PlatformTenantController {
 
     @PostMapping
     public Result<TenantResponseDTO> create(@Valid @RequestBody TenantCreateDTO dto) {
-        TenantEntity entity = new TenantEntity();
-        entity.setName(dto.getName());
-        entity.setContact(dto.getContact());
-        entity.setStatus(dto.getStatus());
-        return Result.success(toTenantResponse(tenantService.create(entity)));
+        return Result.success(toTenantResponse(tenantService.create(dto)));
     }
 
     @PutMapping("/{id}/status")
@@ -94,7 +90,11 @@ public class PlatformTenantController {
         dto.setName(entity.getName());
         dto.setContact(entity.getContact());
         dto.setStatus(entity.getStatus());
+        dto.setLicenseEdition(entity.getId() != null && entity.getId() == 0L ? "PLATFORM" : entity.getLicenseEdition());
+        dto.setLicenseStatus(entity.getId() != null && entity.getId() == 0L ? "EFFECTIVE" : entity.getLicenseStatus());
         dto.setCreatedAt(entity.getCreatedAt());
+        dto.setAdminUserId(entity.getAdminUserId());
+        dto.setAdminUserName(entity.getAdminUserName());
         return dto;
     }
 

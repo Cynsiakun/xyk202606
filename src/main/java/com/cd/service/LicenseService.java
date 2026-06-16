@@ -3,6 +3,7 @@ package com.cd.service;
 import com.cd.dto.LicenseGenerateDTO;
 import com.cd.dto.LicenseActivateDTO;
 import com.cd.dto.LicenseCurrentDTO;
+import com.cd.dto.LicensePlanResponseDTO;
 import com.cd.entity.LicenseEntity;
 
 import java.util.List;
@@ -28,4 +29,6 @@ public interface LicenseService {
     LicenseEntity generateOffline(LicenseActivateDTO dto);
 
     LicenseCurrentDTO current();
+
+    List<LicensePlanResponseDTO> plans();
 }

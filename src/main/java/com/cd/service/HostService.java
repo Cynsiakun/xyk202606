@@ -2,6 +2,7 @@ package com.cd.service;
 
 import com.cd.common.PageResult;
 import com.cd.dto.AssetProbeDTO;
+import com.cd.dto.PortScanDTO;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
@@ -34,4 +35,8 @@ public interface HostService {
     int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app);
 
     void sendAssetProbe(AssetProbeDTO dto);
+
+    int autoPortScanOnlineHosts(int limit);
+
+    void sendPortScan(PortScanDTO dto);
 }

@@ -7,15 +7,20 @@ CREATE TABLE IF NOT EXISTS test (
 
 CREATE TABLE IF NOT EXISTS user (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    user_name VARCHAR(50) NOT NULL UNIQUE,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    user_name VARCHAR(50) NOT NULL,
     user_pwd VARCHAR(64) NOT NULL,
     user_avatar VARCHAR(255),
-    user_phone VARCHAR(20) UNIQUE,
-    user_email VARCHAR(100) UNIQUE,
+    user_phone VARCHAR(20),
+    user_email VARCHAR(100),
     status TINYINT DEFAULT 1,
     create_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    last_login_time DATETIME
+    last_login_time DATETIME,
+    UNIQUE KEY uk_user_tenant_name (tenant_id, user_name),
+    UNIQUE KEY uk_user_tenant_phone (tenant_id, user_phone),
+    UNIQUE KEY uk_user_tenant_email (tenant_id, user_email),
+    KEY idx_user_tenant_id (tenant_id)
 );
 
 INSERT INTO user (user_name, user_pwd, status)
@@ -894,4 +899,118 @@ WHERE NOT EXISTS (
     SELECT 1 FROM tenant WHERE id = 0
 );
 
+-- ============================================================
+-- 端口扫描权限
+-- ============================================================
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'port-scan:view', '查看端口扫描结果', 'API', '/api/port-scan/**', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'port-scan:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'port-scan:delete', '删除端口扫描记录', 'API', '/api/port-scan/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'port-scan:delete');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'port-scan:trigger', '触发端口扫描', 'API', '/api/port-scan/trigger', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'port-scan:trigger');
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id FROM sys_role r, sys_permission p
+WHERE r.role_code = 'SUPER_ADMIN' AND p.permission_code IN ('port-scan:view', 'port-scan:delete', 'port-scan:trigger')
+  AND NOT EXISTS (SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id FROM sys_role r, sys_permission p
+WHERE r.role_code IN ('SECURITY_ADMIN', 'ANALYST') AND p.permission_code IN ('port-scan:view', 'port-scan:trigger')
+  AND NOT EXISTS (SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id);
+
+INSERT INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id FROM sys_role r, sys_permission p
+WHERE r.role_code = 'AUDITOR' AND p.permission_code = 'port-scan:view'
+  AND NOT EXISTS (SELECT 1 FROM sys_role_permission rp WHERE rp.role_id = r.id AND rp.permission_id = p.id);
+
 SET SESSION SQL_MODE = @OLD_SQL_MODE;
+
+-- ============================================================
+-- V12 SaaS login, database-backed License plans, tenant admins,
+-- and tenant machine authorization.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS license_plan (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    code VARCHAR(32) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    user_limit INT NOT NULL DEFAULT 0,
+    host_limit INT NOT NULL DEFAULT 0,
+    feature_flags TEXT,
+    status TINYINT NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO license_plan (code, name, user_limit, host_limit, feature_flags, status, sort_order)
+VALUES
+    ('TRIAL', 'Trial', 1, 10, 'HOST', 1, 1),
+    ('STANDARD', 'Standard', 5, 100, 'HOST,ASSET,PATCH,VULN,LOG,BASELINE,USER', 1, 2),
+    ('PROFESSIONAL', 'Professional', 20, 500, 'HOST,ASSET,PATCH,VULN,LOG,BASELINE,USER,AI', 1, 3)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    user_limit = VALUES(user_limit),
+    host_limit = VALUES(host_limit),
+    feature_flags = VALUES(feature_flags),
+    status = VALUES(status),
+    sort_order = VALUES(sort_order);
+
+CREATE TABLE IF NOT EXISTS tenant_machine (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id BIGINT NOT NULL,
+    machine_id VARCHAR(128),
+    mac_address VARCHAR(64),
+    host_name VARCHAR(255),
+    remark VARCHAR(255),
+    status TINYINT NOT NULL DEFAULT 1,
+    created_by BIGINT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_tenant_machine_machine_id (machine_id),
+    UNIQUE KEY uk_tenant_machine_mac_address (mac_address),
+    KEY idx_tenant_machine_tenant (tenant_id),
+    KEY idx_tenant_machine_status (status)
+);
+
+INSERT INTO sys_role (role_code, role_name, status)
+SELECT 'TENANT_ADMIN', 'Tenant Admin', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE role_code = 'TENANT_ADMIN');
+
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT tenant_role.id, rp.permission_id
+FROM sys_role tenant_role
+         JOIN sys_role source_role ON source_role.role_code = 'SECURITY_ADMIN'
+         JOIN sys_role_permission rp ON rp.role_id = source_role.id
+WHERE tenant_role.role_code = 'TENANT_ADMIN';
+
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.permission_code IN ('user:role:assign', 'host:asset:view', 'host:probe')
+WHERE r.role_code = 'TENANT_ADMIN';
+
+-- ============================================================
+-- 探测策略扩展：端口扫描相关字段
+-- ============================================================
+ALTER TABLE probe_strategy
+    ADD COLUMN IF NOT EXISTS probe_port_scan TINYINT DEFAULT 0 COMMENT '是否启用端口扫描' AFTER probe_app;
+
+ALTER TABLE probe_strategy
+    ADD COLUMN IF NOT EXISTS probe_fingerprint TINYINT DEFAULT 0 COMMENT '是否启用指纹识别' AFTER probe_port_scan;
+
+ALTER TABLE probe_strategy
+    ADD COLUMN IF NOT EXISTS port_scan_range VARCHAR(32) DEFAULT 'common' COMMENT '扫描范围' AFTER probe_fingerprint;
+
+ALTER TABLE probe_strategy
+    ADD COLUMN IF NOT EXISTS port_scan_custom_ports TEXT COMMENT '自定义端口列表' AFTER port_scan_range;
+
+ALTER TABLE probe_strategy
+    ADD COLUMN IF NOT EXISTS last_port_scan_at DATETIME COMMENT '上次端口扫描下发时间' AFTER last_run_at;

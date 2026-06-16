@@ -35,6 +35,10 @@ public class ProbeStrategyServiceImpl implements ProbeStrategyService {
         entity.setProbeService(dto.isService() ? 1 : 0);
         entity.setProbeProcess(dto.isProcess() ? 1 : 0);
         entity.setProbeApp(dto.isApp() ? 1 : 0);
+        entity.setProbePortScan(dto.isPortScan() ? 1 : 0);
+        entity.setProbeFingerprint(dto.isFingerprint() ? 1 : 0);
+        entity.setPortScanRange(dto.getPortScanRange());
+        entity.setPortScanCustomPorts(dto.getPortScanCustomPorts());
         probeStrategyMapper.updateStrategy(entity);
         return getStrategy();
     }
@@ -47,6 +51,11 @@ public class ProbeStrategyServiceImpl implements ProbeStrategyService {
     @Override
     public void markRun(LocalDateTime runAt) {
         probeStrategyMapper.updateLastRunAt(runAt);
+    }
+
+    @Override
+    public void markPortScanRun(LocalDateTime runAt) {
+        probeStrategyMapper.updateLastPortScanAt(runAt);
     }
 
     private ProbeStrategyDTO toDto(ProbeStrategyEntity entity) {
@@ -66,6 +75,10 @@ public class ProbeStrategyServiceImpl implements ProbeStrategyService {
         dto.setService(entity.getProbeService() != null && entity.getProbeService() == 1);
         dto.setProcess(entity.getProbeProcess() != null && entity.getProbeProcess() == 1);
         dto.setApp(entity.getProbeApp() != null && entity.getProbeApp() == 1);
+        dto.setPortScan(entity.getProbePortScan() != null && entity.getProbePortScan() == 1);
+        dto.setFingerprint(entity.getProbeFingerprint() != null && entity.getProbeFingerprint() == 1);
+        dto.setPortScanRange(entity.getPortScanRange());
+        dto.setPortScanCustomPorts(entity.getPortScanCustomPorts());
         dto.setLastRunAt(entity.getLastRunAt());
         return dto;
     }

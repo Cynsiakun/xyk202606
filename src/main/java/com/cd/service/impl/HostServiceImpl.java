@@ -8,6 +8,7 @@ import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetProbeDTO;
+import com.cd.dto.PortScanDTO;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
@@ -15,6 +16,7 @@ import com.cd.dto.HostUpdateDTO;
 import com.cd.entity.HostEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.service.HostService;
+import com.cd.service.ProbeStrategyService;
 import com.cd.util.CsvImportUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class HostServiceImpl implements HostService {
 
     private static final int ONLINE_THRESHOLD_SECONDS = 4;
     private static final String PROBE_TYPE_ASSETS = "assets";
+    private static final String PROBE_TYPE_PORT_SCAN = "port_scan";
     private static final int PROBE_ONLINE_THRESHOLD_SECONDS = 15;
     private static final Duration MANUAL_PROBE_VALID_DURATION = Duration.ofHours(8);
     private static final List<DateTimeFormatter> CSV_DATE_TIME_FORMATTERS = List.of(
@@ -55,12 +58,13 @@ public class HostServiceImpl implements HostService {
     private final ObjectMapper objectMapper;
     private final AmqpAdmin amqpAdmin;
     private final LicenseGuard licenseGuard;
+    private final ProbeStrategyService probeStrategyService;
 
     @Override
     public HostResponseDTO create(HostCreateDTO dto) {
         validateMacUnique(null, dto.getMacAddress());
         Long tenantId = currentTenantId();
-        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        licenseGuard.requireFeature(LicenseFeature.HOST);
         licenseGuard.requireHostQuotaBeforeCreate();
         HostEntity entity = new HostEntity();
         entity.setTenantId(tenantId);
@@ -85,7 +89,7 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public HostResponseDTO update(Long id, HostUpdateDTO dto) {
-        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        licenseGuard.requireFeature(LicenseFeature.HOST);
         Long tenantId = currentTenantId();
         HostEntity existing = ensureExists(id);
         validateMacUnique(id, dto.getMacAddress());
@@ -110,7 +114,7 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public void deleteById(Long id) {
-        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        licenseGuard.requireFeature(LicenseFeature.HOST);
         Long tenantId = currentTenantId();
         ensureExists(id);
         hostMapper.deleteByIdAndTenant(id, tenantId);
@@ -193,7 +197,7 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public void sendAssetProbe(AssetProbeDTO dto) {
-        licenseGuard.requireFeature(LicenseFeature.ASSET_MANAGE);
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
         String macAddress = dto.getMacAddress();
         if (!StringUtils.hasText(macAddress)) {
             throw new IllegalArgumentException("MAC地址不能为空");
@@ -271,7 +275,7 @@ public class HostServiceImpl implements HostService {
         imported.setTenantId(tenantId);
         HostEntity existing = hostMapper.selectByNormalizedMacAndTenant(normalizeMac(imported.getMacAddress()), tenantId);
         if (existing == null) {
-            licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+            licenseGuard.requireFeature(LicenseFeature.HOST);
             licenseGuard.requireHostQuotaBeforeCreate();
             if (imported.getStatus() == null) {
                 imported.setStatus(1);
@@ -298,6 +302,70 @@ public class HostServiceImpl implements HostService {
             return "";
         }
         return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
+    }
+
+    @Override
+    public void sendPortScan(PortScanDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
+        String macAddress = dto.getMacAddress();
+        if (!StringUtils.hasText(macAddress)) {
+            throw new IllegalArgumentException("MAC地址不能为空");
+        }
+        sendPortScanInternal(dto);
+    }
+
+    @Override
+    public int autoPortScanOnlineHosts(int limit) {
+        int batchSize = Math.max(1, limit);
+        List<HostEntity> hosts = hostMapper.selectPortScanCandidates(batchSize);
+        var strategy = probeStrategyService.getStrategyEntity();
+        int sentCount = 0;
+        for (HostEntity host : hosts) {
+            if (host == null || !StringUtils.hasText(host.getMacAddress())) {
+                continue;
+            }
+            PortScanDTO dto = new PortScanDTO();
+            dto.setMacAddress(host.getMacAddress());
+            dto.setScanRange(strategy != null && strategy.getPortScanRange() != null
+                    ? strategy.getPortScanRange() : "common");
+            dto.setCustomPorts(strategy != null ? strategy.getPortScanCustomPorts() : null);
+            dto.setGrabBanner(strategy != null && strategy.getProbeFingerprint() != null
+                    && strategy.getProbeFingerprint() == 1);
+            try {
+                sendPortScanInternal(dto);
+                sentCount++;
+            } catch (Exception e) {
+                log.warn("自动端口扫描下发失败: hostId={}, mac={}, reason={}",
+                        host.getId(), host.getMacAddress(), e.getMessage());
+            }
+        }
+        return sentCount;
+    }
+
+    private void sendPortScanInternal(PortScanDTO dto) {
+        String macAddress = dto.getMacAddress();
+        String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX + normalizeMac(macAddress)
+                + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
+        if (amqpAdmin.getQueueProperties(queueName) == null) {
+            throw new IllegalArgumentException("客户端队列不存在，无法发送端口扫描指令");
+        }
+
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("type", PROBE_TYPE_PORT_SCAN);
+        message.put("macAddress", macAddress);
+        message.put("scanRange", dto.getScanRange() != null ? dto.getScanRange() : "common");
+        message.put("customPorts", dto.getCustomPorts() != null ? dto.getCustomPorts() : "");
+        message.put("grabBanner", dto.isGrabBanner());
+
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            throw new IllegalStateException("组装端口扫描消息失败", e);
+        }
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, macAddress, payload);
+        log.info("端口扫描任务已下发: routingKey={}, payload={}", macAddress, payload);
     }
 
     private String requireField(CSVRecord record, String... headerNames) {

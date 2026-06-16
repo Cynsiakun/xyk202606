@@ -33,6 +33,14 @@ public class ProbeStrategyDTO {
     /** 探测内容：应用。 */
     private boolean app;
 
+    private boolean portScan;
+
+    private boolean fingerprint;
+
+    private String portScanRange;
+
+    private String portScanCustomPorts;
+
     /** 上次自动探测下发时间（只读，前端展示用）。 */
     private LocalDateTime lastRunAt;
 }

@@ -23,10 +23,10 @@
         if (!message) {
             return "请求失败";
         }
-        if (message.indexOf("License feature not allowed: AI_") === 0) {
+        if (message.indexOf("License feature not allowed: AI") === 0) {
             return "当前授权版本不支持 AI 功能";
         }
-        if (message === "License feature not allowed: ASSET_EXPORT") {
+        if (message === "License feature not allowed: ASSET") {
             return "当前授权版本不支持资产导出";
         }
         if (message.indexOf("License feature not allowed:") === 0) {

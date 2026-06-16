@@ -10,7 +10,6 @@ import com.cd.common.security.CustomUserDetailsService;
 import com.cd.common.security.JwtTokenBlacklistService;
 import com.cd.common.security.JwtTokenProvider;
 import com.cd.common.security.Md5PasswordEncoder;
-import com.cd.common.security.SecurityUser;
 import com.cd.common.security.SecurityUtils;
 import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.CsvImportResultDTO;
@@ -23,8 +22,10 @@ import com.cd.dto.UserLoginResponseDTO;
 import com.cd.dto.UserResponseDTO;
 import com.cd.dto.UserUpdateDTO;
 import com.cd.dto.UserUpdateSelfDTO;
+import com.cd.entity.TenantEntity;
 import com.cd.entity.UserEntity;
 import com.cd.mapper.RbacMapper;
+import com.cd.mapper.TenantMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.LoginLogService;
 import com.cd.service.UserService;
@@ -32,10 +33,6 @@ import com.cd.util.CsvImportUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -62,51 +59,54 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RbacMapper rbacMapper;
     private final LoginLogService loginLogService;
-    private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtTokenBlacklistService jwtTokenBlacklistService;
     private final Md5PasswordEncoder md5PasswordEncoder;
     private final LicenseGuard licenseGuard;
+    private final TenantMapper tenantMapper;
 
     @Override
     public UserLoginResponseDTO login(UserLoginDTO dto, String ipAddress) {
-        UserEntity user = userMapper.selectByUserName(dto.getUserName());
+        Long tenantId = dto.getTenantId() == null ? 0L : dto.getTenantId();
+        String userName = trimRequired(dto.getUserName(), "userName");
+        UserEntity user = userMapper.selectByUserNameAndTenant(userName, tenantId);
         if (user == null) {
-            loginLogService.record(null, dto.getUserName(), ipAddress, 0, "用户名或密码错误");
-            throw new UnauthorizedException("用户名或密码错误");
+            TenantContextHolder.setTenantId(tenantId);
+            loginLogService.record(null, userName, ipAddress, 0, "Bad credentials");
+            throw new UnauthorizedException("Bad credentials");
         }
 
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(dto.getUserName(), dto.getPassword())
-            );
-            SecurityUser securityUser = (SecurityUser) authentication.getPrincipal();
-            TenantContextHolder.setTenantId(securityUser.getTenantId());
-            List<String> roles = customUserDetailsService.loadRoleCodes(securityUser.getUserId());
-            String token = jwtTokenProvider.createToken(securityUser, roles);
-
-            userMapper.updateLastLoginTime(user.getId());
-            UserEntity latestUser = userMapper.selectById(user.getId());
-            loginLogService.record(latestUser.getId(), latestUser.getUserName(), ipAddress, 1, "登录成功");
-
-            UserLoginResponseDTO response = new UserLoginResponseDTO();
-            response.setToken(token);
-            response.setUserId(latestUser.getId());
-            response.setUserName(latestUser.getUserName());
-            response.setLastLoginTime(latestUser.getLastLoginTime());
-            return response;
-        } catch (BadCredentialsException e) {
-            TenantContextHolder.setTenantId(user.getTenantId());
-            loginLogService.record(user.getId(), dto.getUserName(), ipAddress, 0, "用户名或密码错误");
-            throw new UnauthorizedException("用户名或密码错误");
+        TenantContextHolder.setTenantId(user.getTenantId());
+        if (!md5PasswordEncoder.matches(dto.getPassword(), user.getUserPwd())) {
+            loginLogService.record(user.getId(), userName, ipAddress, 0, "Bad credentials");
+            throw new UnauthorizedException("Bad credentials");
         }
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            loginLogService.record(user.getId(), userName, ipAddress, 0, "User disabled");
+            throw new UnauthorizedException("User disabled");
+        }
+
+        var securityUser = customUserDetailsService.loadUserById(user.getId());
+        List<String> roles = customUserDetailsService.loadRoleCodes(securityUser.getUserId());
+        String token = jwtTokenProvider.createToken(securityUser, roles);
+
+        userMapper.updateLastLoginTime(user.getId());
+        UserEntity latestUser = userMapper.selectById(user.getId());
+        loginLogService.record(latestUser.getId(), latestUser.getUserName(), ipAddress, 1, "Login success");
+
+        UserLoginResponseDTO response = new UserLoginResponseDTO();
+        response.setToken(token);
+        response.setUserId(latestUser.getId());
+        response.setTenantId(latestUser.getTenantId());
+        response.setUserName(latestUser.getUserName());
+        response.setLastLoginTime(latestUser.getLastLoginTime());
+        return response;
     }
 
     @Override
     public UserCurrentDTO currentUser() {
-        Long currentUserId = requireCurrentUserId();
-        return currentUser(currentUserId);
+        return currentUser(requireCurrentUserId());
     }
 
     @Override
@@ -129,7 +129,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserCurrentDTO updateSelf(Long currentUserId, UserUpdateSelfDTO dto) {
         UserEntity existing = ensureExists(currentUserId);
-        validateUnique(currentUserId, existing.getUserName(), dto.getUserPhone(), dto.getUserEmail());
+        validateUnique(currentUserId, existing.getTenantId(), existing.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         if (dto.getUserAvatar() != null) {
             existing.setUserAvatar(dto.getUserAvatar());
         }
@@ -158,7 +158,7 @@ public class UserServiceImpl implements UserService {
             Files.createDirectories(avatarDirectory);
             file.transferTo(targetPath);
         } catch (IOException e) {
-            throw new IllegalArgumentException("头像上传失败");
+            throw new IllegalArgumentException("Avatar upload failed");
         }
 
         String avatarUrl = "/uploads/avatar/" + fileName;
@@ -179,16 +179,16 @@ public class UserServiceImpl implements UserService {
     public void changePassword(Long currentUserId, UserChangePasswordDTO dto) {
         UserEntity existing = ensureExists(currentUserId);
         if (!md5PasswordEncoder.matches(dto.getOldPwd(), existing.getUserPwd())) {
-            throw new IllegalArgumentException("原密码不正确");
+            throw new IllegalArgumentException("Old password is incorrect");
         }
         if (dto.getNewPwd().equals(dto.getOldPwd())) {
-            throw new IllegalArgumentException("新密码不能与当前密码相同");
+            throw new IllegalArgumentException("New password must be different");
         }
         if (!dto.getNewPwd().matches("^(?=.*[A-Za-z])(?=.*\\d).{8,64}$")) {
-            throw new IllegalArgumentException("新密码长度不少于8位，且必须同时包含字母和数字");
+            throw new IllegalArgumentException("New password must be 8-64 chars and include letters and digits");
         }
         if (!dto.getNewPwd().equals(dto.getConfirmPwd())) {
-            throw new IllegalArgumentException("两次输入的新密码必须一致");
+            throw new IllegalArgumentException("Password confirmation does not match");
         }
         userMapper.updatePasswordById(currentUserId, md5PasswordEncoder.encode(dto.getNewPwd()));
 
@@ -202,9 +202,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponseDTO create(UserCreateDTO dto) {
         Long tenantId = currentTenantId();
-        licenseGuard.requireFeature(LicenseFeature.USER_MANAGE);
+        licenseGuard.requireFeature(LicenseFeature.USER);
         licenseGuard.requireUserQuotaBeforeCreate();
-        validateUnique(null, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
+        validateUnique(null, tenantId, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         UserEntity entity = new UserEntity();
         entity.setTenantId(tenantId);
         entity.setUserName(dto.getUserName());
@@ -236,7 +236,7 @@ public class UserServiceImpl implements UserService {
     public UserResponseDTO update(Long id, UserUpdateDTO dto) {
         Long tenantId = currentTenantId();
         UserEntity existing = ensureTenantUserExists(id, tenantId);
-        validateUnique(id, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
+        validateUnique(id, tenantId, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         existing.setUserName(dto.getUserName());
         existing.setUserAvatar(dto.getUserAvatar());
         existing.setUserPhone(emptyToNull(dto.getUserPhone()));
@@ -279,12 +279,12 @@ public class UserServiceImpl implements UserService {
         imported.setTenantId(tenantId);
         UserEntity existing = userMapper.selectByUserNameAndTenant(imported.getUserName(), tenantId);
         if (existing == null) {
-            licenseGuard.requireFeature(LicenseFeature.USER_MANAGE);
+            licenseGuard.requireFeature(LicenseFeature.USER);
             licenseGuard.requireUserQuotaBeforeCreate();
             if (!StringUtils.hasText(imported.getUserPwd())) {
-                throw new IllegalArgumentException("新增用户必须提供 user_pwd");
+                throw new IllegalArgumentException("New user must provide user_pwd");
             }
-            validateUnique(null, imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
+            validateUnique(null, tenantId, imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
             imported.setUserPwd(md5PasswordEncoder.encode(imported.getUserPwd().trim()));
             imported.setStatus(imported.getStatus() == null ? 1 : imported.getStatus());
             userMapper.insert(imported);
@@ -292,7 +292,7 @@ public class UserServiceImpl implements UserService {
             return;
         }
 
-        validateUnique(existing.getId(), imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
+        validateUnique(existing.getId(), tenantId, imported.getUserName(), imported.getUserPhone(), imported.getUserEmail());
         existing.setUserAvatar(imported.getUserAvatar());
         existing.setUserPhone(imported.getUserPhone());
         existing.setUserEmail(imported.getUserEmail());
@@ -308,7 +308,7 @@ public class UserServiceImpl implements UserService {
     private UserEntity ensureExists(Long id) {
         UserEntity entity = userMapper.selectById(id);
         if (entity == null) {
-            throw new ResourceNotFoundException("记录不存在，id=" + id);
+            throw new ResourceNotFoundException("User not found: id=" + id);
         }
         return entity;
     }
@@ -316,14 +316,14 @@ public class UserServiceImpl implements UserService {
     private UserEntity ensureTenantUserExists(Long id, Long tenantId) {
         UserEntity entity = userMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
-            throw new ResourceNotFoundException("璁板綍涓嶅瓨鍦紝id=" + id);
+            throw new ResourceNotFoundException("User not found: id=" + id);
         }
         return entity;
     }
 
     private Long validateToken(String token) {
         if (!StringUtils.hasText(token) || !jwtTokenProvider.isValid(token) || jwtTokenBlacklistService.isRevoked(token)) {
-            throw new UnauthorizedException("未登录或登录状态已失效");
+            throw new UnauthorizedException("Unauthorized");
         }
         return jwtTokenProvider.getUserId(token);
     }
@@ -331,7 +331,7 @@ public class UserServiceImpl implements UserService {
     private Long requireCurrentUserId() {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         if (currentUserId == null) {
-            throw new UnauthorizedException("未登录或登录状态已失效");
+            throw new UnauthorizedException("Unauthorized");
         }
         return currentUserId;
     }
@@ -341,25 +341,25 @@ public class UserServiceImpl implements UserService {
         return tenantId == null ? 0L : tenantId;
     }
 
-    private void validateUnique(Long id, String userName, String userPhone, String userEmail) {
-        UserEntity userByName = userMapper.selectByUserName(userName);
+    private void validateUnique(Long id, Long tenantId, String userName, String userPhone, String userEmail) {
+        UserEntity userByName = userMapper.selectByUserNameAndTenant(userName, tenantId);
         if (userByName != null && !userByName.getId().equals(id)) {
-            throw new IllegalArgumentException("用户名已存在");
+            throw new IllegalArgumentException("User name already exists in current tenant");
         }
 
         String normalizedPhone = emptyToNull(userPhone);
         if (normalizedPhone != null) {
-            UserEntity userByPhone = userMapper.selectByUserPhone(normalizedPhone);
-            if (userByPhone != null && !userByPhone.getId().equals(id)) {
-                throw new IllegalArgumentException("手机号已存在");
+            UserEntity userByPhone = userMapper.selectByUserPhoneAndTenantExcludingId(normalizedPhone, tenantId, id);
+            if (userByPhone != null) {
+                throw new IllegalArgumentException("Phone already exists in current tenant");
             }
         }
 
         String normalizedEmail = emptyToNull(userEmail);
         if (normalizedEmail != null) {
-            UserEntity userByEmail = userMapper.selectByUserEmail(normalizedEmail);
-            if (userByEmail != null && !userByEmail.getId().equals(id)) {
-                throw new IllegalArgumentException("邮箱已存在");
+            UserEntity userByEmail = userMapper.selectByUserEmailAndTenantExcludingId(normalizedEmail, tenantId, id);
+            if (userByEmail != null) {
+                throw new IllegalArgumentException("Email already exists in current tenant");
             }
         }
     }
@@ -382,6 +382,9 @@ public class UserServiceImpl implements UserService {
     private UserCurrentDTO toCurrentResponse(UserEntity entity) {
         UserCurrentDTO dto = new UserCurrentDTO();
         dto.setId(entity.getId());
+        dto.setTenantId(entity.getTenantId());
+        TenantEntity tenant = entity.getTenantId() == null ? null : tenantMapper.selectById(entity.getTenantId());
+        dto.setTenantName(tenant == null ? null : tenant.getName());
         dto.setUserName(entity.getUserName());
         dto.setUserAvatar(entity.getUserAvatar());
         dto.setUserPhone(entity.getUserPhone());
@@ -396,7 +399,7 @@ public class UserServiceImpl implements UserService {
     private String requireField(CSVRecord record, String... headerNames) {
         String value = CsvImportUtil.getValue(record, headerNames);
         if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException("必填字段缺失: " + headerNames[0]);
+            throw new IllegalArgumentException("Missing required field: " + headerNames[0]);
         }
         return value.trim();
     }
@@ -408,11 +411,11 @@ public class UserServiceImpl implements UserService {
         try {
             int status = Integer.parseInt(value.trim());
             if (status != 0 && status != 1) {
-                throw new IllegalArgumentException("status 仅支持 0 或 1");
+                throw new IllegalArgumentException("status only supports 0 or 1");
             }
             return status;
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException("status 必须是整数");
+            throw new IllegalArgumentException("status must be an integer");
         }
     }
 
@@ -420,39 +423,45 @@ public class UserServiceImpl implements UserService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
+    private String trimRequired(String value, String fieldName) {
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return value.trim();
+    }
+
     private void validateAvatarFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("请选择图片文件");
+            throw new IllegalArgumentException("Please choose an image file");
         }
-
         if (file.getSize() > MAX_AVATAR_SIZE) {
-            throw new IllegalArgumentException("图片大小不能超过5MB");
+            throw new IllegalArgumentException("Image size must not exceed 5MB");
         }
 
         String extension = getFileExtension(file.getOriginalFilename());
         if (!ALLOWED_AVATAR_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException("仅支持 jpg、jpeg、png、gif 格式图片");
+            throw new IllegalArgumentException("Only jpg, jpeg, png, and gif images are supported");
         }
 
         String contentType = file.getContentType();
         if (!StringUtils.hasText(contentType) || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            throw new IllegalArgumentException("仅支持上传图片文件");
+            throw new IllegalArgumentException("Only image files are supported");
         }
 
         try {
             BufferedImage image = ImageIO.read(file.getInputStream());
             if (image == null) {
-                throw new IllegalArgumentException("仅支持上传图片文件");
+                throw new IllegalArgumentException("Only image files are supported");
             }
         } catch (IOException e) {
-            throw new IllegalArgumentException("读取图片文件失败");
+            throw new IllegalArgumentException("Failed to read image file");
         }
     }
 
     private String getFileExtension(String originalFilename) {
         String extension = StringUtils.getFilenameExtension(originalFilename);
         if (!StringUtils.hasText(extension)) {
-            throw new IllegalArgumentException("文件格式不正确");
+            throw new IllegalArgumentException("Invalid file extension");
         }
         return extension.toLowerCase(Locale.ROOT);
     }

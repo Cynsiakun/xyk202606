@@ -28,6 +28,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**", "/vulnRule/**")
                 .excludePathPatterns(
                         "/api/user/login",
+                        "/api/tenant/options",
+                        "/api/client/machine/validate",
                         "/api/user/current",
                         "/api/user/logout",
                         "/api/user/updateSelf",
@@ -36,7 +38,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/host/**",
                         "/api/dashboard/**",
                         "/api/platform/**",
-                        "/api/license/activate"
+                        "/api/license/activate",
+                        "/api/license/check"
                 );
     }
 }

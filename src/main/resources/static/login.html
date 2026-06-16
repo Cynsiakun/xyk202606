@@ -13,25 +13,33 @@
         <div class="login-brand">
             <h1>后台管理系统</h1>
             <p class="login-subtitle">Spring Boot 3 + MyBatis</p>
-            <p class="login-description">请输入账号密码进入后台</p>
+            <p class="login-description">请选择租户后输入账号密码登录。</p>
         </div>
         <form class="layui-form login-form" id="loginForm">
+            <div class="layui-form-item">
+                <label class="login-label" for="tenantId">租户</label>
+                <div class="layui-input-wrap">
+                    <select id="tenantId" name="tenantId" lay-verify="required">
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+            </div>
             <div class="layui-form-item">
                 <label class="login-label" for="userName">用户名</label>
                 <div class="layui-input-wrap">
                     <input type="text" id="userName" name="userName" placeholder="请输入用户名" autocomplete="username"
-                           value="admin" lay-verify="userName" class="layui-input">
+                           lay-verify="userName" class="layui-input">
                 </div>
             </div>
             <div class="layui-form-item">
                 <label class="login-label" for="password">密码</label>
                 <div class="layui-input-wrap">
-                          <input type="password" id="password" name="password" placeholder="请输入密码" autocomplete="current-password"
-                              value="6L7ruYQeTEW8_Cb" lay-verify="password" class="layui-input">
+                    <input type="password" id="password" name="password" placeholder="请输入密码" autocomplete="current-password"
+                           lay-verify="password" class="layui-input">
                 </div>
             </div>
             <div class="layui-form-item">
-                <button class="layui-btn login-submit" lay-submit lay-filter="loginSubmit" type="submit">登录</button>
+                <button class="layui-btn login-submit" id="loginSubmitButton" lay-submit lay-filter="loginSubmit" type="submit">登录</button>
             </div>
         </form>
     </div>

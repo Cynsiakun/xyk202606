@@ -51,7 +51,6 @@ public class PermissionChecker {
         }
         return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .filter(value -> !value.startsWith("ROLE_"))
                 .toList();
     }
 

@@ -20,6 +20,11 @@ public class ProbeStrategyEntity {
     private Integer probeService;
     private Integer probeProcess;
     private Integer probeApp;
+    private Integer probePortScan;
+    private Integer probeFingerprint;
+    private String portScanRange;
+    private String portScanCustomPorts;
     private LocalDateTime lastRunAt;
+    private LocalDateTime lastPortScanAt;
     private LocalDateTime updatedAt;
 }

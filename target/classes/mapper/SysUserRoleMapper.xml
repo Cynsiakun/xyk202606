@@ -16,6 +16,11 @@
         </foreach>
     </insert>
 
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO sys_user_role (user_id, role_id)
+        VALUES (#{userId}, #{roleId})
+    </insert>
+
     <select id="selectRoleIdsByUserId" resultType="long">
         SELECT role_id
         FROM sys_user_role

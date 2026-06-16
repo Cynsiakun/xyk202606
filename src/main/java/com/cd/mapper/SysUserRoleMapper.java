@@ -10,6 +10,8 @@ public interface SysUserRoleMapper {
 
     int insertBatch(@Param("userId") Long userId, @Param("roleIds") List<Long> roleIds);
 
+    int insertIgnore(@Param("userId") Long userId, @Param("roleId") Long roleId);
+
     List<Long> selectRoleIdsByUserId(@Param("userId") Long userId);
 
     long countByRoleId(@Param("roleId") Long roleId);

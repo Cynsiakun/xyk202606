@@ -316,3 +316,156 @@
 - Added frontend platform tenant page `pages/platform-tenant.html`.
 - Platform tenant page supports tenant list/search/status filter, tenant creation, detail, enable/disable, License list, License generation, and offline `license.dat` generation/download.
 - `mvn test` passed.
+
+## V13 SaaS tenant login, plans, and authorized machines
+
+- Login now requires selecting an enabled tenant/company from `GET /api/tenant/options`; username/password are validated within that tenant.
+- `UserLoginDTO` now carries `tenantId`, and login responses include `tenantId` for frontend login state.
+- `selectByUserName` remains available for legacy login lookup compatibility, while the active login flow uses `selectByUserNameAndTenant`.
+- User uniqueness is tenant-scoped for username, phone, and email; `schema.sql` fresh bootstrap now matches the tenant-scoped unique indexes.
+- Creating a tenant from the platform tenant API now also creates the tenant's initial administrator account.
+- Added platform `TENANT_ADMIN` bootstrap and initial role assignment for newly created tenant administrators.
+- Added `license_plan` as the server-side source of Trial/Standard/Professional defaults and feature flags.
+- Platform License generation now uses `planCode`; online SaaS Licenses are tenant-level and no longer bind `machineId`.
+- Added super-admin-only `GET /api/platform/license/plans` for frontend plan rendering.
+- Added tenant-managed authorized machine records in `tenant_machine`.
+- Added tenant admin REST APIs under `/api/tenant-machines` for list/create/update/delete, guarded by existing host permissions and License features.
+- Added public client validation API `POST /api/client/machine/validate`; clients submit `machineId` and/or `macAddress` and receive tenant, edition, expiry, and feature flags only when authorized.
+- Authorized machine creation/enabling enforces the current tenant's effective License host quota.
+- License platform bypass now uses existing `SUPER_ADMIN` permission semantics instead of treating `tenantId = 0` as super admin.
+- `/api/license/current` now reports platform full capability only for actual `SUPER_ADMIN`; normal tenant-0 users receive normal License state.
+- Frontend login page now loads tenant options and submits `{ tenantId, userName, password }`.
+- Frontend platform tenant page now captures initial tenant admin fields and reads plans from the backend instead of hard-coding package choices.
+- Added frontend authorized machine page and menu entry, filtered by backend permissions and `HOST_VIEW`.
+- Added migration script `sql/migration/V4_tenant_login_plan_machine.sql` and applied it to local `xyk2026`.
+
+## V13 SaaS tenant login and authorized machine verification
+
+- `mvn test` passed.
+- `mvn -DskipTests package` passed.
+- `node --check` passed for `login.js`, `platform-tenant.js`, `tenant-machine.js`, and `index.js`.
+- Started the packaged application on port `8081` for verification, then stopped it after testing.
+- Super admin login with selected tenant `0` succeeded and `/api/license/current` returned platform capability.
+- Normal tenant-0 `security` user login succeeded but `/api/license/current` returned no effective License instead of platform capability.
+- `GET /api/platform/license/plans` returned Trial, Standard, and Professional plans from the database.
+- Super admin created temporary tenants with initial tenant administrators; tenant admin login succeeded by selecting the created tenant.
+- Standard License generation using `planCode = STANDARD` applied plan defaults and returned a signed License.
+- Tenant admin could create and list an authorized machine under an effective Standard License.
+- Public client machine validation succeeded for an authorized `machineId`/`macAddress` and returned tenant, edition, expiry, and feature flags.
+- Host quota verification with `hostLimit = 1` allowed the first authorized machine and rejected the second with business `code = 403`.
+- User quota verification with `userLimit = 1` rejected creating another user with business `code = 403`.
+- Standard AI access returned business `code = 403`.
+- Trial AI access returned business `code = 403`.
+- Trial asset export returned business `code = 403`.
+- Professional `/api/license/current` returned Professional feature flags including AI capabilities and default `20` user / `500` host limits.
+- Temporary tenant, user, License, login-log, and authorized-machine verification data was cleaned up.
+
+## V13 follow-up: tenant menu, package display, RBAC assignment, and tenant name UX
+
+- Fixed Trial tenant menu loading by removing the broad class-level `ROLE_MANAGE` License gate from `RbacController`.
+- `/api/rbac/menu/current` and `/api/rbac/permission/current` remain available for all logged-in users so the application shell can load under Trial.
+- RBAC role/permission platform maintenance endpoints now require actual `SUPER_ADMIN`.
+- Tenant administrators can read assignable platform roles through `/api/rbac/role/all` and assign roles to users in their own tenant through `/api/rbac/user/{userId}/roles`.
+- Tenant administrators still cannot create/update/delete roles, manage permissions, assign role permissions, or open the role/permission maintenance lists.
+- `TENANT_ADMIN` bootstrap now explicitly includes `user:role:assign` in addition to copied `SECURITY_ADMIN` permissions.
+- Added the same `TENANT_ADMIN` permission bootstrap to `sql/migration/V4_tenant_login_plan_machine.sql` and `schema.sql`; local `xyk2026` was updated.
+- Platform tenant list responses now include `licenseEdition` and `licenseStatus`; tenant `id = 0` displays as `PROFESSIONAL`.
+- Platform tenant frontend list/detail now displays each tenant's package.
+- `/api/license/current` now returns `tenantName`.
+- `/api/current-user` now returns `tenantId` and `tenantName`.
+- Frontend login stores the selected tenant name as a fallback.
+- Main shell now displays tenant name in the header instead of only `tenantId`.
+- Frontend License menu filtering hides role/permission maintenance pages from non-super-admin users while keeping user management visible when `USER_MANAGE` is enabled.
+
+## V13 follow-up verification
+
+- Started the packaged application on port `8081` for verification, then stopped it after testing.
+- Trial tenant administrator login succeeded; `/api/rbac/menu/current` returned business `code = 200` instead of menu-load failure.
+- Trial `/api/license/current` returned the tenant name and `edition = TRIAL`.
+- Platform tenant list showed temporary Trial and Standard tenants with `licenseEdition = TRIAL` / `STANDARD`.
+- Standard tenant administrator could call `/api/rbac/role/all`, assign a role to a user in the same tenant, and read back the assigned role IDs.
+- Standard tenant administrator was still blocked from `/api/rbac/role/list` with business `code = 403`.
+- Temporary tenant, user, License, login-log, and role-assignment verification data was cleaned up.
+- `node --check` passed for `auth.js`, `login.js`, `index.js`, and `platform-tenant.js`.
+- `mvn test` passed.
+
+## V14 Policy Backbone and menu decision convergence
+
+- Added a policy backbone under `com.cd.common.access`.
+- Added `AccessPolicyRegistry` with stable `policyKey` definitions for common, tenant, and platform domains.
+- Added `AccessPolicyService` and `AccessDecision` as the unified decision layer for policy-key evaluation.
+- Added `GET /api/access/effective` to return the current user's effective policy snapshot for frontend rendering.
+- Effective access now separates tenant features from platform features.
+- Platform users now receive `edition = PLATFORM` and platform policies only, not Professional tenant policies.
+- License plan feature flags were normalized from action-like names to module-level tenant features:
+  - Trial: `HOST`
+  - Standard: `HOST,ASSET,PATCH,VULN,LOG,BASELINE,USER`
+  - Professional: `HOST,ASSET,PATCH,VULN,LOG,BASELINE,USER,AI`
+- `LicenseGuard` keeps backward-compatible normalization for older feature names such as `HOST_VIEW`, `HOST_MANAGE`, `ASSET_EXPORT`, and `AI_ANALYSIS`.
+- Updated local `xyk2026.license_plan` to the normalized module feature values.
+- Platform tenant `id = 0` now displays as `PLATFORM` instead of `PROFESSIONAL` in tenant management.
+- Platform asset/rule APIs are now forced through policy gate in `LicenseFeatureInterceptor`:
+  - CVE management: `PLATFORM_CVE_VIEW`
+  - Vulnerability rule management: `PLATFORM_VULN_RULE_VIEW`
+  - Baseline rule management: `PLATFORM_BASELINE_RULE_VIEW`
+- CVE management, vulnerability rule management, and baseline rule management remain platform-only regardless of tenant package.
+- Frontend shell menu rendering now uses a static menu schema with `policyKey` instead of filename-based feature guessing.
+- Frontend shell stores `/api/access/effective` as `accessInfo` and filters menus by `allowedPolicies`.
+- Frontend shell logs an `[ACCESS MENU SNAPSHOT]` to the browser console with tenant, edition, allowed policies, and visible menu titles.
+- Host page action buttons now use policy keys for asset view/export/probe and host update/delete/create.
+- Authorized host page action buttons now use policy keys for create/update/delete.
+- RabbitMQ, MQ tenant mapping, host mapping semantics, and client activation protocol were not modified in this stage.
+
+## V14 Policy Backbone verification
+
+- `mvn test` passed.
+- `node --check` passed for `auth.js`, `request.js`, `index.js`, `host.js`, `tenant-machine.js`, and `platform-tenant.js`.
+- Built and started the packaged application locally on port `8081`, then stopped it after verification.
+- Created temporary Trial, Standard, and Professional tenants and removed them after verification.
+- Trial `/api/access/effective` returned tenant feature `HOST` and host policies only.
+- Standard `/api/access/effective` returned tenant features `ASSET,BASELINE,HOST,LOG,PATCH,USER,VULN` and no AI policy.
+- Professional `/api/access/effective` returned tenant features including `AI` and policy `TENANT_AI_ANALYSIS`.
+- Platform `/api/access/effective` returned `edition = PLATFORM`, platform features, and platform policies only.
+- Trial, Standard, and Professional tenant administrators were all blocked from CVE management, vulnerability rule management, and baseline rule management APIs with business `code = 403`.
+- Platform super admin could access CVE management, vulnerability rule management, and baseline rule management APIs with business `code = 200`.
+- Temporary tenant, user, License, login-log, and role-assignment verification data was cleaned up.
+
+## V14 follow-up: Standard/Professional asset policy correction
+
+- Corrected `TENANT_ASSET_VIEW` to use the asset module permission `asset:view` instead of host-only `host:asset:view`.
+- Standard and Professional tenant administrators now retain asset management menu access when their License includes `ASSET`.
+- `TENANT_ADMIN` bootstrap now explicitly includes `host:asset:view` and `host:probe`, so host-page asset viewing and asset probe buttons are available when the package permits `ASSET`.
+- Trial remains limited to host-oriented capabilities and still does not receive asset management policies.
+- Added the same `TENANT_ADMIN` permission bootstrap to `sql/migration/V4_tenant_login_plan_machine.sql` and `schema.sql`; local `xyk2026` was updated.
+- `mvn test` passed.
+- `node --check` passed for `auth.js`, `index.js`, and `host.js`.
+
+## V14 follow-up: platform super admin full visibility
+
+- Platform `SUPER_ADMIN` effective access now returns all common, tenant, and platform policy keys for debugging and operations.
+- Platform `SUPER_ADMIN` still displays `edition = PLATFORM`, but now also receives all tenant feature names in the effective access snapshot.
+- Tenant users remain controlled by License features plus RBAC; platform-only CVE, vulnerability rule, and baseline rule APIs remain unavailable to tenants.
+- `mvn test` passed.
+- `node --check` passed for `auth.js`, `index.js`, and `host.js`.
+
+## V15 tenant License center
+
+- Added authenticated `GET /api/license/plans` for tenant-side package display; it reuses database-backed `license_plan` data and does not hard-code Trial/Standard/Professional in the frontend.
+- Right-header License status is now clickable and opens a License status dialog with edition, expire time, status, host quota, and user quota.
+- License status dialog shows upgrade, renew, and contact-sales actions only for `ROLE_TENANT_ADMIN`; normal users are read-only and platform `SUPER_ADMIN` has no purchase entry.
+- Added `pages/license-center.html`, `js/pages/license-center.js`, and `css/license-center.css`.
+- License center displays current package, quota usage, and package cards from `/api/license/plans`; the current package is highlighted.
+- Upgrade and renew actions intentionally do not integrate payment and only show `请联系销售或管理员开通服务`.
+- Added License expiry reminders: 30 days or less uses warning styling; 7 days or less uses danger styling.
+- RBAC model was not changed; frontend role display logic uses the existing current-permission snapshot with role authorities included.
+- `mvn test` passed.
+- `node --check` passed for `auth.js`, `index.js`, and `license-center.js`.
+
+## V15 follow-up: client machine authorization contract
+
+- Added public client compatibility endpoint `POST /api/license/check`.
+- The endpoint accepts `machineId` and/or `macAddress` and delegates to the existing tenant authorized-machine validation logic.
+- Response now includes both `authorized` and legacy `allowed`, plus `tenantId`, `tenantName`, `edition`, `hostLimit`, `expireTime`, `featureFlags`, and `reason`.
+- `POST /api/client/machine/validate` remains available for backward compatibility.
+- Added `/api/license/check` to security and License-interceptor public exclusions.
+- `mvn test` passed.

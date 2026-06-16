@@ -203,6 +203,17 @@
         LIMIT #{limit}
     </select>
 
+    <select id="selectPortScanCandidates" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts h
+        WHERE h.status = 1
+        ORDER BY COALESCE(
+            (SELECT MAX(created_at) FROM port_scan_results WHERE mac_address = h.mac_address AND deleted = 0),
+            '1970-01-01'
+        ) ASC, h.id ASC
+        LIMIT #{limit}
+    </select>
+
     <select id="selectAllIds" resultType="long">
         SELECT id
         FROM hosts

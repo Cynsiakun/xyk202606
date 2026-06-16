@@ -4,12 +4,17 @@ import com.cd.common.license.LicenseSigner;
 import com.cd.common.license.LicenseGuard;
 import com.cd.dto.LicenseActivateDTO;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.PermissionChecker;
 import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.LicenseCurrentDTO;
 import com.cd.dto.LicenseGenerateDTO;
+import com.cd.dto.LicensePlanResponseDTO;
 import com.cd.entity.LicenseEntity;
+import com.cd.entity.LicensePlanEntity;
+import com.cd.entity.TenantEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.LicenseMapper;
+import com.cd.mapper.LicensePlanMapper;
 import com.cd.mapper.TenantMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.LicenseService;
@@ -20,21 +25,21 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
+import java.util.Arrays;
 
 @Service
 @RequiredArgsConstructor
 public class LicenseServiceImpl implements LicenseService {
 
-    private static final Set<String> SUPPORTED_EDITIONS = Set.of("TRIAL", "STANDARD", "PROFESSIONAL");
-
     private final LicenseMapper licenseMapper;
+    private final LicensePlanMapper licensePlanMapper;
     private final TenantMapper tenantMapper;
     private final HostMapper hostMapper;
     private final UserMapper userMapper;
     private final LicenseSigner licenseSigner;
     private final LicenseGuard licenseGuard;
+    private final PermissionChecker permissionChecker;
 
     @Override
     public LicenseEntity create(LicenseEntity entity) {
@@ -94,14 +99,15 @@ public class LicenseServiceImpl implements LicenseService {
     @Override
     public LicenseEntity generateForTenant(Long tenantId, LicenseGenerateDTO dto) {
         requireTenantExists(tenantId);
+        LicensePlanEntity plan = requirePlan(dto.getPlanCode() == null ? dto.getEdition() : dto.getPlanCode());
         LicenseEntity entity = new LicenseEntity();
         entity.setLicenseKey(generateLicenseKey());
         entity.setTenantId(tenantId);
-        entity.setEdition(normalizeEdition(dto.getEdition()));
-        entity.setHostLimit(dto.getHostLimit());
-        entity.setUserLimit(dto.getUserLimit());
+        entity.setEdition(plan.getCode());
+        entity.setHostLimit(dto.getHostLimit() == null ? plan.getHostLimit() : dto.getHostLimit());
+        entity.setUserLimit(dto.getUserLimit() == null ? plan.getUserLimit() : dto.getUserLimit());
         entity.setExpireTime(dto.getExpireTime());
-        entity.setMachineId(trim(dto.getMachineId()));
+        entity.setMachineId(null);
         entity.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         return create(entity);
     }
@@ -121,10 +127,12 @@ public class LicenseServiceImpl implements LicenseService {
         Long tenantId = currentTenantId();
         LicenseCurrentDTO dto = new LicenseCurrentDTO();
         dto.setTenantId(tenantId);
+        TenantEntity tenant = tenantMapper.selectById(tenantId);
+        dto.setTenantName(tenant == null ? null : tenant.getName());
         dto.setHostUsed(hostMapper.countByTenantId(tenantId));
         dto.setUserUsed(userMapper.countAllByTenant(null, tenantId));
 
-        if (tenantId == 0L) {
+        if (permissionChecker.isSuperAdmin()) {
             dto.setEdition("PLATFORM");
             dto.setHostLimit(0);
             dto.setUserLimit(0);
@@ -132,19 +140,14 @@ public class LicenseServiceImpl implements LicenseService {
             dto.setEffective(true);
             dto.setMessage("Platform tenant");
             dto.setFeatureFlags(List.of(
-                    "HOST_VIEW",
-                    "HOST_MANAGE",
-                    "ASSET_MANAGE",
-                    "ASSET_EXPORT",
+                    "HOST",
+                    "ASSET",
                     "PATCH",
                     "VULN",
                     "LOG",
                     "BASELINE",
-                    "USER_MANAGE",
-                    "ROLE_MANAGE",
-                    "AI_ANALYSIS",
-                    "AI_REMEDIATION",
-                    "AI_REPORT"
+                    "USER",
+                    "AI"
             ));
             return dto;
         }
@@ -170,6 +173,13 @@ public class LicenseServiceImpl implements LicenseService {
         dto.setMessage("License effective");
         dto.setFeatureFlags(licenseGuard.featureNames(entity.getEdition()));
         return dto;
+    }
+
+    @Override
+    public List<LicensePlanResponseDTO> plans() {
+        return licensePlanMapper.selectEnabled().stream()
+                .map(this::toPlanResponse)
+                .toList();
     }
 
     private LicenseEntity bindMachineAndSign(LicenseActivateDTO dto) {
@@ -218,9 +228,7 @@ public class LicenseServiceImpl implements LicenseService {
             throw new IllegalArgumentException("edition must not be blank");
         }
         String normalized = edition.trim().toUpperCase(Locale.ROOT);
-        if (!SUPPORTED_EDITIONS.contains(normalized)) {
-            throw new IllegalArgumentException("edition must be TRIAL, STANDARD, or PROFESSIONAL");
-        }
+        requirePlan(normalized);
         return normalized;
     }
 
@@ -280,5 +288,31 @@ public class LicenseServiceImpl implements LicenseService {
     private Long currentTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         return tenantId == null ? 0L : tenantId;
+    }
+
+    private LicensePlanEntity requirePlan(String planCode) {
+        if (!StringUtils.hasText(planCode)) {
+            throw new IllegalArgumentException("planCode must not be blank");
+        }
+        String normalized = planCode.trim().toUpperCase(Locale.ROOT);
+        LicensePlanEntity plan = licensePlanMapper.selectByCode(normalized);
+        if (plan == null) {
+            throw new IllegalArgumentException("Unsupported License plan: " + normalized);
+        }
+        return plan;
+    }
+
+    private LicensePlanResponseDTO toPlanResponse(LicensePlanEntity entity) {
+        LicensePlanResponseDTO dto = new LicensePlanResponseDTO();
+        dto.setId(entity.getId());
+        dto.setCode(entity.getCode());
+        dto.setName(entity.getName());
+        dto.setUserLimit(entity.getUserLimit());
+        dto.setHostLimit(entity.getHostLimit());
+        dto.setFeatureFlags(Arrays.stream((entity.getFeatureFlags() == null ? "" : entity.getFeatureFlags()).split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList());
+        return dto;
     }
 }

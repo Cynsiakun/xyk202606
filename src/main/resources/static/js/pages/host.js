@@ -32,19 +32,19 @@ layui.use(["table", "form", "layer"], function () {
             }},
             {title: "操作", width: 360, fixed: "right", templet: function () {
                 var buttons = '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>';
-                if (AppAuth.hasPermission("host:asset:view")) {
+                if (AppAuth.canPolicy("TENANT_ASSET_VIEW")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="asset">查看资产</button>';
                 }
-                if (AppAuth.hasPermission("asset:export")) {
+                if (AppAuth.canPolicy("TENANT_ASSET_EXPORT")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-warm layui-btn-xs" lay-event="export">导出</button>';
                 }
-                if (AppAuth.hasPermission("host:probe")) {
+                if (AppAuth.canPolicy("TENANT_ASSET_PROBE")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-normal layui-btn-xs" lay-event="probe">资产探测</button>';
                 }
-                if (AppAuth.hasPermission("host:update")) {
+                if (AppAuth.canPolicy("TENANT_HOST_UPDATE")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-xs" lay-event="edit">编辑</button>';
                 }
-                if (AppAuth.hasPermission("host:delete")) {
+                if (AppAuth.canPolicy("TENANT_HOST_DELETE")) {
                     buttons += '<button type="button" class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</button>';
                 }
                 return buttons;
@@ -95,8 +95,17 @@ layui.use(["table", "form", "layer"], function () {
             app: data.field.app === "on",
             macAddress: data.field.macAddress
         };
+        var portScanOn = data.field.portScan === "on";
+        var scanOpts = portScanOn ? {
+            scanRange: data.field.portScanRange || "common",
+            customPorts: data.field.portScanCustomPorts || "",
+            grabBanner: data.field.grabBanner === "on"
+        } : null;
         (async function () {
             await submitProbe(payload, false);
+            if (portScanOn) {
+                await submitPortScan(data.field.macAddress, scanOpts);
+            }
         })();
         return false;
     });
@@ -108,7 +117,11 @@ layui.use(["table", "form", "layer"], function () {
             account: data.field.account === "on",
             service: data.field.service === "on",
             process: data.field.process === "on",
-            app: data.field.app === "on"
+            app: data.field.app === "on",
+            portScan: data.field.portScan === "on",
+            fingerprint: data.field.fingerprint === "on",
+            portScanRange: data.field.portScanRange || "common",
+            portScanCustomPorts: data.field.portScanCustomPorts || ""
         };
         (async function () {
             try {
@@ -124,6 +137,32 @@ layui.use(["table", "form", "layer"], function () {
             }
         })();
         return false;
+    });
+
+    form.on("checkbox", function (data) {
+        if (data.elem.name !== "portScan") return;
+        var formElem = data.elem.closest("form");
+        if (!formElem) return;
+        var optionsWrap = formElem.querySelector(".probe-port-scan-options, .probe-strategy-port-scan-options");
+        var customPorts = formElem.querySelector(".probe-custom-ports, .probe-strategy-custom-ports");
+        var portScanRange = formElem.querySelector('select[name="portScanRange"]');
+        if (optionsWrap) {
+            optionsWrap.style.display = data.elem.checked ? "" : "none";
+        }
+        if (customPorts && portScanRange) {
+            customPorts.style.display = (data.elem.checked && portScanRange.value === "custom") ? "" : "none";
+        }
+    });
+
+    form.on("select", function (data) {
+        if (data.elem.name !== "portScanRange") return;
+        var formElem = data.elem.closest("form");
+        if (!formElem) return;
+        var customPorts = formElem.querySelector(".probe-custom-ports, .probe-strategy-custom-ports");
+        var portScanCheckbox = formElem.querySelector('input[name="portScan"]');
+        if (customPorts && portScanCheckbox) {
+            customPorts.style.display = (portScanCheckbox.checked && data.value === "custom") ? "" : "none";
+        }
     });
 
     table.on("tool(hostTable)", function (obj) {
@@ -151,7 +190,7 @@ layui.use(["table", "form", "layer"], function () {
 
     function bindToolbar() {
         var addHostButton = document.getElementById("addHostButton");
-        if (AppAuth.hasPermission("host:create")) {
+        if (AppAuth.canPolicy("TENANT_HOST_CREATE")) {
             addHostButton.addEventListener("click", function () {
                 openHostDialog(null);
             });
@@ -160,14 +199,14 @@ layui.use(["table", "form", "layer"], function () {
         }
 
         var importButton = document.getElementById("importButton");
-        if (AppAuth.hasPermission("host:create")) {
+        if (AppAuth.canPolicy("TENANT_HOST_CREATE")) {
             importButton.addEventListener("click", openImportDialog);
         } else {
             importButton.style.display = "none";
         }
 
         var probeStrategyButton = document.getElementById("probeStrategyButton");
-        if (AppAuth.hasPermission("host:probe")) {
+        if (AppAuth.canPolicy("TENANT_ASSET_PROBE")) {
             probeStrategyButton.addEventListener("click", openProbeStrategyDialog);
         } else {
             probeStrategyButton.style.display = "none";
@@ -218,6 +257,24 @@ layui.use(["table", "form", "layer"], function () {
                     submitProbe(payload, true);
                 });
             }
+        }
+    }
+
+    async function submitPortScan(macAddress, opts) {
+        try {
+            await AppRequest.request("/api/port-scan/trigger", {
+                method: "POST",
+                body: {
+                    macAddress: macAddress,
+                    scanRange: opts.scanRange || "common",
+                    customPorts: opts.customPorts || "",
+                    grabBanner: !!opts.grabBanner
+                }
+            }, {
+                successMessage: "端口扫描任务已下发"
+            });
+        } catch (error) {
+            return;
         }
     }
 
@@ -346,10 +403,10 @@ layui.use(["table", "form", "layer"], function () {
     }
 
     function openProbeStrategyDialog() {
-        var viewportHeight = window.innerHeight || 420;
-        var viewportWidth = window.innerWidth || 460;
-        var dialogHeight = Math.min(360, viewportHeight - 30);
-        var dialogWidth = Math.min(460, viewportWidth - 30);
+        var viewportHeight = window.innerHeight || 640;
+        var viewportWidth = window.innerWidth || 500;
+        var dialogHeight = Math.min(580, viewportHeight - 30);
+        var dialogWidth = Math.min(500, viewportWidth - 30);
         layer.open({
             type: 1,
             title: "探测策略配置",
@@ -359,14 +416,14 @@ layui.use(["table", "form", "layer"], function () {
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);
                 });
+
                 (async function () {
                     var strategy = {
                         enabled: false,
                         periodHours: 8,
-                        account: true,
-                        service: true,
-                        process: true,
-                        app: true
+                        account: true, service: true, process: true, app: true,
+                        portScan: false, fingerprint: false,
+                        portScanRange: "common", portScanCustomPorts: ""
                     };
                     try {
                         var result = await AppRequest.request("/api/host/probe-strategy", {
@@ -375,7 +432,7 @@ layui.use(["table", "form", "layer"], function () {
                             showErrorMessage: false
                         });
                         if (result && result.data) {
-                            strategy = result.data;
+                            strategy = Object.assign(strategy, result.data);
                         }
                     } catch (error) {
                         return;
@@ -386,18 +443,31 @@ layui.use(["table", "form", "layer"], function () {
                         account: !!strategy.account,
                         service: !!strategy.service,
                         process: !!strategy.process,
-                        app: !!strategy.app
+                        app: !!strategy.app,
+                        portScan: !!strategy.portScan,
+                        fingerprint: !!strategy.fingerprint,
+                        portScanRange: strategy.portScanRange || "common",
+                        portScanCustomPorts: strategy.portScanCustomPorts || ""
                     });
                     form.render(null, "probeStrategyForm");
+                    var optionsWrap = layero[0].querySelector('.probe-strategy-port-scan-options');
+                    var customPorts = layero[0].querySelector('.probe-strategy-custom-ports');
+                    if (optionsWrap) {
+                        optionsWrap.style.display = strategy.portScan ? '' : 'none';
+                    }
+                    if (customPorts) {
+                        var showCustom = strategy.portScanRange === 'custom' && !!strategy.portScan;
+                        customPorts.style.display = showCustom ? '' : 'none';
+                    }
                 })();
             }
         });
     }
 
     function openProbeDialog(host) {
-        var viewportHeight = window.innerHeight || 480;
+        var viewportHeight = window.innerHeight || 640;
         var viewportWidth = window.innerWidth || 460;
-        var dialogHeight = Math.min(360, viewportHeight - 30);
+        var dialogHeight = Math.min(560, viewportHeight - 30);
         var dialogWidth = Math.min(460, viewportWidth - 30);
         var index = layer.open({
             type: 1,
@@ -410,9 +480,14 @@ layui.use(["table", "form", "layer"], function () {
                     account: true,
                     service: false,
                     process: false,
-                    app: false
+                    app: false,
+                    portScan: false,
+                    portScanRange: "common",
+                    portScanCustomPorts: "",
+                    grabBanner: false
                 });
                 form.render(null, "assetProbeForm");
+
                 layero.find('[data-action="close"]').on("click", function () {
                     layer.close(index);
                 });

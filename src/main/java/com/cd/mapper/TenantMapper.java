@@ -19,10 +19,17 @@ public interface TenantMapper {
 
     List<TenantEntity> selectAll();
 
+    List<TenantEntity> selectOptions(@Param("status") Integer status);
+
     List<TenantEntity> selectPage(@Param("offset") int offset,
                                   @Param("size") int size,
                                   @Param("keyword") String keyword,
                                   @Param("status") Integer status);
+
+    List<TenantEntity> selectPageWithLicense(@Param("offset") int offset,
+                                             @Param("size") int size,
+                                             @Param("keyword") String keyword,
+                                             @Param("status") Integer status);
 
     long countAll(@Param("keyword") String keyword, @Param("status") Integer status);
 }

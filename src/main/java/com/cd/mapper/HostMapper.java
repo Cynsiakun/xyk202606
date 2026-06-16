@@ -63,6 +63,8 @@ public interface HostMapper {
 
     List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
 
+    List<HostEntity> selectPortScanCandidates(@Param("limit") int limit);
+
     List<Long> selectAllIds();
 
     List<Long> selectAllIdsByTenant(@Param("tenantId") Long tenantId);

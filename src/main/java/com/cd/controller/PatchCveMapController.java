@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/patch-cve-map")
 @RequiredArgsConstructor
-@PreAuthorize("@licenseGuard.hasFeature('PATCH')")
+@PreAuthorize("@perm.isSuperAdmin()")
 public class PatchCveMapController {
 
     private final PatchCveMapService patchCveMapService;

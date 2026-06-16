@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping
 @RequiredArgsConstructor
-@PreAuthorize("@licenseGuard.hasFeature('VULN')")
+@PreAuthorize("@perm.isSuperAdmin()")
 public class VulnRuleManagementController {
 
     private final VulnRuleManagementService vulnRuleManagementService;

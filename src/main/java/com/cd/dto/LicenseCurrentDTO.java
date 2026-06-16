@@ -9,6 +9,7 @@ import java.util.List;
 public class LicenseCurrentDTO {
 
     private Long tenantId;
+    private String tenantName;
     private String edition;
     private Integer hostLimit;
     private Long hostUsed;

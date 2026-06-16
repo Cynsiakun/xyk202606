@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授权主机</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="machineSearchForm">
+            <div class="toolbar-group">
+                <input type="text" name="keyword" placeholder="按 MachineId / MAC / 主机名搜索" autocomplete="off" class="layui-input toolbar-input">
+                <button type="submit" class="layui-btn" lay-submit lay-filter="machineSearchSubmit">搜索</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
+            </div>
+            <button type="button" class="layui-btn" id="addMachineButton">
+                <i class="layui-icon layui-icon-add-1"></i> 新增授权主机
+            </button>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="machineTable" lay-filter="machineTable"></table>
+    </div>
+</div>
+
+<template id="machineFormTemplate">
+    <form class="layui-form popup-form" lay-filter="machineForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">MachineId</label>
+            <div class="layui-input-block">
+                <input type="text" name="machineId" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">MAC</label>
+            <div class="layui-input-block">
+                <input type="text" name="macAddress" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">主机名</label>
+            <div class="layui-input-block">
+                <input type="text" name="hostName" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">备注</label>
+            <div class="layui-input-block">
+                <input type="text" name="remark" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <select name="status">
+                    <option value="1">启用</option>
+                    <option value="0">禁用</option>
+                </select>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveMachine">保存</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/tenant-machine.js"></script>
+</body>
+</html>

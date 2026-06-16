@@ -73,39 +73,39 @@ public class UserController {
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('user:create') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:create') and @licenseGuard.hasFeature('USER')")
     @PostMapping
     public Result<UserResponseDTO> create(@Valid @RequestBody UserCreateDTO dto) {
         return Result.success(userService.create(dto));
     }
 
-    @PreAuthorize("@perm.has('user:create') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:create') and @licenseGuard.hasFeature('USER')")
     @PostMapping("/import")
     public Result<CsvImportResultDTO> importCsv(@RequestParam("file") MultipartFile file) {
         return Result.success(userService.importCsv(file));
     }
 
-    @PreAuthorize("@perm.has('user:delete') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:delete') and @licenseGuard.hasFeature('USER')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         userService.deleteById(id);
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('user:update') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:update') and @licenseGuard.hasFeature('USER')")
     @PutMapping("/{id}")
     public Result<UserResponseDTO> update(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
                                           @Valid @RequestBody UserUpdateDTO dto) {
         return Result.success(userService.update(id, dto));
     }
 
-    @PreAuthorize("@perm.has('user:view') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:view') and @licenseGuard.hasFeature('USER')")
     @GetMapping("/{id}")
     public Result<UserResponseDTO> getById(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         return Result.success(userService.getById(id));
     }
 
-    @PreAuthorize("@perm.has('user:view') and @licenseGuard.hasFeature('USER_MANAGE')")
+    @PreAuthorize("@perm.has('user:view') and @licenseGuard.hasFeature('USER')")
     @GetMapping("/list")
     public Result<PageResult<UserResponseDTO>> list(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,

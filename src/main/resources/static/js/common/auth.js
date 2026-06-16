@@ -3,8 +3,10 @@
     var CURRENT_USER_ID_KEY = "currentUserId";
     var CURRENT_USER_NAME_KEY = "currentUserName";
     var TENANT_ID_KEY = "tenantId";
+    var TENANT_NAME_KEY = "tenantName";
     var PERMISSIONS_KEY = "permissions";
     var LICENSE_INFO_KEY = "licenseInfo";
+    var ACCESS_INFO_KEY = "accessInfo";
 
     function isInFrame() {
         try {
@@ -30,6 +32,9 @@
         } else if (payload.tenantId != null) {
             localStorage.setItem(TENANT_ID_KEY, payload.tenantId);
         }
+        if (authData.tenantName) {
+            localStorage.setItem(TENANT_NAME_KEY, authData.tenantName);
+        }
     }
 
     function clearLogin() {
@@ -37,8 +42,10 @@
         localStorage.removeItem(CURRENT_USER_ID_KEY);
         localStorage.removeItem(CURRENT_USER_NAME_KEY);
         localStorage.removeItem(TENANT_ID_KEY);
+        localStorage.removeItem(TENANT_NAME_KEY);
         localStorage.removeItem(PERMISSIONS_KEY);
         localStorage.removeItem(LICENSE_INFO_KEY);
+        localStorage.removeItem(ACCESS_INFO_KEY);
     }
 
     function setPermissions(permissionCodes) {
@@ -67,6 +74,19 @@
         return permissions.indexOf("*") > -1 || permissions.indexOf("ROLE_SUPER_ADMIN") > -1;
     }
 
+    function hasRole(roleCode) {
+        var normalized = String(roleCode || "").trim();
+        if (!normalized) {
+            return false;
+        }
+        var authority = normalized.indexOf("ROLE_") === 0 ? normalized : "ROLE_" + normalized;
+        return getPermissions().indexOf(authority) > -1;
+    }
+
+    function isTenantAdmin() {
+        return hasRole("TENANT_ADMIN");
+    }
+
     function getCurrentUserName() {
         return localStorage.getItem(CURRENT_USER_NAME_KEY);
     }
@@ -83,6 +103,16 @@
             value = payload.tenantId;
         }
         return value == null || value === "" ? null : Number(value);
+    }
+
+    function setTenantName(tenantName) {
+        if (tenantName) {
+            localStorage.setItem(TENANT_NAME_KEY, tenantName);
+        }
+    }
+
+    function getTenantName() {
+        return localStorage.getItem(TENANT_NAME_KEY);
     }
 
     function isLoggedIn() {
@@ -103,6 +133,13 @@
     }
 
     function hasFeature(featureName) {
+        var access = getAccessInfo();
+        if (access && Array.isArray(access.tenantFeatures)) {
+            if (access.platformFeatures && access.platformFeatures.length > 0) {
+                return true;
+            }
+            return access.tenantFeatures.indexOf(featureName) > -1;
+        }
         var license = getLicenseInfo();
         if (!license || license.effective === false) {
             return false;
@@ -112,6 +149,25 @@
         }
         var features = Array.isArray(license.featureFlags) ? license.featureFlags : [];
         return features.indexOf(featureName) > -1;
+    }
+
+    function setAccessInfo(info) {
+        localStorage.setItem(ACCESS_INFO_KEY, JSON.stringify(info || null));
+    }
+
+    function getAccessInfo() {
+        try {
+            var stored = JSON.parse(localStorage.getItem(ACCESS_INFO_KEY));
+            return stored && typeof stored === "object" ? stored : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function canPolicy(policyKey) {
+        var access = getAccessInfo();
+        var policies = access && Array.isArray(access.allowedPolicies) ? access.allowedPolicies : [];
+        return policies.indexOf(policyKey) > -1;
     }
 
     function redirectToLogin() {
@@ -145,14 +201,21 @@
         getCurrentUserId: getCurrentUserId,
         getCurrentUserName: getCurrentUserName,
         getTenantId: getTenantId,
+        setTenantName: setTenantName,
+        getTenantName: getTenantName,
         isLoggedIn: isLoggedIn,
         redirectToLogin: redirectToLogin,
         setPermissions: setPermissions,
         getPermissions: getPermissions,
         hasPermission: hasPermission,
         isSuperAdmin: isSuperAdmin,
+        hasRole: hasRole,
+        isTenantAdmin: isTenantAdmin,
         setLicenseInfo: setLicenseInfo,
         getLicenseInfo: getLicenseInfo,
-        hasFeature: hasFeature
+        hasFeature: hasFeature,
+        setAccessInfo: setAccessInfo,
+        getAccessInfo: getAccessInfo,
+        canPolicy: canPolicy
     };
 })(window);

@@ -12,9 +12,11 @@ import java.time.LocalDateTime;
 @Data
 public class LicenseGenerateDTO {
 
-    @NotBlank(message = "edition must not be blank")
     @Size(max = 32, message = "edition length must be less than or equal to 32")
     private String edition;
+
+    @Size(max = 32, message = "planCode length must be less than or equal to 32")
+    private String planCode;
 
     @Min(value = 0, message = "hostLimit must be greater than or equal to 0")
     private Integer hostLimit;

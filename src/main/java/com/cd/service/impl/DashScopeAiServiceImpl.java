@@ -44,7 +44,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chat(String promptName, Map<String, Object> variables) {
-        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
+        licenseGuard.requireFeature(LicenseFeature.AI);
         validateConfig();
         String prompt = renderPrompt(promptName, variables == null ? Map.of() : variables);
         return sendMessages(promptName, List.of(Map.of(
@@ -55,7 +55,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chatWithSystem(String systemPromptName, String userMessage) {
-        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
+        licenseGuard.requireFeature(LicenseFeature.AI);
         validateConfig();
         String systemPrompt = loadPrompt(systemPromptName);
         return sendMessages(systemPromptName, List.of(
@@ -66,7 +66,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chatJsonWithSystem(String systemPromptName, String userMessage, Integer maxTokens) {
-        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
+        licenseGuard.requireFeature(LicenseFeature.AI);
         validateConfig();
         String systemPrompt = loadPrompt(systemPromptName);
         return sendMessages(systemPromptName, List.of(

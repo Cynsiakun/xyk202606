@@ -50,6 +50,14 @@ public interface UserMapper {
 
     UserEntity selectByUserEmailAndTenant(@Param("userEmail") String userEmail, @Param("tenantId") Long tenantId);
 
+    UserEntity selectByUserPhoneAndTenantExcludingId(@Param("userPhone") String userPhone,
+                                                     @Param("tenantId") Long tenantId,
+                                                     @Param("id") Long id);
+
+    UserEntity selectByUserEmailAndTenantExcludingId(@Param("userEmail") String userEmail,
+                                                     @Param("tenantId") Long tenantId,
+                                                     @Param("id") Long id);
+
     int updateLastLoginTime(@Param("id") Long id);
 
     long countCreatedToday();
