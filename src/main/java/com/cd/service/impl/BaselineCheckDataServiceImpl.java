@@ -1,8 +1,10 @@
 package com.cd.service.impl;
 
 import com.cd.entity.BaselineCheckDataEntity;
+import com.cd.entity.BaselineTaskEntity;
 import com.cd.entity.MqErrorLogEntity;
 import com.cd.mapper.BaselineCheckDataMapper;
+import com.cd.mapper.BaselineTaskMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.service.BaselineCheckDataService;
 import com.cd.service.BaselineRemediationService;
@@ -33,6 +35,7 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
     private static final String ROLLBACK_RESULT_TYPE = "baseline_rollback_result";
 
     private final BaselineCheckDataMapper baselineCheckDataMapper;
+    private final BaselineTaskMapper baselineTaskMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final BaselineRuleEngine baselineRuleEngine;
     private final BaselineRemediationService baselineRemediationService;
@@ -91,6 +94,7 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
         BaselineCheckDataEntity entity = new BaselineCheckDataEntity();
         entity.setTaskId(taskId);
         entity.setHostId(hostId);
+        entity.setTenantId(resolveTenantId(taskId));
         entity.setCheckData(message);
         entity.setCreateTime(LocalDateTime.now());
         baselineCheckDataMapper.insert(entity);
@@ -207,5 +211,10 @@ public class BaselineCheckDataServiceImpl implements BaselineCheckDataService {
         } catch (Exception e) {
             log.error("写入 mq_error_logs 失败 (已尝试入库并原消息已 ACK): queue={}, reason={}", queueName, errorReason, e);
         }
+    }
+
+    private Long resolveTenantId(Long taskId) {
+        BaselineTaskEntity task = baselineTaskMapper.selectTaskById(taskId);
+        return task == null || task.getTenantId() == null ? 0L : task.getTenantId();
     }
 }

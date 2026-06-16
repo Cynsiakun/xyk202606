@@ -20,40 +20,52 @@ public interface BaselineQueryMapper {
                                                  @Param("executeType") String executeType,
                                                  @Param("taskType") String taskType,
                                                  @Param("status") String status,
+                                                 @Param("tenantId") Long tenantId,
                                                  @Param("offset") int offset,
                                                  @Param("limit") int limit);
 
     long countTasks(@Param("keyword") String keyword,
                     @Param("executeType") String executeType,
                     @Param("taskType") String taskType,
-                    @Param("status") String status);
+                    @Param("status") String status,
+                    @Param("tenantId") Long tenantId);
 
-    BaselineTaskResultOverviewDTO selectResultOverview(@Param("taskId") Long taskId);
+    BaselineTaskResultOverviewDTO selectResultOverview(@Param("taskId") Long taskId,
+                                                       @Param("tenantId") Long tenantId);
 
     List<BaselineProblemHostDTO> selectProblemHostPage(@Param("taskId") Long taskId,
+                                                       @Param("tenantId") Long tenantId,
                                                        @Param("offset") int offset,
                                                        @Param("limit") int limit);
 
-    long countProblemHosts(@Param("taskId") Long taskId);
+    long countProblemHosts(@Param("taskId") Long taskId,
+                           @Param("tenantId") Long tenantId);
 
     List<BaselineHostResultItemDTO> selectTaskHostResults(@Param("taskId") Long taskId,
-                                                          @Param("hostId") Long hostId);
+                                                          @Param("hostId") Long hostId,
+                                                          @Param("tenantId") Long tenantId);
 
-    List<BaselineTaskExportRowDTO> selectTaskExportRows(@Param("taskId") Long taskId);
+    List<BaselineTaskExportRowDTO> selectTaskExportRows(@Param("taskId") Long taskId,
+                                                        @Param("tenantId") Long tenantId);
 
-    List<BaselineTaskExportRowDTO> selectHostExportRows(@Param("hostId") Long hostId);
+    List<BaselineTaskExportRowDTO> selectHostExportRows(@Param("hostId") Long hostId,
+                                                        @Param("tenantId") Long tenantId);
 
     List<BaselineRuleOptionDTO> selectRuleOptions(@Param("keyword") String keyword);
 
     /** 主机合规总览：每台主机取最近一次基线汇总，支持关键字与合规等级筛选。 */
     List<BaselineHostOverviewDTO> selectHostOverviewPage(@Param("keyword") String keyword,
                                                          @Param("level") String level,
+                                                         @Param("tenantId") Long tenantId,
                                                          @Param("offset") int offset,
                                                          @Param("limit") int limit);
 
-    long countHostOverview(@Param("keyword") String keyword, @Param("level") String level);
+    long countHostOverview(@Param("keyword") String keyword,
+                           @Param("level") String level,
+                           @Param("tenantId") Long tenantId);
 
     /** 主机详情：取该主机最近一次任务的逐规则检测结果，onlyFail=true 时仅返回 FAIL/ERROR。 */
     List<BaselineHostResultItemDTO> selectHostResults(@Param("hostId") Long hostId,
-                                                      @Param("onlyFail") boolean onlyFail);
+                                                      @Param("onlyFail") boolean onlyFail,
+                                                      @Param("tenantId") Long tenantId);
 }

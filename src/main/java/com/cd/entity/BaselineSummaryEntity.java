@@ -13,6 +13,7 @@ import lombok.Data;
 public class BaselineSummaryEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private Long taskId;
     private Integer passCount;

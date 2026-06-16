@@ -21,16 +21,16 @@ public interface SecurityLogCenterMapper {
     long countPage(@Param("q") EventLogQueryDTO query);
 
     /** 单条详情（含 raw_xml）。 */
-    EventLogDetailDTO selectDetailById(@Param("id") Long id);
+    EventLogDetailDTO selectDetailById(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /** 今日某日志类型数量（按 event_time）。 */
-    long countTodayByType(@Param("logType") String logType);
+    long countTodayByType(@Param("logType") String logType, @Param("tenantId") Long tenantId);
 
     /** 今日错误级别数量（Error / Critical，按 event_time）。 */
-    long countTodayError();
+    long countTodayError(@Param("tenantId") Long tenantId);
 
     /** 主机下拉选项。 */
-    List<HostOptionDTO> selectHostOptions();
+    List<HostOptionDTO> selectHostOptions(@Param("tenantId") Long tenantId);
 
     /** 导出用：与列表相同条件，最多取 {@code limit} 行。 */
     List<EventLogItemDTO> selectForExport(@Param("q") EventLogQueryDTO query, @Param("limit") int limit);

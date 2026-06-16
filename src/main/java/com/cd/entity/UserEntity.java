@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class UserEntity {
 
     private Long id;
+    private Long tenantId;
     private String userName;
     private String userPwd;
     private String userAvatar;

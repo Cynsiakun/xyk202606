@@ -5,7 +5,7 @@
 <mapper namespace="com.cd.mapper.AssetExportLogMapper">
 
     <insert id="insert" parameterType="com.cd.entity.AssetExportLogEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO asset_export_logs (user_id, host_id, export_time, export_format, ip_address)
-        VALUES (#{userId}, #{hostId}, #{exportTime}, #{exportFormat}, #{ipAddress})
+        INSERT INTO asset_export_logs (tenant_id, user_id, host_id, export_time, export_format, ip_address)
+        VALUES (COALESCE(#{tenantId}, 0), #{userId}, #{hostId}, #{exportTime}, #{exportFormat}, #{ipAddress})
     </insert>
 </mapper>

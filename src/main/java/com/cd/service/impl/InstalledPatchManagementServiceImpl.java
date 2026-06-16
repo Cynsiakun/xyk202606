@@ -2,10 +2,12 @@ package com.cd.service.impl;
 
 import com.cd.common.PageResult;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.InstalledPatchCreateDTO;
 import com.cd.dto.InstalledPatchResponseDTO;
 import com.cd.dto.InstalledPatchUpdateDTO;
 import com.cd.entity.InstalledPatchEntity;
+import com.cd.mapper.HostMapper;
 import com.cd.mapper.InstalledPatchManagementMapper;
 import com.cd.service.InstalledPatchManagementService;
 import lombok.RequiredArgsConstructor;
@@ -19,31 +21,38 @@ import java.util.List;
 public class InstalledPatchManagementServiceImpl implements InstalledPatchManagementService {
 
     private final InstalledPatchManagementMapper installedPatchManagementMapper;
+    private final HostMapper hostMapper;
 
     @Override
     public InstalledPatchResponseDTO create(InstalledPatchCreateDTO dto) {
         InstalledPatchEntity entity = new InstalledPatchEntity();
         apply(entity, dto);
+        Long tenantId = currentTenantId();
+        requireTenantHost(entity.getHostId(), tenantId);
+        entity.setTenantId(tenantId);
         entity.setRebootRequired(normalizeFlag(dto.getRebootRequired()));
         entity.setIsSecurityPatch(normalizeFlag(dto.getIsSecurityPatch()));
         installedPatchManagementMapper.insert(entity);
-        return toResponse(installedPatchManagementMapper.selectById(entity.getId()));
+        return toResponse(installedPatchManagementMapper.selectByIdAndTenant(entity.getId(), tenantId));
     }
 
     @Override
     public InstalledPatchResponseDTO update(Long id, InstalledPatchUpdateDTO dto) {
         InstalledPatchEntity entity = ensureExists(id);
         apply(entity, dto);
+        Long tenantId = currentTenantId();
+        requireTenantHost(entity.getHostId(), tenantId);
+        entity.setTenantId(tenantId);
         entity.setRebootRequired(normalizeFlag(dto.getRebootRequired()));
         entity.setIsSecurityPatch(normalizeFlag(dto.getIsSecurityPatch()));
         installedPatchManagementMapper.updateById(entity);
-        return toResponse(installedPatchManagementMapper.selectById(id));
+        return toResponse(installedPatchManagementMapper.selectByIdAndTenant(id, tenantId));
     }
 
     @Override
     public void deleteById(Long id) {
         ensureExists(id);
-        installedPatchManagementMapper.deleteById(id);
+        installedPatchManagementMapper.deleteByIdAndTenant(id, currentTenantId());
     }
 
     @Override
@@ -51,7 +60,7 @@ public class InstalledPatchManagementServiceImpl implements InstalledPatchManage
         if (ids == null || ids.isEmpty()) {
             throw new IllegalArgumentException("ids 不能为空");
         }
-        installedPatchManagementMapper.deleteBatch(ids);
+        installedPatchManagementMapper.deleteBatchByTenant(ids, currentTenantId());
     }
 
     @Override
@@ -64,9 +73,10 @@ public class InstalledPatchManagementServiceImpl implements InstalledPatchManage
         int offset = (page - 1) * size;
         String normalizedKeyword = emptyToNull(keyword);
         String normalizedInstallStatus = emptyToNull(installStatus);
-        long total = installedPatchManagementMapper.countAll(normalizedKeyword, normalizedInstallStatus);
+        Long tenantId = currentTenantId();
+        long total = installedPatchManagementMapper.countAll(normalizedKeyword, normalizedInstallStatus, tenantId);
         List<InstalledPatchResponseDTO> list = installedPatchManagementMapper.selectPage(
-                        offset, size, normalizedKeyword, normalizedInstallStatus)
+                        offset, size, normalizedKeyword, normalizedInstallStatus, tenantId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -108,7 +118,7 @@ public class InstalledPatchManagementServiceImpl implements InstalledPatchManage
     }
 
     private InstalledPatchEntity ensureExists(Long id) {
-        InstalledPatchEntity entity = installedPatchManagementMapper.selectById(id);
+        InstalledPatchEntity entity = installedPatchManagementMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) {
             throw new ResourceNotFoundException("记录不存在 id=" + id);
         }
@@ -117,6 +127,17 @@ public class InstalledPatchManagementServiceImpl implements InstalledPatchManage
 
     private String emptyToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private void requireTenantHost(Long hostId, Long tenantId) {
+        if (hostId != null && hostMapper.selectByIdAndTenant(hostId, tenantId) == null) {
+            throw new ResourceNotFoundException("涓绘満涓嶅瓨鍦? id=" + hostId);
+        }
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private InstalledPatchResponseDTO toResponse(InstalledPatchEntity entity) {

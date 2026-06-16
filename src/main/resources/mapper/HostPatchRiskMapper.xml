@@ -6,6 +6,7 @@
 
     <resultMap id="HostPatchRiskResultMap" type="com.cd.entity.HostPatchRiskEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="host_id" property="hostId"/>
         <result column="risk_id" property="riskId"/>
         <result column="risk_type" property="riskType"/>
@@ -23,11 +24,11 @@
 
     <insert id="insert" parameterType="com.cd.entity.HostPatchRiskEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO host_patch_risk (
-            host_id, risk_id, risk_type, risk_name, risk_level,
+            tenant_id, host_id, risk_id, risk_type, risk_name, risk_level,
             related_patch_id, status, scan_time, related_cve,
             evidence, recommendation
         ) VALUES (
-            #{hostId}, #{riskId}, #{riskType}, #{riskName}, #{riskLevel},
+            COALESCE(#{tenantId}, 0), #{hostId}, #{riskId}, #{riskType}, #{riskName}, #{riskLevel},
             #{relatedPatchId}, #{status}, #{scanTime}, #{relatedCve},
             #{evidence}, #{recommendation}
         )
@@ -46,6 +47,7 @@
             evidence = #{evidence},
             recommendation = #{recommendation}
         WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </update>
 
     <select id="selectByRiskId" resultMap="HostPatchRiskResultMap">
@@ -56,11 +58,40 @@
         LIMIT 1
     </select>
 
+    <select id="selectByRiskIdAndTenant" resultMap="HostPatchRiskResultMap">
+        SELECT *
+        FROM host_patch_risk
+        WHERE risk_id = #{riskId}
+          AND tenant_id = #{tenantId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
     <update id="markFixedByHostIdExceptRiskIds">
         UPDATE host_patch_risk
         SET status = 'fixed',
             updated_at = CURRENT_TIMESTAMP
         WHERE host_id = #{hostId}
+          AND status = 'open'
+        <choose>
+            <when test="riskIds != null and riskIds.size() > 0">
+                AND risk_id NOT IN
+                <foreach collection="riskIds" item="riskId" open="(" separator="," close=")">
+                    #{riskId}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 1
+            </otherwise>
+        </choose>
+    </update>
+
+    <update id="markFixedByHostIdExceptRiskIdsAndTenant">
+        UPDATE host_patch_risk
+        SET status = 'fixed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
           AND status = 'open'
         <choose>
             <when test="riskIds != null and riskIds.size() > 0">

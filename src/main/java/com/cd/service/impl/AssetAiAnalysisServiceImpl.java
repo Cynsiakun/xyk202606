@@ -3,6 +3,7 @@ package com.cd.service.impl;
 import com.cd.common.ai.AiException;
 import com.cd.common.ai.AiProperties;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AiChatResponseDTO;
 import com.cd.dto.AssetRecordDTO;
 import com.cd.dto.AssetRiskAnalysisDTO;
@@ -62,7 +63,8 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
 
     @Override
     public AssetRecordDTO analyzeAccount(Long id, String assetJson) {
-        AccountEntity entity = accountMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        AccountEntity entity = accountMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
             throw new ResourceNotFoundException("账号资产记录不存在 id=" + id);
         }
@@ -83,7 +85,7 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
                         "account",
                         entity.getId(),
                         items,
-                        accountMapper.updateAssetJsonById(entity.getId(), items.toString(), items.size())
+                        accountMapper.updateAssetJsonByIdAndTenant(entity.getId(), items.toString(), items.size(), tenantId)
                 ))
                 .afterExtract(this::syncShadowAccounts)
                 .detailSupplier(() -> assetQueryService.accountDetail(id))
@@ -92,7 +94,8 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
 
     @Override
     public AssetRecordDTO analyzeService(Long id, String assetJson) {
-        ServiceEntity entity = serviceMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        ServiceEntity entity = serviceMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
             throw new ResourceNotFoundException("服务资产记录不存在 id=" + id);
         }
@@ -113,7 +116,7 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
                         "service",
                         entity.getId(),
                         items,
-                        serviceMapper.updateAssetJsonById(entity.getId(), items.toString(), items.size())
+                        serviceMapper.updateAssetJsonByIdAndTenant(entity.getId(), items.toString(), items.size(), tenantId)
                 ))
                 .batchSize(serviceBatchSize())
                 .compactPayload(true)
@@ -124,7 +127,8 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
 
     @Override
     public AssetRecordDTO analyzeProcess(Long id, String assetJson) {
-        ProcessEntity entity = processMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        ProcessEntity entity = processMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
             throw new ResourceNotFoundException("进程资产记录不存在 id=" + id);
         }
@@ -145,7 +149,7 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
                         "process",
                         entity.getId(),
                         items,
-                        processMapper.updateAssetJsonById(entity.getId(), items.toString(), items.size())
+                        processMapper.updateAssetJsonByIdAndTenant(entity.getId(), items.toString(), items.size(), tenantId)
                 ))
                 .batchSize(processBatchSize())
                 .compactPayload(true)
@@ -156,7 +160,8 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
 
     @Override
     public AssetRecordDTO analyzeApp(Long id, String assetJson) {
-        AppEntity entity = appMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        AppEntity entity = appMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
             throw new ResourceNotFoundException("APP资产记录不存在 id=" + id);
         }
@@ -177,7 +182,7 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
                         "app",
                         entity.getId(),
                         items,
-                        appMapper.updateAssetJsonById(entity.getId(), items.toString(), items.size())
+                        appMapper.updateAssetJsonByIdAndTenant(entity.getId(), items.toString(), items.size(), tenantId)
                 ))
                 .batchSize(appBatchSize())
                 .compactPayload(true)
@@ -632,6 +637,11 @@ public class AssetAiAnalysisServiceImpl implements AssetAiAnalysisService {
                 }
             }
         }
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private String preview(String content) {

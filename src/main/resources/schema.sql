@@ -847,3 +847,51 @@ SET child.parent_id = parent_menu.id,
     child.menu_path = './pages/vuln-rule-management.html',
     child.permission_id = p.id
 WHERE child.menu_code = 'vuln_rule_management';
+
+-- ============================================================
+-- Tenant and license foundation
+-- Current phase only creates base models and keeps the system
+-- running in single-tenant mode.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS tenant (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    contact VARCHAR(100),
+    status INT DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS license (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    license_key VARCHAR(64) NOT NULL UNIQUE,
+    tenant_id BIGINT NOT NULL,
+    edition VARCHAR(32),
+    host_limit INT,
+    user_limit INT,
+    expire_time DATETIME,
+    machine_id VARCHAR(128),
+    signature VARCHAR(2048),
+    status TINYINT DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_license_tenant_id (tenant_id)
+);
+
+SET @OLD_SQL_MODE = @@SESSION.SQL_MODE;
+SET SESSION SQL_MODE = CONCAT_WS(',', @@SESSION.SQL_MODE, 'NO_AUTO_VALUE_ON_ZERO');
+
+UPDATE tenant
+SET id = 0
+WHERE name = 'Platform Tenant'
+  AND contact = 'system'
+  AND NOT EXISTS (
+      SELECT 1 FROM (SELECT id FROM tenant WHERE id = 0) existing_platform_tenant
+  );
+
+INSERT INTO tenant (id, name, contact, status)
+SELECT 0, 'Platform Tenant', 'system', 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM tenant WHERE id = 0
+);
+
+SET SESSION SQL_MODE = @OLD_SQL_MODE;

@@ -1,7 +1,10 @@
 package com.cd.service.impl;
 
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetExportDTO;
 import com.cd.dto.AssetExportFileDTO;
 import com.cd.dto.HostResponseDTO;
@@ -53,9 +56,11 @@ public class AssetExportServiceImpl implements AssetExportService {
     private final ServiceMapper serviceMapper;
     private final AppMapper appMapper;
     private final AssetExportLogMapper assetExportLogMapper;
+    private final LicenseGuard licenseGuard;
 
     @Override
     public AssetExportDTO exportJson(Long hostId, String ipAddress) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET_EXPORT);
         AssetExportDTO exportData = buildExportData(hostId);
         recordExport(hostId, "json", ipAddress);
         return exportData;
@@ -63,6 +68,7 @@ public class AssetExportServiceImpl implements AssetExportService {
 
     @Override
     public AssetExportFileDTO exportExcel(Long hostId, String ipAddress) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET_EXPORT);
         AssetExportDTO exportData = buildExportData(hostId);
         byte[] content = buildExcel(exportData);
         recordExport(hostId, "excel", ipAddress);
@@ -71,7 +77,8 @@ public class AssetExportServiceImpl implements AssetExportService {
     }
 
     private AssetExportDTO buildExportData(Long hostId) {
-        HostEntity host = hostMapper.selectById(hostId);
+        Long tenantId = currentTenantId();
+        HostEntity host = hostMapper.selectByIdAndTenant(hostId, tenantId);
         if (host == null) {
             throw new ResourceNotFoundException("主机不存在 id=" + hostId);
         }
@@ -79,9 +86,9 @@ public class AssetExportServiceImpl implements AssetExportService {
             throw new IllegalArgumentException("主机未绑定MAC地址，无法导出资产清单");
         }
 
-        ProcessEntity processRecord = processMapper.selectLatestByMac(host.getMacAddress());
-        ServiceEntity serviceRecord = serviceMapper.selectLatestByMac(host.getMacAddress());
-        AppEntity appRecord = appMapper.selectLatestByMac(host.getMacAddress());
+        ProcessEntity processRecord = processMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
+        ServiceEntity serviceRecord = serviceMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
+        AppEntity appRecord = appMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
 
         List<Map<String, Object>> processes = parseAssetJson(processRecord == null ? null : processRecord.getAssetJson());
         List<Map<String, Object>> services = parseAssetJson(serviceRecord == null ? null : serviceRecord.getAssetJson());
@@ -311,6 +318,7 @@ public class AssetExportServiceImpl implements AssetExportService {
 
     private void recordExport(Long hostId, String format, String ipAddress) {
         AssetExportLogEntity log = new AssetExportLogEntity();
+        log.setTenantId(currentTenantId());
         log.setUserId(SecurityUtils.getCurrentUserId());
         log.setHostId(hostId);
         log.setExportTime(LocalDateTime.now());
@@ -344,5 +352,10 @@ public class AssetExportServiceImpl implements AssetExportService {
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

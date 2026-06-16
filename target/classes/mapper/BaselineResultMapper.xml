@@ -5,10 +5,10 @@
 <mapper namespace="com.cd.mapper.BaselineResultMapper">
 
     <insert id="insert" parameterType="com.cd.entity.BaselineResultEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO baseline_result (task_id, task_host_id, host_id, rule_id, rule_version, check_key,
+        INSERT INTO baseline_result (tenant_id, task_id, task_host_id, host_id, rule_id, rule_version, check_key,
                                      status, actual_value, expected_value, message, evidence,
                                      remediation_status, scan_time, create_time)
-        VALUES (#{taskId}, #{taskHostId}, #{hostId}, #{ruleId}, #{ruleVersion}, #{checkKey},
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{taskHostId}, #{hostId}, #{ruleId}, #{ruleVersion}, #{checkKey},
                 #{status}, #{actualValue}, #{expectedValue}, #{message}, #{evidence},
                 #{remediationStatus}, #{scanTime}, #{createTime})
     </insert>
@@ -19,6 +19,7 @@
 
     <select id="selectByIds" resultType="com.cd.entity.BaselineResultEntity">
         SELECT id                 AS id,
+               tenant_id          AS tenantId,
                task_id            AS taskId,
                task_host_id       AS taskHostId,
                host_id            AS hostId,
@@ -40,8 +41,34 @@
         </foreach>
     </select>
 
+    <select id="selectByIdsAndTenant" resultType="com.cd.entity.BaselineResultEntity">
+        SELECT id                 AS id,
+               tenant_id          AS tenantId,
+               task_id            AS taskId,
+               task_host_id       AS taskHostId,
+               host_id            AS hostId,
+               rule_id            AS ruleId,
+               rule_version       AS ruleVersion,
+               check_key          AS checkKey,
+               status             AS status,
+               actual_value       AS actualValue,
+               expected_value     AS expectedValue,
+               message            AS message,
+               evidence           AS evidence,
+               remediation_status AS remediationStatus,
+               scan_time          AS scanTime,
+               create_time        AS createTime
+        FROM baseline_result
+        WHERE tenant_id = #{tenantId}
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <select id="selectLatestBefore" resultType="com.cd.entity.BaselineResultEntity">
         SELECT id                 AS id,
+               tenant_id          AS tenantId,
                task_id            AS taskId,
                task_host_id       AS taskHostId,
                host_id            AS hostId,
@@ -65,16 +92,60 @@
         LIMIT 1
     </select>
 
+    <select id="selectLatestBeforeByTenant" resultType="com.cd.entity.BaselineResultEntity">
+        SELECT id                 AS id,
+               tenant_id          AS tenantId,
+               task_id            AS taskId,
+               task_host_id       AS taskHostId,
+               host_id            AS hostId,
+               rule_id            AS ruleId,
+               rule_version       AS ruleVersion,
+               check_key          AS checkKey,
+               status             AS status,
+               actual_value       AS actualValue,
+               expected_value     AS expectedValue,
+               message            AS message,
+               evidence           AS evidence,
+               remediation_status AS remediationStatus,
+               scan_time          AS scanTime,
+               create_time        AS createTime
+        FROM baseline_result
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+          AND rule_id = #{ruleId}
+          AND COALESCE(check_key, '') = COALESCE(#{checkKey}, '')
+          AND id &lt; #{beforeId}
+        ORDER BY scan_time DESC, id DESC
+        LIMIT 1
+    </select>
+
     <update id="updateRemediationStatus">
         UPDATE baseline_result
         SET remediation_status = #{remediationStatus}
         WHERE id = #{id}
     </update>
 
+    <update id="updateRemediationStatusByTenant">
+        UPDATE baseline_result
+        SET remediation_status = #{remediationStatus}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+    </update>
+
     <update id="updateRemediationStatusByIds">
         UPDATE baseline_result
         SET remediation_status = #{remediationStatus}
         WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="updateRemediationStatusByIdsAndTenant">
+        UPDATE baseline_result
+        SET remediation_status = #{remediationStatus}
+        WHERE tenant_id = #{tenantId}
+          AND id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>

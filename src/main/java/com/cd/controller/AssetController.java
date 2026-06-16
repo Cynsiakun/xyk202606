@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/assets")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('ASSET_MANAGE')")
 public class AssetController {
 
     private final AssetQueryService assetQueryService;
@@ -72,7 +73,7 @@ public class AssetController {
         return Result.success(assetQueryService.accountDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI_ANALYSIS')")
     @PostMapping("/account/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeAccount(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -104,7 +105,7 @@ public class AssetController {
         return Result.success(assetQueryService.serviceDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI_ANALYSIS')")
     @PostMapping("/service/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeService(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -136,7 +137,7 @@ public class AssetController {
         return Result.success(assetQueryService.processDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI_ANALYSIS')")
     @PostMapping("/process/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeProcess(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -168,7 +169,7 @@ public class AssetController {
         return Result.success(assetQueryService.appDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI_ANALYSIS')")
     @PostMapping("/app/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeApp(@PathVariable @Min(1) Long id,
                                              @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {

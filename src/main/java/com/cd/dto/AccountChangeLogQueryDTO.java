@@ -19,6 +19,7 @@ public class AccountChangeLogQueryDTO {
     private String targetUsername;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private Long tenantId;
 
     private String sortColumn = "event_time";
     private String sortDirection = "DESC";

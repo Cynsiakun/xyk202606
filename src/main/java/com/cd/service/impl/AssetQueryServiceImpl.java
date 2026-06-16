@@ -2,6 +2,7 @@ package com.cd.service.impl;
 
 import com.cd.common.PageResult;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetOverviewDTO;
 import com.cd.dto.AssetRecordDTO;
 import com.cd.entity.AccountEntity;
@@ -48,10 +49,11 @@ public class AssetQueryServiceImpl implements AssetQueryService {
         // 从四张表取每个 MAC 的最新记录
         Map<String, AssetOverviewDTO> map = new LinkedHashMap<>();
 
-        mergeIntoOverview(map, accountMapper.selectLatestPerMac(), "account");
-        mergeIntoOverview(map, serviceMapper.selectLatestPerMac(), "service");
-        mergeIntoOverview(map, processMapper.selectLatestPerMac(), "process");
-        mergeIntoOverview(map, appMapper.selectLatestPerMac(), "app");
+        Long tenantId = currentTenantId();
+        mergeIntoOverview(map, accountMapper.selectLatestPerMacByTenant(tenantId), "account");
+        mergeIntoOverview(map, serviceMapper.selectLatestPerMacByTenant(tenantId), "service");
+        mergeIntoOverview(map, processMapper.selectLatestPerMacByTenant(tenantId), "process");
+        mergeIntoOverview(map, appMapper.selectLatestPerMacByTenant(tenantId), "app");
 
         List<AssetOverviewDTO> all = new ArrayList<>(map.values());
         // 关键字过滤
@@ -126,14 +128,15 @@ public class AssetQueryServiceImpl implements AssetQueryService {
             return null;
         }
         String mac = macAddress.trim();
+        Long tenantId = currentTenantId();
         return switch (assetType) {
-            case "account" -> accountMapper.selectPage(0, 1, null, mac).stream()
+            case "account" -> accountMapper.selectPageByTenant(0, 1, null, mac, tenantId).stream()
                     .findFirst().map(this::toAccountDTO).orElse(null);
-            case "service" -> serviceMapper.selectPage(0, 1, null, mac).stream()
+            case "service" -> serviceMapper.selectPageByTenant(0, 1, null, mac, tenantId).stream()
                     .findFirst().map(this::toServiceDTO).orElse(null);
-            case "process" -> processMapper.selectPage(0, 1, null, mac).stream()
+            case "process" -> processMapper.selectPageByTenant(0, 1, null, mac, tenantId).stream()
                     .findFirst().map(this::toProcessDTO).orElse(null);
-            case "app" -> appMapper.selectPage(0, 1, null, mac).stream()
+            case "app" -> appMapper.selectPageByTenant(0, 1, null, mac, tenantId).stream()
                     .findFirst().map(this::toAppDTO).orElse(null);
             default -> null;
         };
@@ -144,23 +147,25 @@ public class AssetQueryServiceImpl implements AssetQueryService {
     @Override
     public PageResult<AssetRecordDTO> accountList(int page, int size, String keyword, String hostScope) {
         int offset = (page - 1) * size;
-        List<AccountEntity> entities = accountMapper.selectPage(offset, size, emptyToNull(keyword), emptyToNull(hostScope));
-        long total = accountMapper.countFiltered(emptyToNull(keyword), emptyToNull(hostScope));
+        Long tenantId = currentTenantId();
+        List<AccountEntity> entities = accountMapper.selectPageByTenant(offset, size, emptyToNull(keyword), emptyToNull(hostScope), tenantId);
+        long total = accountMapper.countFilteredByTenant(emptyToNull(keyword), emptyToNull(hostScope), tenantId);
         return new PageResult<>(total, entities.stream().map(this::toAccountDTO).toList());
     }
 
     @Override
     public AssetRecordDTO accountDetail(Long id) {
-        AccountEntity entity = accountMapper.selectById(id);
+        AccountEntity entity = accountMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) throw new ResourceNotFoundException("账号资产记录不存在: id=" + id);
         return toAccountDTO(entity);
     }
 
     @Override
     public void deleteAccount(Long id) {
-        AccountEntity entity = accountMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        AccountEntity entity = accountMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) throw new ResourceNotFoundException("账号资产记录不存在: id=" + id);
-        accountMapper.softDeleteById(id);
+        accountMapper.softDeleteByIdAndTenant(id, tenantId);
     }
 
     // ——— 服务资产 ———
@@ -168,23 +173,25 @@ public class AssetQueryServiceImpl implements AssetQueryService {
     @Override
     public PageResult<AssetRecordDTO> serviceList(int page, int size, String keyword, String hostScope) {
         int offset = (page - 1) * size;
-        List<ServiceEntity> entities = serviceMapper.selectPage(offset, size, emptyToNull(keyword), emptyToNull(hostScope));
-        long total = serviceMapper.countFiltered(emptyToNull(keyword), emptyToNull(hostScope));
+        Long tenantId = currentTenantId();
+        List<ServiceEntity> entities = serviceMapper.selectPageByTenant(offset, size, emptyToNull(keyword), emptyToNull(hostScope), tenantId);
+        long total = serviceMapper.countFilteredByTenant(emptyToNull(keyword), emptyToNull(hostScope), tenantId);
         return new PageResult<>(total, entities.stream().map(this::toServiceDTO).toList());
     }
 
     @Override
     public AssetRecordDTO serviceDetail(Long id) {
-        ServiceEntity entity = serviceMapper.selectById(id);
+        ServiceEntity entity = serviceMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) throw new ResourceNotFoundException("服务资产记录不存在: id=" + id);
         return toServiceDTO(entity);
     }
 
     @Override
     public void deleteService(Long id) {
-        ServiceEntity entity = serviceMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        ServiceEntity entity = serviceMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) throw new ResourceNotFoundException("服务资产记录不存在: id=" + id);
-        serviceMapper.softDeleteById(id);
+        serviceMapper.softDeleteByIdAndTenant(id, tenantId);
     }
 
     // ——— 进程资产 ———
@@ -192,23 +199,25 @@ public class AssetQueryServiceImpl implements AssetQueryService {
     @Override
     public PageResult<AssetRecordDTO> processList(int page, int size, String keyword, String hostScope) {
         int offset = (page - 1) * size;
-        List<ProcessEntity> entities = processMapper.selectPage(offset, size, emptyToNull(keyword), emptyToNull(hostScope));
-        long total = processMapper.countFiltered(emptyToNull(keyword), emptyToNull(hostScope));
+        Long tenantId = currentTenantId();
+        List<ProcessEntity> entities = processMapper.selectPageByTenant(offset, size, emptyToNull(keyword), emptyToNull(hostScope), tenantId);
+        long total = processMapper.countFilteredByTenant(emptyToNull(keyword), emptyToNull(hostScope), tenantId);
         return new PageResult<>(total, entities.stream().map(this::toProcessDTO).toList());
     }
 
     @Override
     public AssetRecordDTO processDetail(Long id) {
-        ProcessEntity entity = processMapper.selectById(id);
+        ProcessEntity entity = processMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) throw new ResourceNotFoundException("进程资产记录不存在: id=" + id);
         return toProcessDTO(entity);
     }
 
     @Override
     public void deleteProcess(Long id) {
-        ProcessEntity entity = processMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        ProcessEntity entity = processMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) throw new ResourceNotFoundException("进程资产记录不存在: id=" + id);
-        processMapper.softDeleteById(id);
+        processMapper.softDeleteByIdAndTenant(id, tenantId);
     }
 
     // ——— APP资产 ———
@@ -216,23 +225,25 @@ public class AssetQueryServiceImpl implements AssetQueryService {
     @Override
     public PageResult<AssetRecordDTO> appList(int page, int size, String keyword, String hostScope) {
         int offset = (page - 1) * size;
-        List<AppEntity> entities = appMapper.selectPage(offset, size, emptyToNull(keyword), emptyToNull(hostScope));
-        long total = appMapper.countFiltered(emptyToNull(keyword), emptyToNull(hostScope));
+        Long tenantId = currentTenantId();
+        List<AppEntity> entities = appMapper.selectPageByTenant(offset, size, emptyToNull(keyword), emptyToNull(hostScope), tenantId);
+        long total = appMapper.countFilteredByTenant(emptyToNull(keyword), emptyToNull(hostScope), tenantId);
         return new PageResult<>(total, entities.stream().map(this::toAppDTO).toList());
     }
 
     @Override
     public AssetRecordDTO appDetail(Long id) {
-        AppEntity entity = appMapper.selectById(id);
+        AppEntity entity = appMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) throw new ResourceNotFoundException("APP资产记录不存在: id=" + id);
         return toAppDTO(entity);
     }
 
     @Override
     public void deleteApp(Long id) {
-        AppEntity entity = appMapper.selectById(id);
+        Long tenantId = currentTenantId();
+        AppEntity entity = appMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) throw new ResourceNotFoundException("APP资产记录不存在: id=" + id);
-        appMapper.softDeleteById(id);
+        appMapper.softDeleteByIdAndTenant(id, tenantId);
     }
 
     // ——— 转换 ———
@@ -291,5 +302,10 @@ public class AssetQueryServiceImpl implements AssetQueryService {
 
     private String emptyToNull(String value) {
         return StringUtils.hasText(value) ? value : null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

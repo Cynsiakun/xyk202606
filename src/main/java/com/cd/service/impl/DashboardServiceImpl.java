@@ -1,5 +1,6 @@
 package com.cd.service.impl;
 
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.DashboardStatisticsDTO;
 import com.cd.mapper.UserMapper;
 import com.cd.service.DashboardService;
@@ -16,12 +17,18 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardStatisticsDTO statistics() {
+        Long tenantId = currentTenantId();
         DashboardStatisticsDTO dto = new DashboardStatisticsDTO();
-        dto.setTotalUsers(userMapper.countAll(null));
+        dto.setTotalUsers(userMapper.countAllByTenant(null, tenantId));
         dto.setTodayLoginCount(loginLogService.countTodaySuccess());
-        dto.setTodayNewUsers(userMapper.countCreatedToday());
+        dto.setTodayNewUsers(userMapper.countCreatedTodayByTenant(tenantId));
         dto.setWeekActiveUsers(loginLogService.countWeekActiveUsers());
         dto.setTotalLogs(loginLogService.countTotalLogs());
         return dto;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

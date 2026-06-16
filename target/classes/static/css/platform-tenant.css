@@ -1,0 +1,61 @@
+.toolbar-select {
+    min-width: 140px;
+}
+
+.tenant-action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.license-panel {
+    padding: 18px;
+}
+
+.license-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.license-panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.license-panel-sub {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.offline-result {
+    margin-left: 130px;
+    padding-right: 12px;
+}
+
+.offline-result textarea {
+    min-height: 180px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+}
+
+.popup-actions.compact {
+    margin-top: 12px;
+    padding-right: 0;
+}
+
+@media (max-width: 640px) {
+    .license-panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .offline-result {
+        margin-left: 0;
+    }
+}

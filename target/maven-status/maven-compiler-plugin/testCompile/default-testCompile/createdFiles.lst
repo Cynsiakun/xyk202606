@@ -1,3 +1,4 @@
+com\cd\common\security\TenantContextHolderTest.class
 com\cd\service\impl\BaselineRuleEngineImplTest.class
 com\cd\service\impl\SecurityAlertRuleEngineImplTest.class
 com\cd\util\VersionExpressionParserTest.class

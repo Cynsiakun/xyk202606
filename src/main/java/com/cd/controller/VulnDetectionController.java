@@ -28,6 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/vuln-detection")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('VULN')")
 public class VulnDetectionController {
 
     private final VulnDetectionService vulnDetectionService;

@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class BaselineRemediationEntity {
 
     private Long id;
+    private Long tenantId;
     private Long resultId;
     private Long hostId;
     private Long ruleId;

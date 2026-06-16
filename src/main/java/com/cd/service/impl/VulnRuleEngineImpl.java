@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetInfoDTO;
 import com.cd.entity.AppEntity;
 import com.cd.entity.HostEntity;
@@ -57,11 +58,21 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
     @Override
     @Transactional
     public List<HostVulnResultEntity> evaluateHost(Long hostId) {
+        return evaluateHostInternal(hostId, currentTenantId());
+    }
+
+    @Override
+    @Transactional
+    public List<HostVulnResultEntity> evaluateHostForTenant(Long hostId, Long tenantId) {
+        return evaluateHostInternal(hostId, tenantId == null ? 0L : tenantId);
+    }
+
+    private List<HostVulnResultEntity> evaluateHostInternal(Long hostId, Long tenantId) {
         if (hostId == null) {
             return List.of();
         }
 
-        HostEntity host = hostMapper.selectById(hostId);
+        HostEntity host = hostMapper.selectByIdAndTenant(hostId, tenantId);
         if (host == null) {
             throw new ResourceNotFoundException("主机不存在: id=" + hostId);
         }
@@ -76,7 +87,7 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
                     if (!VersionExpressionParser.matches(rule.getMatchType(), rule.getAffectedVersionExpr(), asset)) {
                         continue;
                     }
-                    HostVulnResultEntity result = buildResult(hostId, rule, asset);
+                    HostVulnResultEntity result = buildResult(hostId, tenantId, rule, asset);
                     results.add(ruleEnrichmentService.enrich(result, rule, asset));
                 } catch (Exception e) {
                     log.warn("漏洞规则匹配失败: hostId={}, ruleId={}, assetType={}, assetName={}",
@@ -85,7 +96,7 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             }
         }
 
-        hostVulnResultMapper.markInactiveByHostId(hostId);
+        hostVulnResultMapper.markInactiveByHostIdAndTenant(hostId, tenantId);
         for (HostVulnResultEntity result : results) {
             hostVulnResultMapper.insert(result);
         }
@@ -109,9 +120,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             return assets;
         }
 
-        AppEntity appRecord = appMapper.selectLatestByMac(host.getMacAddress());
-        ServiceEntity serviceRecord = serviceMapper.selectLatestByMac(host.getMacAddress());
-        ProcessEntity processRecord = processMapper.selectLatestByMac(host.getMacAddress());
+        Long tenantId = host.getTenantId() == null ? currentTenantId() : host.getTenantId();
+        AppEntity appRecord = appMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
+        ServiceEntity serviceRecord = serviceMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
+        ProcessEntity processRecord = processMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
 
         assets.addAll(parseAssetJson(TYPE_APP, appRecord == null ? null : appRecord.getAssetJson()));
         assets.addAll(parseAssetJson(TYPE_SERVICE, serviceRecord == null ? null : serviceRecord.getAssetJson()));
@@ -210,8 +222,9 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         return matches;
     }
 
-    private HostVulnResultEntity buildResult(Long hostId, VulnRuleEntity rule, AssetInfoDTO asset) {
+    private HostVulnResultEntity buildResult(Long hostId, Long tenantId, VulnRuleEntity rule, AssetInfoDTO asset) {
         HostVulnResultEntity result = new HostVulnResultEntity();
+        result.setTenantId(tenantId);
         result.setHostId(hostId);
         result.setRuleId(rule.getId());
         result.setSeverity(rule.getSeverity());
@@ -322,5 +335,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             }
         }
         return null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

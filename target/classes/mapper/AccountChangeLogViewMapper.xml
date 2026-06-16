@@ -6,6 +6,7 @@
 
     <sql id="filterConditions">
         <where>
+            a.tenant_id = #{q.tenantId}
             <if test="q.actionType != null and q.actionType != ''">
                 AND a.action_type = #{q.actionType}
             </if>
@@ -48,7 +49,7 @@
                a.action_type       AS actionType,
                a.details           AS details
         FROM account_change_logs a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
     </sql>
 
     <select id="selectPage" resultType="com.cd.dto.AccountChangeLogItemDTO">
@@ -87,21 +88,24 @@
                w.message           AS logMessage,
                w.raw_json          AS rawXml
         FROM account_change_logs a
-        LEFT JOIN hosts h ON h.id = a.host_id
-        LEFT JOIN windows_event_logs w ON w.id = a.source_log_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
+        LEFT JOIN windows_event_logs w ON w.id = a.source_log_id AND w.tenant_id = a.tenant_id
         WHERE a.id = #{id}
+          AND a.tenant_id = #{tenantId}
     </select>
 
     <select id="countToday" resultType="long">
         SELECT COUNT(1)
         FROM account_change_logs
-        WHERE DATE(event_time) = CURDATE()
+        WHERE tenant_id = #{tenantId}
+          AND DATE(event_time) = CURDATE()
     </select>
 
     <select id="countTodayByAction" resultType="long">
         SELECT COUNT(1)
         FROM account_change_logs
         WHERE action_type = #{action}
+          AND tenant_id = #{tenantId}
           AND DATE(event_time) = CURDATE()
     </select>
 
@@ -110,6 +114,7 @@
                h.hostname AS hostname,
                h.ipv4     AS ipv4
         FROM hosts h
+        WHERE h.tenant_id = #{tenantId}
         ORDER BY h.id ASC
     </select>
 </mapper>

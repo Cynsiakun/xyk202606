@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class HostVulnTaskEntity {
 
     private Long id;
+    private Long tenantId;
     private String taskName;
     private String taskType;
     private Long hostId;

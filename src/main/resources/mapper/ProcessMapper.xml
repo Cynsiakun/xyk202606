@@ -6,6 +6,7 @@
 
     <resultMap id="ProcessResultMap" type="com.cd.entity.ProcessEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="task_id" property="taskId"/>
         <result column="host_name" property="hostName"/>
         <result column="mac_address" property="macAddress"/>
@@ -17,7 +18,7 @@
     </resultMap>
 
     <sql id="baseColumns">
-        id, task_id, host_name, mac_address, asset_count, asset_json, deleted, created_at, updated_at
+        id, tenant_id, task_id, host_name, mac_address, asset_count, asset_json, deleted, created_at, updated_at
     </sql>
 
     <sql id="listWhere">
@@ -31,15 +32,35 @@
         </if>
     </sql>
 
+    <sql id="listWhereByTenant">
+        WHERE deleted = 0
+          AND tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (host_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR mac_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="macAddress != null and macAddress != ''">
+            AND mac_address = #{macAddress}
+        </if>
+    </sql>
+
     <insert id="insert" parameterType="com.cd.entity.ProcessEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO processes (task_id, host_name, mac_address, asset_count, asset_json)
-        VALUES (#{taskId}, #{hostName}, #{macAddress}, #{assetCount}, #{assetJson})
+        INSERT INTO processes (tenant_id, task_id, host_name, mac_address, asset_count, asset_json)
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostName}, #{macAddress}, #{assetCount}, #{assetJson})
     </insert>
 
     <select id="selectById" resultMap="ProcessResultMap">
         SELECT <include refid="baseColumns"/>
         FROM processes
         WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectByIdAndTenant" resultMap="ProcessResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM processes
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
     </select>
 
     <select id="selectPage" resultMap="ProcessResultMap">
@@ -50,13 +71,34 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <select id="selectPageByTenant" resultMap="ProcessResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM processes
+        <include refid="listWhereByTenant"/>
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
     <select id="countFiltered" resultType="long">
         SELECT COUNT(1) FROM processes
         <include refid="listWhere"/>
     </select>
 
+    <select id="countFilteredByTenant" resultType="long">
+        SELECT COUNT(1) FROM processes
+        <include refid="listWhereByTenant"/>
+    </select>
+
     <update id="softDeleteById">
         UPDATE processes SET deleted = 1 WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="softDeleteByIdAndTenant">
+        UPDATE processes
+        SET deleted = 1
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
     </update>
 
     <update id="updateAssetJsonById">
@@ -66,6 +108,15 @@
         WHERE id = #{id} AND deleted = 0
     </update>
 
+    <update id="updateAssetJsonByIdAndTenant">
+        UPDATE processes
+        SET asset_json = #{assetJson},
+            asset_count = #{assetCount}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
+    </update>
+
     <select id="selectLatestPerMac" resultMap="ProcessResultMap">
         SELECT <include refid="baseColumns"/>
         FROM processes a
@@ -73,11 +124,35 @@
           AND a.id = (SELECT MAX(id) FROM processes WHERE mac_address = a.mac_address AND deleted = 0)
     </select>
 
+    <select id="selectLatestPerMacByTenant" resultMap="ProcessResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM processes a
+        WHERE a.deleted = 0
+          AND a.tenant_id = #{tenantId}
+          AND a.id = (
+              SELECT MAX(id)
+              FROM processes
+              WHERE mac_address = a.mac_address
+                AND tenant_id = #{tenantId}
+                AND deleted = 0
+          )
+    </select>
+
     <select id="selectLatestByMac" resultMap="ProcessResultMap">
         SELECT <include refid="baseColumns"/>
         FROM processes
         WHERE deleted = 0
           AND mac_address = #{macAddress}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestByMacAndTenant" resultMap="ProcessResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM processes
+        WHERE deleted = 0
+          AND mac_address = #{macAddress}
+          AND tenant_id = #{tenantId}
         ORDER BY id DESC
         LIMIT 1
     </select>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#x79df;&#x6237;&#x7ba1;&#x7406;</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/platform-tenant.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="tenantSearchForm">
+            <div class="toolbar-group">
+                <input type="text" name="keyword" placeholder="&#x6309;&#x79df;&#x6237;&#x540d;&#x6216;&#x8054;&#x7cfb;&#x4eba;&#x641c;&#x7d22;" autocomplete="off" class="layui-input toolbar-input">
+                <select name="status" class="toolbar-select">
+                    <option value="">&#x5168;&#x90e8;&#x72b6;&#x6001;</option>
+                    <option value="1">&#x542f;&#x7528;</option>
+                    <option value="0">&#x7981;&#x7528;</option>
+                </select>
+                <button type="submit" class="layui-btn" lay-submit lay-filter="tenantSearchSubmit">&#x641c;&#x7d22;</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">&#x91cd;&#x7f6e;</button>
+            </div>
+            <button type="button" class="layui-btn" id="addTenantButton">
+                <i class="layui-icon layui-icon-add-1"></i> &#x65b0;&#x5efa;&#x79df;&#x6237;
+            </button>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="tenantTable" lay-filter="tenantTable"></table>
+    </div>
+</div>
+
+<template id="tenantFormTemplate">
+    <form class="layui-form popup-form" lay-filter="tenantForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x79df;&#x6237;&#x540d;</label>
+            <div class="layui-input-block">
+                <input type="text" name="name" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x8054;&#x7cfb;&#x4eba;</label>
+            <div class="layui-input-block">
+                <input type="text" name="contact" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x72b6;&#x6001;</label>
+            <div class="layui-input-block">
+                <select name="status">
+                    <option value="1">&#x542f;&#x7528;</option>
+                    <option value="0">&#x7981;&#x7528;</option>
+                </select>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">&#x53d6;&#x6d88;</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveTenant">&#x4fdd;&#x5b58;</button>
+        </div>
+    </form>
+</template>
+
+<template id="licensePanelTemplate">
+    <div class="license-panel">
+        <div class="license-panel-head">
+            <div>
+                <div class="license-panel-title" id="licenseTenantName"></div>
+                <div class="license-panel-sub" id="licenseTenantMeta"></div>
+            </div>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-normal layui-btn-sm" id="generateLicenseButton">
+                    <i class="layui-icon layui-icon-add-1"></i> &#x751f;&#x6210; License
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary layui-btn-sm" id="offlineLicenseButton">
+                    <i class="layui-icon layui-icon-download-circle"></i> &#x79bb;&#x7ebf;&#x6587;&#x4ef6;
+                </button>
+            </div>
+        </div>
+        <table id="licenseTable" lay-filter="licenseTable"></table>
+    </div>
+</template>
+
+<template id="licenseFormTemplate">
+    <form class="layui-form popup-form" lay-filter="licenseForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x7248;&#x672c;</label>
+            <div class="layui-input-block">
+                <select name="edition" required lay-verify="required">
+                    <option value="TRIAL">Trial</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x4e3b;&#x673a;&#x4e0a;&#x9650;</label>
+            <div class="layui-input-block">
+                <input type="number" name="hostLimit" min="0" placeholder="&#x7559;&#x7a7a;&#x4f7f;&#x7528;&#x7248;&#x672c;&#x9ed8;&#x8ba4;&#x503c;" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x7528;&#x6237;&#x4e0a;&#x9650;</label>
+            <div class="layui-input-block">
+                <input type="number" name="userLimit" min="0" placeholder="&#x7559;&#x7a7a;&#x4f7f;&#x7528;&#x7248;&#x672c;&#x9ed8;&#x8ba4;&#x503c;" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x5230;&#x671f;&#x65f6;&#x95f4;</label>
+            <div class="layui-input-block">
+                <input type="text" name="expireTime" id="licenseExpireTime" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">MachineId</label>
+            <div class="layui-input-block">
+                <input type="text" name="machineId" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">&#x72b6;&#x6001;</label>
+            <div class="layui-input-block">
+                <select name="status">
+                    <option value="1">&#x542f;&#x7528;</option>
+                    <option value="0">&#x7981;&#x7528;</option>
+                </select>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">&#x53d6;&#x6d88;</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveLicense">&#x751f;&#x6210;</button>
+        </div>
+    </form>
+</template>
+
+<template id="offlineFormTemplate">
+    <form class="layui-form popup-form" lay-filter="offlineForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">LicenseKey</label>
+            <div class="layui-input-block">
+                <input type="text" name="licenseKey" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">MachineId</label>
+            <div class="layui-input-block">
+                <input type="text" name="machineId" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="offline-result" id="offlineResult" hidden>
+            <textarea id="offlineJson" class="layui-textarea" readonly></textarea>
+            <div class="popup-actions compact">
+                <button type="button" class="layui-btn layui-btn-primary" id="copyOfflineButton">&#x590d;&#x5236; JSON</button>
+                <button type="button" class="layui-btn layui-btn-normal" id="downloadOfflineButton">&#x4e0b;&#x8f7d; license.dat</button>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">&#x5173;&#x95ed;</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="generateOffline">&#x751f;&#x6210;</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/platform-tenant.js"></script>
+</body>
+</html>

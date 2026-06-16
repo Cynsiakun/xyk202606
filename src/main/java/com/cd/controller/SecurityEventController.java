@@ -40,6 +40,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/security-event")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('LOG')")
 public class SecurityEventController {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

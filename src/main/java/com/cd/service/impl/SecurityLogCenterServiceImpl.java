@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.EventLogDetailDTO;
 import com.cd.dto.EventLogItemDTO;
 import com.cd.dto.EventLogQueryDTO;
@@ -42,6 +43,7 @@ public class SecurityLogCenterServiceImpl implements SecurityLogCenterService {
 
     @Override
     public PageResult<EventLogItemDTO> page(EventLogQueryDTO query, int page, int size, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         query.setSize(size);
         query.setOffset((page - 1) * size);
@@ -52,26 +54,28 @@ public class SecurityLogCenterServiceImpl implements SecurityLogCenterService {
 
     @Override
     public EventLogStatDTO stats() {
+        Long tenantId = currentTenantId();
         EventLogStatDTO stat = new EventLogStatDTO();
-        stat.setTodaySecurity(mapper.countTodayByType("Security"));
-        stat.setTodaySystem(mapper.countTodayByType("System"));
-        stat.setTodayApplication(mapper.countTodayByType("Application"));
-        stat.setTodayError(mapper.countTodayError());
+        stat.setTodaySecurity(mapper.countTodayByType("Security", tenantId));
+        stat.setTodaySystem(mapper.countTodayByType("System", tenantId));
+        stat.setTodayApplication(mapper.countTodayByType("Application", tenantId));
+        stat.setTodayError(mapper.countTodayError(tenantId));
         return stat;
     }
 
     @Override
     public EventLogDetailDTO detail(Long id) {
-        return mapper.selectDetailById(id);
+        return mapper.selectDetailById(id, currentTenantId());
     }
 
     @Override
     public List<HostOptionDTO> hostOptions() {
-        return mapper.selectHostOptions();
+        return mapper.selectHostOptions(currentTenantId());
     }
 
     @Override
     public byte[] exportCsv(EventLogQueryDTO query, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         List<EventLogItemDTO> rows = mapper.selectForExport(query, EXPORT_LIMIT);
 
@@ -112,5 +116,10 @@ public class SecurityLogCenterServiceImpl implements SecurityLogCenterService {
         String column = sortField == null ? null : SORT_COLUMNS.get(sortField);
         query.setSortColumn(column != null ? column : "event_time");
         query.setSortDirection("asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC");
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

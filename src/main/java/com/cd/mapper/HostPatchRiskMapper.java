@@ -11,6 +11,13 @@ public interface HostPatchRiskMapper {
 
     HostPatchRiskEntity selectByRiskId(@Param("riskId") String riskId);
 
+    HostPatchRiskEntity selectByRiskIdAndTenant(@Param("riskId") String riskId,
+                                                @Param("tenantId") Long tenantId);
+
     int markFixedByHostIdExceptRiskIds(@Param("hostId") Long hostId,
                                        @Param("riskIds") java.util.List<String> riskIds);
+
+    int markFixedByHostIdExceptRiskIdsAndTenant(@Param("hostId") Long hostId,
+                                                @Param("riskIds") java.util.List<String> riskIds,
+                                                @Param("tenantId") Long tenantId);
 }

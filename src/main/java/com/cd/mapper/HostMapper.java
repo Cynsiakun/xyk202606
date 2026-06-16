@@ -13,11 +13,20 @@ public interface HostMapper {
 
     int deleteById(@Param("id") Long id);
 
+    int deleteByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     HostEntity selectById(@Param("id") Long id);
+
+    HostEntity selectByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     HostEntity selectByMac(@Param("macAddress") String macAddress);
 
+    HostEntity selectByMacAndTenant(@Param("macAddress") String macAddress, @Param("tenantId") Long tenantId);
+
     HostEntity selectByNormalizedMac(@Param("normalizedMac") String normalizedMac);
+
+    HostEntity selectByNormalizedMacAndTenant(@Param("normalizedMac") String normalizedMac,
+                                              @Param("tenantId") Long tenantId);
 
     /**
      * 按 MAC 唯一键做存在即更新、不存在即插入。
@@ -56,9 +65,20 @@ public interface HostMapper {
 
     List<Long> selectAllIds();
 
+    List<Long> selectAllIdsByTenant(@Param("tenantId") Long tenantId);
+
     List<HostEntity> selectPage(@Param("offset") int offset,
                                 @Param("size") int size,
                                 @Param("keyword") String keyword);
 
+    List<HostEntity> selectPageByTenant(@Param("offset") int offset,
+                                        @Param("size") int size,
+                                        @Param("keyword") String keyword,
+                                        @Param("tenantId") Long tenantId);
+
     long countAll(@Param("keyword") String keyword);
+
+    long countAllByTenant(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
+
+    long countByTenantId(@Param("tenantId") Long tenantId);
 }

@@ -33,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/rbac")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('ROLE_MANAGE')")
 public class RbacController {
 
     private final RbacService rbacService;

@@ -38,6 +38,10 @@ security:
     secret: 1234567890123456789012345678901234567890123456789012345678901234
     expire-seconds: 86400
 
+license:
+  rsa:
+    private-key: ${LICENSE_RSA_PRIVATE_KEY:}
+
 ai:
   api-key: ${DASHSCOPE_API_KEY:}
   base-url: https://dashscope.aliyuncs.com/compatible-mode/v1

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class InstalledPatchEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private String patchId;
     private String patchType;

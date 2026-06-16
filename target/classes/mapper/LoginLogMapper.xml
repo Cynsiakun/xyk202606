@@ -6,6 +6,7 @@
 
     <resultMap id="LoginLogEntityResultMap" type="com.cd.entity.LoginLogEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="user_id" property="userId"/>
         <result column="user_name" property="userName"/>
         <result column="login_time" property="loginTime"/>
@@ -15,16 +16,17 @@
     </resultMap>
 
     <insert id="insert" parameterType="com.cd.entity.LoginLogEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO login_log (user_id, user_name, ip_address, status, message)
-        VALUES (#{userId}, #{userName}, #{ipAddress}, #{status}, #{message})
+        INSERT INTO login_log (tenant_id, user_id, user_name, ip_address, status, message)
+        VALUES (COALESCE(#{tenantId}, 0), #{userId}, #{userName}, #{ipAddress}, #{status}, #{message})
     </insert>
 
     <select id="selectPage" resultMap="LoginLogEntityResultMap">
-        SELECT id, user_id, user_name, login_time, ip_address, status, message
+        SELECT id, tenant_id, user_id, user_name, login_time, ip_address, status, message
         FROM login_log
         <where>
+            tenant_id = #{tenantId}
             <if test="userName != null and userName != ''">
-                user_name LIKE CONCAT('%', #{userName}, '%')
+                AND user_name LIKE CONCAT('%', #{userName}, '%')
             </if>
             <if test="status != null">
                 AND status = #{status}
@@ -38,8 +40,9 @@
         SELECT COUNT(1)
         FROM login_log
         <where>
+            tenant_id = #{tenantId}
             <if test="userName != null and userName != ''">
-                user_name LIKE CONCAT('%', #{userName}, '%')
+                AND user_name LIKE CONCAT('%', #{userName}, '%')
             </if>
             <if test="status != null">
                 AND status = #{status}
@@ -51,6 +54,7 @@
         SELECT COUNT(1)
         FROM login_log
         WHERE status = 1
+          AND tenant_id = #{tenantId}
           AND DATE(login_time) = CURDATE()
     </select>
 
@@ -58,6 +62,7 @@
         SELECT COUNT(DISTINCT user_id)
         FROM login_log
         WHERE status = 1
+          AND tenant_id = #{tenantId}
           AND user_id IS NOT NULL
           AND login_time &gt;= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
     </select>
@@ -65,5 +70,6 @@
     <select id="countTotalLogs" resultType="long">
         SELECT COUNT(1)
         FROM login_log
+        WHERE tenant_id = #{tenantId}
     </select>
 </mapper>

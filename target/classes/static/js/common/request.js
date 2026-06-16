@@ -19,6 +19,31 @@
         }
     }
 
+    function normalizeErrorMessage(message) {
+        if (!message) {
+            return "请求失败";
+        }
+        if (message.indexOf("License feature not allowed: AI_") === 0) {
+            return "当前授权版本不支持 AI 功能";
+        }
+        if (message === "License feature not allowed: ASSET_EXPORT") {
+            return "当前授权版本不支持资产导出";
+        }
+        if (message.indexOf("License feature not allowed:") === 0) {
+            return "当前授权版本不支持该功能";
+        }
+        if (message === "User quota exceeded") {
+            return "用户配额已满";
+        }
+        if (message === "Host quota exceeded" || message === "Host limit exceeded") {
+            return "主机配额已满";
+        }
+        if (message === "No effective License for current tenant") {
+            return "当前租户暂无有效授权";
+        }
+        return message;
+    }
+
     async function request(url, options, extraOptions) {
         var requestOptions = options || {};
         var customOptions = extraOptions || {};
@@ -48,14 +73,15 @@
         }
 
         if (!response.ok || !result || result.code !== 200) {
-            var requestError = new Error(result && result.message ? result.message : "请求失败");
+            var rawMessage = result && result.message ? result.message : "请求失败";
+            var requestError = new Error(normalizeErrorMessage(rawMessage));
             requestError.code = result && result.code ? result.code : response.status;
 
             if (customOptions.showErrorMessage !== false) {
                 showMessage(requestError.message, 2, customOptions.errorTime || 2200);
             }
 
-            if ((requestError.code === 401 || requestError.code === 403) && customOptions.redirectOnUnauthorized !== false) {
+            if (requestError.code === 401 && customOptions.redirectOnUnauthorized !== false) {
                 window.AppAuth.clearLogin();
                 window.AppAuth.redirectToLogin();
             }
@@ -71,6 +97,7 @@
 
     window.AppRequest = {
         request: request,
-        showMessage: showMessage
+        showMessage: showMessage,
+        normalizeErrorMessage: normalizeErrorMessage
     };
 })(window);

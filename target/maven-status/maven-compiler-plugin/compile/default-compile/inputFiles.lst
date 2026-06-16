@@ -17,10 +17,17 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\config\VulnModuleInitializer
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\WebMvcConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\config\WebSocketConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\constant\AuthConstants.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\LicenseAccessDeniedException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\ProbeConfirmRequiredException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\ResourceNotFoundException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\exception\UnauthorizedException.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\handler\GlobalExceptionHandler.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseConfig.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseFeature.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseFeatureInterceptor.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseGuard.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseProperties.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\license\LicenseSigner.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\PageResult.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\Result.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\CustomUserDetailsService.java
@@ -35,6 +42,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\common\security\PermissionChecker.j
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityConfig.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUser.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\security\SecurityUtils.java
+C:\DATA\2026实训\java\src\main\java\com\cd\common\security\TenantContextHolder.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\ws\AlertHandshakeInterceptor.java
 C:\DATA\2026实训\java\src\main\java\com\cd\common\ws\AlertWebSocketHandler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\AccountChangeLogController.java
@@ -49,11 +57,14 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\DashboardController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\HostLogController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\InstalledPatchManagementController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\LicenseActivationController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\LoginLogController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\LoginSecurityLogController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PageController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PatchCveMapController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\PatchSecurityController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\PlatformLicenseController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\PlatformTenantController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\SecurityEventController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\SecurityLogCenterController.java
@@ -114,6 +125,13 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\InstalledPatchBatchDeleteDTO.ja
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\InstalledPatchCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\InstalledPatchResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\InstalledPatchUpdateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseActivateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseCurrentDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseDtoConverter.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseGenerateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseOfflineResponseDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicensePayloadDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\LicenseResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\LoginLogResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\LoginSecurityLogDetailDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\LoginSecurityLogItemDTO.java
@@ -144,6 +162,9 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysPermissionUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleUpdateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantCreateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantResponseDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantStatusUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TestCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TestResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TestUpdateDTO.java
@@ -189,6 +210,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostPatchStatusEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostVulnResultEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\HostVulnTaskEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\InstalledPatchEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\LicenseEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\LoginLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\LoginSecurityLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\MqErrorLogEntity.java
@@ -202,6 +224,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysPermissionEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysRoleEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysRolePermissionEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\SysUserRoleEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\TenantEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\TestEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\UserEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\VulnRuleEntity.java
@@ -226,6 +249,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostVulnResultMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\HostVulnTaskMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\InstalledPatchManagementMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\InstalledPatchMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LicenseMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginSecurityLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\LoginSecurityLogViewMapper.java
@@ -245,6 +269,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysPermissionMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysRoleMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysRolePermissionMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\SysUserRoleMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\TenantMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\TestMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\UserMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\VulnRuleMapper.java
@@ -300,6 +325,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DashScopeAiServiceImpl
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\DefaultRuleEnrichmentService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\HostServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\InstalledPatchManagementServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\LicenseServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\LoginLogServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\LoginSecurityLogViewServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\PatchCveMapServiceImpl.java
@@ -313,6 +339,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\RuleEngineServiceImpl.
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\SecurityAlertRuleEngineImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\SecurityEventServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\SecurityLogCenterServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\TenantServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\TestServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\UserServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnDetectionServiceImpl.java
@@ -322,6 +349,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleEngineImpl.jav
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnRuleManagementServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\VulnVerificationServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\InstalledPatchManagementService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\LicenseService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\LoginLogService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\LoginSecurityLogViewService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\PatchCveMapService.java
@@ -336,6 +364,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\RuleEnrichmentService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\SecurityAlertRuleEngine.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\SecurityEventService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\SecurityLogCenterService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\TenantService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\TestService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\UserService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnDetectionService.java

@@ -77,6 +77,7 @@ public class PatchScanServiceImpl implements PatchScanService {
             }
 
             Long hostId = host.getId();
+            Long tenantId = host.getTenantId() == null ? 0L : host.getTenantId();
             JsonNode patchesNode = root.path("installedPatches");
             if (patchesNode.isMissingNode() || patchesNode.isNull() || !patchesNode.isArray()) {
                 saveError(queueName, message, "缺少必要字段 installedPatches 或其类型不是数组");
@@ -86,12 +87,12 @@ public class PatchScanServiceImpl implements PatchScanService {
             log.info("关联主机成功: host_id={}, mac={}, patch_count={}", hostId, rawMac, patchesNode.size());
 
             LocalDateTime scanTime = parseDateTime(firstText(hostPatchNode, "scan_time", "scanTime"));
-            upsertHostPatchStatus(hostId, hostPatchNode, scanTime);
+            upsertHostPatchStatus(hostId, tenantId, hostPatchNode, scanTime);
             log.info("host_patch_status入库成功: host_id={}", hostId);
 
             int count = 0;
             for (JsonNode patchNode : patchesNode) {
-                upsertInstalledPatch(hostId, patchNode, scanTime);
+                upsertInstalledPatch(hostId, tenantId, patchNode, scanTime);
                 count++;
             }
             updateHostLastScanTime(hostId, scanTime);
@@ -102,15 +103,17 @@ public class PatchScanServiceImpl implements PatchScanService {
         }
     }
 
-    private void upsertHostPatchStatus(Long hostId, JsonNode hostPatchNode, LocalDateTime scanTime) {
-        HostPatchStatusEntity entity = hostPatchStatusMapper.selectLatestByHostId(hostId);
+    private void upsertHostPatchStatus(Long hostId, Long tenantId, JsonNode hostPatchNode, LocalDateTime scanTime) {
+        HostPatchStatusEntity entity = hostPatchStatusMapper.selectLatestByHostIdAndTenant(hostId, tenantId);
         boolean create = entity == null;
         if (create) {
             entity = new HostPatchStatusEntity();
+            entity.setTenantId(tenantId);
             entity.setHostId(hostId);
             entity.setCreatedAt(LocalDateTime.now());
         }
 
+        entity.setTenantId(tenantId);
         entity.setOsFamily(firstText(hostPatchNode, "os_family", "osFamily"));
         entity.setOsBuild(firstText(hostPatchNode, "os_build", "osBuild"));
         entity.setKernelVersion(firstText(hostPatchNode, "kernel_version", "kernelVersion"));
@@ -128,10 +131,10 @@ public class PatchScanServiceImpl implements PatchScanService {
         } else {
             hostPatchStatusMapper.updateById(entity);
         }
-        hostPatchStatusMapper.deleteByHostIdAndExcludeId(hostId, entity.getId());
+        hostPatchStatusMapper.deleteByHostIdAndTenantExcludeId(hostId, tenantId, entity.getId());
     }
 
-    private void upsertInstalledPatch(Long hostId, JsonNode patchNode, LocalDateTime scanTime) {
+    private void upsertInstalledPatch(Long hostId, Long tenantId, JsonNode patchNode, LocalDateTime scanTime) {
         String rawPatchId = firstText(patchNode, "patch_id", "patchId");
         String normalizedPatchId = patchNormalizeService.normalizePatchId(rawPatchId);
         if (!StringUtils.hasText(normalizedPatchId)) {
@@ -139,13 +142,16 @@ public class PatchScanServiceImpl implements PatchScanService {
             return;
         }
 
-        InstalledPatchEntity entity = installedPatchMapper.selectLatestByHostIdAndPatchId(hostId, normalizedPatchId);
+        InstalledPatchEntity entity = installedPatchMapper.selectLatestByHostIdAndPatchIdAndTenant(
+                hostId, normalizedPatchId, tenantId);
         boolean create = entity == null;
         if (create) {
             entity = new InstalledPatchEntity();
+            entity.setTenantId(tenantId);
             entity.setHostId(hostId);
         }
 
+        entity.setTenantId(tenantId);
         entity.setPatchId(normalizedPatchId);
         entity.setPatchType(firstText(patchNode, "patch_type", "patchType"));
         entity.setProductName(firstText(patchNode, "product_name", "productName"));
@@ -165,7 +171,8 @@ public class PatchScanServiceImpl implements PatchScanService {
         } else {
             installedPatchMapper.updateById(entity);
         }
-        installedPatchMapper.deleteByHostIdAndPatchIdExcludeId(hostId, normalizedPatchId, entity.getId());
+        installedPatchMapper.deleteByHostIdAndPatchIdAndTenantExcludeId(
+                hostId, normalizedPatchId, tenantId, entity.getId());
     }
 
     private void updateHostLastScanTime(Long hostId, LocalDateTime scanTime) {

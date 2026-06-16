@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class HostEntity {
 
     private Long id;
+    private Long tenantId;
     private String hostname;
     private String ipv4;
     private String macAddress;

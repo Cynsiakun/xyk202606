@@ -5,6 +5,7 @@ import com.cd.dto.VulnAffectedHostDTO;
 import com.cd.dto.VulnHostOverviewDTO;
 import com.cd.dto.VulnOverviewDTO;
 import com.cd.dto.PatchSecurityActionResultDTO;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.entity.HostVulnResultEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.HostVulnResultMapper;
@@ -25,18 +26,18 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
 
     @Override
     public VulnDetectionSummaryDTO summary() {
-        VulnDetectionSummaryDTO summary = hostVulnResultMapper.selectSummary();
+        VulnDetectionSummaryDTO summary = hostVulnResultMapper.selectSummaryByTenant(currentTenantId());
         return summary == null ? new VulnDetectionSummaryDTO() : summary;
     }
 
     @Override
     public List<VulnHostOverviewDTO> listHostOverviews() {
-        return hostVulnResultMapper.selectHostOverviews();
+        return hostVulnResultMapper.selectHostOverviewsByTenant(currentTenantId());
     }
 
     @Override
     public List<VulnOverviewDTO> listVulnOverviews() {
-        return hostVulnResultMapper.selectVulnOverviews();
+        return hostVulnResultMapper.selectVulnOverviewsByTenant(currentTenantId());
     }
 
     @Override
@@ -44,7 +45,7 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
         if (ruleId == null) {
             return List.of();
         }
-        return hostVulnResultMapper.selectAffectedHostsByRuleId(ruleId);
+        return hostVulnResultMapper.selectAffectedHostsByRuleIdAndTenant(ruleId, currentTenantId());
     }
 
     @Override
@@ -56,12 +57,12 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
                 .filter(id -> id != null && id > 0)
                 .distinct()
                 .toList();
-        return ids.isEmpty() ? 0 : hostVulnResultMapper.ignoreByResultIds(ids);
+        return ids.isEmpty() ? 0 : hostVulnResultMapper.ignoreByResultIdsAndTenant(ids, currentTenantId());
     }
 
     @Override
     public PatchSecurityActionResultDTO evaluateAllHosts() {
-        List<Long> hostIds = hostMapper.selectAllIds();
+        List<Long> hostIds = hostMapper.selectAllIdsByTenant(currentTenantId());
         PatchSecurityActionResultDTO result = new PatchSecurityActionResultDTO();
         result.setTotal(hostIds.size());
         for (Long hostId : hostIds) {
@@ -85,7 +86,12 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
         if (hostId == null) {
             return List.of();
         }
-        return hostVulnResultMapper.selectActiveByHostId(hostId);
+        return hostVulnResultMapper.selectActiveByHostIdAndTenant(hostId, currentTenantId());
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
 }

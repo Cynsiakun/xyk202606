@@ -2,6 +2,7 @@ package com.cd.service.impl;
 
 import com.cd.entity.AccountEntity;
 import com.cd.entity.AppEntity;
+import com.cd.entity.HostEntity;
 import com.cd.entity.MqErrorLogEntity;
 import com.cd.entity.ProcessEntity;
 import com.cd.entity.ServiceEntity;
@@ -86,6 +87,13 @@ public class AssetDataServiceImpl implements AssetDataService {
                 return;
             }
             String macAddress = macNode.asText();
+            HostEntity host = hostMapper.selectByNormalizedMac(normalizeMac(macAddress));
+            if (host == null) {
+                saveError(queueName, message, "未找到匹配主机: mac=" + macAddress);
+                log.warn("资产探测消息未关联到主机: mac={}", macAddress);
+                return;
+            }
+            Long tenantId = host.getTenantId() == null ? 0L : host.getTenantId();
 
             // 按类型确定资产数组字段与统计字段
             String arrayField;
@@ -125,6 +133,7 @@ public class AssetDataServiceImpl implements AssetDataService {
             switch (type) {
                 case "account" -> {
                     AccountEntity entity = new AccountEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
@@ -134,6 +143,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                 }
                 case "service" -> {
                     ServiceEntity entity = new ServiceEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
@@ -143,6 +153,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                 }
                 case "process" -> {
                     ProcessEntity entity = new ProcessEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
@@ -152,6 +163,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                 }
                 case "app" -> {
                     AppEntity entity = new AppEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
@@ -161,7 +173,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                 }
             }
             hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
-            triggerStaticVulnMatch(macAddress);
+            triggerStaticVulnMatch(macAddress, tenantId);
             log.info("资产探测结果已入库: queue={}, type={}, host={}, count={}", queueName, type, hostName, assetCount);
 
         } catch (Exception e) {
@@ -170,14 +182,15 @@ public class AssetDataServiceImpl implements AssetDataService {
         }
     }
 
-    private void triggerStaticVulnMatch(String macAddress) {
+    private void triggerStaticVulnMatch(String macAddress, Long tenantId) {
         try {
-            var host = hostMapper.selectByMac(macAddress);
+            Long resolvedTenantId = tenantId == null ? 0L : tenantId;
+            var host = hostMapper.selectByNormalizedMacAndTenant(normalizeMac(macAddress), resolvedTenantId);
             if (host == null || host.getId() == null) {
                 log.warn("资产入库后未找到主机，跳过静态漏洞匹配: mac={}", macAddress);
                 return;
             }
-            vulnRuleEngine.evaluateHost(host.getId());
+            vulnRuleEngine.evaluateHostForTenant(host.getId(), resolvedTenantId);
         } catch (Exception e) {
             log.warn("资产入库后静态漏洞匹配失败: mac={}", macAddress, e);
         }
@@ -192,6 +205,10 @@ public class AssetDataServiceImpl implements AssetDataService {
             case "app_queue" -> "app";
             default -> null;
         };
+    }
+
+    private String normalizeMac(String mac) {
+        return mac == null ? "" : mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
     private void saveError(String queueName, String rawMessage, String errorReason) {

@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/baseline/rule-management")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('BASELINE')")
 public class BaselineRuleManagementController {
 
     private final BaselineRuleManagementService baselineRuleManagementService;

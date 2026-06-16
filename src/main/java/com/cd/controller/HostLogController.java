@@ -30,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/host-log")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('LOG')")
 public class HostLogController {
 
     private final SecurityLogCenterService securityLogCenterService;

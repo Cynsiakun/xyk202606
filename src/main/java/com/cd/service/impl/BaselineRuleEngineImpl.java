@@ -92,6 +92,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
             return;
         }
         Long taskHostId = taskHost.getId();
+        Long tenantId = taskHost.getTenantId() == null ? (checkData.getTenantId() == null ? 0L : checkData.getTenantId()) : taskHost.getTenantId();
 
         // 幂等：同一 task_host 已生成结果则跳过
         if (baselineResultMapper.countByTaskHostId(taskHostId) > 0) {
@@ -119,7 +120,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         int score = 0;
 
         for (JsonNode result : results) {
-            BaselineResultEntity entity = buildResult(result, taskId, taskHostId, hostId, itemMap, scanTime, now);
+            BaselineResultEntity entity = buildResult(result, taskId, taskHostId, hostId, tenantId, itemMap, scanTime, now);
             baselineResultMapper.insert(entity);
             inheritRemediationStatus(entity);
             switch (entity.getStatus()) {
@@ -133,7 +134,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         }
 
         // 写入汇总并将 task_host 置为 FINISHED
-        writeSummary(hostId, taskId, passCount, failCount, score, scanTime != null ? scanTime : now);
+        writeSummary(hostId, taskId, tenantId, passCount, failCount, score, scanTime != null ? scanTime : now);
         String summaryJson = buildHostSummaryJson(passCount, failCount, score);
         baselineTaskMapper.finishTaskHost(taskHostId, HOST_STATUS_FINISHED, summaryJson,
                 scanTime != null ? scanTime : now);
@@ -152,6 +153,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
                                              Long taskId,
                                              Long taskHostId,
                                              Long hostId,
+                                             Long tenantId,
                                              Map<Long, BaselineRuleItemEntity> itemMap,
                                              LocalDateTime scanTime,
                                              LocalDateTime now) {
@@ -177,6 +179,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         String evidence = cleanEvidence(rawEvidence, actualForDisplay);
 
         BaselineResultEntity entity = new BaselineResultEntity();
+        entity.setTenantId(tenantId);
         entity.setTaskId(taskId);
         entity.setTaskHostId(taskHostId);
         entity.setHostId(hostId);
@@ -207,8 +210,8 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         if (entity.getId() == null || entity.getHostId() == null || entity.getRuleId() == null) {
             return;
         }
-        BaselineResultEntity previous = baselineResultMapper.selectLatestBefore(
-                entity.getHostId(), entity.getRuleId(), entity.getCheckKey(), entity.getId());
+        BaselineResultEntity previous = baselineResultMapper.selectLatestBeforeByTenant(
+                entity.getHostId(), entity.getRuleId(), entity.getCheckKey(), entity.getId(), entity.getTenantId());
         if (previous == null || !StringUtils.hasText(previous.getRemediationStatus())) {
             return;
         }
@@ -223,7 +226,7 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
             nextRemediationStatus = STATUS_PASS.equals(entity.getStatus()) ? "FIXED" : "FAILED";
         }
         entity.setRemediationStatus(nextRemediationStatus);
-        baselineResultMapper.updateRemediationStatus(entity.getId(), nextRemediationStatus);
+        baselineResultMapper.updateRemediationStatusByTenant(entity.getId(), nextRemediationStatus, entity.getTenantId());
     }
 
     /**
@@ -350,8 +353,9 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         String cleaned = cleanEvidence(agentMessage, null);
         return StringUtils.hasText(cleaned) ? "检测执行失败：" + cleaned : "检测执行失败：客户端未返回有效结果。";
     }
-    private void writeSummary(Long hostId, Long taskId, int passCount, int failCount, int score, LocalDateTime scanTime) {
+    private void writeSummary(Long hostId, Long taskId, Long tenantId, int passCount, int failCount, int score, LocalDateTime scanTime) {
         BaselineSummaryEntity summary = new BaselineSummaryEntity();
+        summary.setTenantId(tenantId);
         summary.setHostId(hostId);
         summary.setTaskId(taskId);
         summary.setPassCount(passCount);

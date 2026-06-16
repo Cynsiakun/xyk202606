@@ -1,9 +1,12 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
@@ -51,11 +54,16 @@ public class HostServiceImpl implements HostService {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final AmqpAdmin amqpAdmin;
+    private final LicenseGuard licenseGuard;
 
     @Override
     public HostResponseDTO create(HostCreateDTO dto) {
         validateMacUnique(null, dto.getMacAddress());
+        Long tenantId = currentTenantId();
+        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        licenseGuard.requireHostQuotaBeforeCreate();
         HostEntity entity = new HostEntity();
+        entity.setTenantId(tenantId);
         entity.setHostname(dto.getHostname());
         entity.setIpv4(dto.getIpv4());
         entity.setMacAddress(dto.getMacAddress());
@@ -72,11 +80,13 @@ public class HostServiceImpl implements HostService {
         entity.setMemUsage(dto.getMemUsage());
         entity.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         hostMapper.insert(entity);
-        return toResponse(hostMapper.selectById(entity.getId()));
+        return toResponse(hostMapper.selectByIdAndTenant(entity.getId(), tenantId));
     }
 
     @Override
     public HostResponseDTO update(Long id, HostUpdateDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        Long tenantId = currentTenantId();
         HostEntity existing = ensureExists(id);
         validateMacUnique(id, dto.getMacAddress());
         existing.setHostname(dto.getHostname());
@@ -95,13 +105,15 @@ public class HostServiceImpl implements HostService {
         existing.setMemUsage(dto.getMemUsage());
         existing.setStatus(dto.getStatus() == null ? existing.getStatus() : dto.getStatus());
         hostMapper.updateById(existing);
-        return toResponse(hostMapper.selectById(id));
+        return toResponse(hostMapper.selectByIdAndTenant(id, tenantId));
     }
 
     @Override
     public void deleteById(Long id) {
+        licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+        Long tenantId = currentTenantId();
         ensureExists(id);
-        hostMapper.deleteById(id);
+        hostMapper.deleteByIdAndTenant(id, tenantId);
     }
 
     @Override
@@ -114,8 +126,9 @@ public class HostServiceImpl implements HostService {
         hostMapper.reconcileStatusByHeartbeat(ONLINE_THRESHOLD_SECONDS);
         int offset = (page - 1) * size;
         String normalizedKeyword = emptyToNull(keyword);
-        long total = hostMapper.countAll(normalizedKeyword);
-        List<HostResponseDTO> list = hostMapper.selectPage(offset, size, normalizedKeyword)
+        Long tenantId = currentTenantId();
+        long total = hostMapper.countAllByTenant(normalizedKeyword, tenantId);
+        List<HostResponseDTO> list = hostMapper.selectPageByTenant(offset, size, normalizedKeyword, tenantId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -180,12 +193,13 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public void sendAssetProbe(AssetProbeDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET_MANAGE);
         String macAddress = dto.getMacAddress();
         if (!StringUtils.hasText(macAddress)) {
             throw new IllegalArgumentException("MAC地址不能为空");
         }
 
-        HostEntity host = hostMapper.selectByMac(macAddress);
+        HostEntity host = hostMapper.selectByMacAndTenant(macAddress, currentTenantId());
         if (!dto.isForce()
                 && host != null
                 && host.getLastScanTime() != null
@@ -198,7 +212,9 @@ public class HostServiceImpl implements HostService {
 
     private void sendAssetProbeInternal(AssetProbeDTO dto, boolean strictOnlineCheck) {
         String macAddress = dto.getMacAddress();
-        HostEntity host = hostMapper.selectByMac(macAddress);
+        HostEntity host = strictOnlineCheck
+                ? hostMapper.selectByMacAndTenant(macAddress, currentTenantId())
+                : hostMapper.selectByMac(macAddress);
         LocalDateTime updatedAt = host == null ? null : host.getUpdatedAt();
         if (strictOnlineCheck && (updatedAt == null
                 || Duration.between(updatedAt, LocalDateTime.now()).getSeconds() > PROBE_ONLINE_THRESHOLD_SECONDS)) {
@@ -251,8 +267,12 @@ public class HostServiceImpl implements HostService {
     }
 
     private void saveImportedRecord(HostEntity imported, CsvImportResultDTO result) {
-        HostEntity existing = hostMapper.selectByNormalizedMac(normalizeMac(imported.getMacAddress()));
+        Long tenantId = currentTenantId();
+        imported.setTenantId(tenantId);
+        HostEntity existing = hostMapper.selectByNormalizedMacAndTenant(normalizeMac(imported.getMacAddress()), tenantId);
         if (existing == null) {
+            licenseGuard.requireFeature(LicenseFeature.HOST_MANAGE);
+            licenseGuard.requireHostQuotaBeforeCreate();
             if (imported.getStatus() == null) {
                 imported.setStatus(1);
             }
@@ -262,6 +282,7 @@ public class HostServiceImpl implements HostService {
         }
 
         imported.setId(existing.getId());
+        imported.setTenantId(tenantId);
         if (imported.getStatus() == null) {
             imported.setStatus(existing.getStatus());
         }
@@ -325,7 +346,7 @@ public class HostServiceImpl implements HostService {
     }
 
     private HostEntity ensureExists(Long id) {
-        HostEntity entity = hostMapper.selectById(id);
+        HostEntity entity = hostMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) {
             throw new ResourceNotFoundException("记录不存在，id=" + id);
         }
@@ -340,6 +361,11 @@ public class HostServiceImpl implements HostService {
         if (hostByMac != null && !hostByMac.getId().equals(id)) {
             throw new IllegalArgumentException("MAC地址已存在");
         }
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private String emptyToNull(String value) {

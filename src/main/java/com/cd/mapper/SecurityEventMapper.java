@@ -19,18 +19,19 @@ public interface SecurityEventMapper {
 
     long countPage(@Param("q") SecurityEventQueryDTO query);
 
-    SecurityEventDetailDTO selectDetailById(@Param("id") Long id);
+    SecurityEventDetailDTO selectDetailById(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    long countByLevel(@Param("level") String level);
+    long countByLevel(@Param("level") String level, @Param("tenantId") Long tenantId);
 
-    long countByStatus(@Param("status") String status);
+    long countByStatus(@Param("status") String status, @Param("tenantId") Long tenantId);
 
     /** 批量更新状态：仅当当前状态在 {@code fromStatuses} 内时才更新（空表示不限制）。 */
     int updateStatus(@Param("ids") List<Long> ids,
                      @Param("status") String status,
-                     @Param("fromStatuses") List<String> fromStatuses);
+                     @Param("fromStatuses") List<String> fromStatuses,
+                     @Param("tenantId") Long tenantId);
 
-    List<HostOptionDTO> selectHostOptions();
+    List<HostOptionDTO> selectHostOptions(@Param("tenantId") Long tenantId);
 
     List<SecurityEventItemDTO> selectForExport(@Param("q") SecurityEventQueryDTO query, @Param("limit") int limit);
 
@@ -42,4 +43,6 @@ public interface SecurityEventMapper {
 
     /** 连接初始同步：最近未处理的 Critical/High 告警。 */
     List<PopupAlertDTO> selectRecentHighCritical(@Param("limit") int limit);
+
+    List<PopupAlertDTO> selectRecentHighCriticalByTenant(@Param("tenantId") Long tenantId, @Param("limit") int limit);
 }

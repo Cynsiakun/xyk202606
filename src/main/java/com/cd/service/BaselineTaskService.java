@@ -6,4 +6,6 @@ import com.cd.dto.BaselineTaskDispatchResponseDTO;
 public interface BaselineTaskService {
 
     BaselineTaskDispatchResponseDTO createAndDispatch(BaselineTaskCreateRequestDTO request);
+
+    BaselineTaskDispatchResponseDTO createAndDispatchForTenant(BaselineTaskCreateRequestDTO request, Long tenantId);
 }

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class BaselineTaskEntity {
 
     private Long id;
+    private Long tenantId;
     private String taskName;
     private String executeType;
     private String cronExpr;

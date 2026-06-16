@@ -5,9 +5,9 @@
 <mapper namespace="com.cd.mapper.BaselineSummaryMapper">
 
     <insert id="upsert" parameterType="com.cd.entity.BaselineSummaryEntity">
-        INSERT INTO baseline_summary (host_id, task_id, pass_count, fail_count, score,
+        INSERT INTO baseline_summary (tenant_id, host_id, task_id, pass_count, fail_count, score,
                                       compliance_rate, last_scan_time)
-        VALUES (#{hostId}, #{taskId}, #{passCount}, #{failCount}, #{score},
+        VALUES (COALESCE(#{tenantId}, 0), #{hostId}, #{taskId}, #{passCount}, #{failCount}, #{score},
                 #{complianceRate}, #{lastScanTime})
         ON DUPLICATE KEY UPDATE
             pass_count = #{passCount},

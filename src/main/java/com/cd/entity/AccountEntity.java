@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class AccountEntity {
 
     private Long id;
+    private Long tenantId;
     private String taskId;
     private String hostName;
     private String macAddress;

@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class SecurityAlertEntity {
 
     private Long id;
+    private Long tenantId;
     private Long sourceLogId;
     private Long hostId;
     private Integer eventId;

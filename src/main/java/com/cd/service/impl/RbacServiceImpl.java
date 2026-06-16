@@ -16,6 +16,7 @@ import com.cd.entity.SysPermissionEntity;
 import com.cd.entity.SysRoleEntity;
 import com.cd.common.config.CacheConfig;
 import com.cd.common.security.PermissionChecker;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.mapper.SysMenuMapper;
 import com.cd.mapper.SysPermissionMapper;
 import com.cd.mapper.SysRoleMapper;
@@ -162,7 +163,7 @@ public class RbacServiceImpl implements RbacService {
     @Override
     @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#userId")
     public void assignRolesToUser(Long userId, List<Long> roleIds) {
-        if (userMapper.selectById(userId) == null) {
+        if (userMapper.selectByIdAndTenant(userId, currentTenantId()) == null) {
             throw new ResourceNotFoundException("用户不存在 id=" + userId);
         }
         validateRoleIds(roleIds);
@@ -174,6 +175,9 @@ public class RbacServiceImpl implements RbacService {
 
     @Override
     public List<Long> getRoleIdsByUserId(Long userId) {
+        if (userMapper.selectByIdAndTenant(userId, currentTenantId()) == null) {
+            throw new ResourceNotFoundException("user not found, id=" + userId);
+        }
         return sysUserRoleMapper.selectRoleIdsByUserId(userId);
     }
 
@@ -281,6 +285,11 @@ public class RbacServiceImpl implements RbacService {
         for (Long permissionId : permissionIds) {
             ensurePermissionExists(permissionId);
         }
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private SysRoleEntity ensureRoleExists(Long id) {

@@ -6,6 +6,7 @@
 
     <sql id="filterConditions">
         <where>
+            l.tenant_id = #{q.tenantId}
             <if test="q.loginResult != null and q.loginResult != ''">
                 AND l.login_result = #{q.loginResult}
             </if>
@@ -53,7 +54,7 @@
                l.process_name   AS processName,
                l.is_elevated    AS isElevated
         FROM login_security_logs l
-        LEFT JOIN hosts h ON h.id = l.host_id
+        LEFT JOIN hosts h ON h.id = l.host_id AND h.tenant_id = l.tenant_id
     </sql>
 
     <select id="selectPage" resultType="com.cd.dto.LoginSecurityLogItemDTO">
@@ -94,15 +95,17 @@
                w.message        AS logMessage,
                w.raw_json       AS rawXml
         FROM login_security_logs l
-        LEFT JOIN hosts h ON h.id = l.host_id
-        LEFT JOIN windows_event_logs w ON w.id = l.source_log_id
+        LEFT JOIN hosts h ON h.id = l.host_id AND h.tenant_id = l.tenant_id
+        LEFT JOIN windows_event_logs w ON w.id = l.source_log_id AND w.tenant_id = l.tenant_id
         WHERE l.id = #{id}
+          AND l.tenant_id = #{tenantId}
     </select>
 
     <select id="countTodayByResult" resultType="long">
         SELECT COUNT(1)
         FROM login_security_logs
         WHERE login_result = #{result}
+          AND tenant_id = #{tenantId}
           AND DATE(event_time) = CURDATE()
     </select>
 
@@ -110,6 +113,7 @@
         SELECT COUNT(1)
         FROM login_security_logs
         WHERE is_elevated = 1
+          AND tenant_id = #{tenantId}
           AND DATE(event_time) = CURDATE()
     </select>
 
@@ -118,6 +122,7 @@
                h.hostname AS hostname,
                h.ipv4     AS ipv4
         FROM hosts h
+        WHERE h.tenant_id = #{tenantId}
         ORDER BY h.id ASC
     </select>
 </mapper>

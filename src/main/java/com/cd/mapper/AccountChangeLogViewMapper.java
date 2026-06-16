@@ -18,15 +18,15 @@ public interface AccountChangeLogViewMapper {
 
     long countPage(@Param("q") AccountChangeLogQueryDTO query);
 
-    AccountChangeLogDetailDTO selectDetailById(@Param("id") Long id);
+    AccountChangeLogDetailDTO selectDetailById(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /** 今日变更总数（按 event_time）。 */
-    long countToday();
+    long countToday(@Param("tenantId") Long tenantId);
 
     /** 今日某动作数量（按 event_time）。 */
-    long countTodayByAction(@Param("action") String action);
+    long countTodayByAction(@Param("action") String action, @Param("tenantId") Long tenantId);
 
-    List<HostOptionDTO> selectHostOptions();
+    List<HostOptionDTO> selectHostOptions(@Param("tenantId") Long tenantId);
 
     List<AccountChangeLogItemDTO> selectForExport(@Param("q") AccountChangeLogQueryDTO query, @Param("limit") int limit);
 }

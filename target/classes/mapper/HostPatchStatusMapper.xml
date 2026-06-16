@@ -6,6 +6,7 @@
 
     <resultMap id="HostPatchStatusResultMap" type="com.cd.entity.HostPatchStatusEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="host_id" property="hostId"/>
         <result column="os_family" property="osFamily"/>
         <result column="os_build" property="osBuild"/>
@@ -23,11 +24,11 @@
 
     <insert id="insert" parameterType="com.cd.entity.HostPatchStatusEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO host_patch_status (
-            host_id, os_family, os_build, kernel_version, support_status,
+            tenant_id, host_id, os_family, os_build, kernel_version, support_status,
             last_boot_time, pending_reboot, asset_criticality, risk_level,
             missing_patch_count, scan_time, created_at, updated_at
         ) VALUES (
-            #{hostId}, #{osFamily}, #{osBuild}, #{kernelVersion}, #{supportStatus},
+            COALESCE(#{tenantId}, 0), #{hostId}, #{osFamily}, #{osBuild}, #{kernelVersion}, #{supportStatus},
             #{lastBootTime}, #{pendingReboot}, #{assetCriticality}, #{riskLevel},
             #{missingPatchCount}, #{scanTime}, #{createdAt}, #{updatedAt}
         )
@@ -58,9 +59,25 @@
         LIMIT 1
     </select>
 
+    <select id="selectLatestByHostIdAndTenant" resultMap="HostPatchStatusResultMap">
+        SELECT *
+        FROM host_patch_status
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
     <delete id="deleteByHostIdAndExcludeId">
         DELETE FROM host_patch_status
         WHERE host_id = #{hostId}
+          AND id &lt;&gt; #{excludeId}
+    </delete>
+
+    <delete id="deleteByHostIdAndTenantExcludeId">
+        DELETE FROM host_patch_status
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
           AND id &lt;&gt; #{excludeId}
     </delete>
 </mapper>

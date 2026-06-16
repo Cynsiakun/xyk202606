@@ -33,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/baseline")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('BASELINE')")
 public class BaselineTaskController {
 
     private final BaselineTaskService baselineTaskService;

@@ -4,12 +4,15 @@ import com.cd.common.PageResult;
 import com.cd.common.config.CacheConfig;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
 import com.cd.common.security.CustomUserDetailsService;
 import com.cd.common.security.JwtTokenBlacklistService;
 import com.cd.common.security.JwtTokenProvider;
 import com.cd.common.security.Md5PasswordEncoder;
 import com.cd.common.security.SecurityUser;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.UserAvatarUploadResponseDTO;
 import com.cd.dto.UserChangePasswordDTO;
@@ -64,6 +67,7 @@ public class UserServiceImpl implements UserService {
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtTokenBlacklistService jwtTokenBlacklistService;
     private final Md5PasswordEncoder md5PasswordEncoder;
+    private final LicenseGuard licenseGuard;
 
     @Override
     public UserLoginResponseDTO login(UserLoginDTO dto, String ipAddress) {
@@ -78,6 +82,7 @@ public class UserServiceImpl implements UserService {
                     new UsernamePasswordAuthenticationToken(dto.getUserName(), dto.getPassword())
             );
             SecurityUser securityUser = (SecurityUser) authentication.getPrincipal();
+            TenantContextHolder.setTenantId(securityUser.getTenantId());
             List<String> roles = customUserDetailsService.loadRoleCodes(securityUser.getUserId());
             String token = jwtTokenProvider.createToken(securityUser, roles);
 
@@ -92,6 +97,7 @@ public class UserServiceImpl implements UserService {
             response.setLastLoginTime(latestUser.getLastLoginTime());
             return response;
         } catch (BadCredentialsException e) {
+            TenantContextHolder.setTenantId(user.getTenantId());
             loginLogService.record(user.getId(), dto.getUserName(), ipAddress, 0, "用户名或密码错误");
             throw new UnauthorizedException("用户名或密码错误");
         }
@@ -195,8 +201,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDTO create(UserCreateDTO dto) {
+        Long tenantId = currentTenantId();
+        licenseGuard.requireFeature(LicenseFeature.USER_MANAGE);
+        licenseGuard.requireUserQuotaBeforeCreate();
         validateUnique(null, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         UserEntity entity = new UserEntity();
+        entity.setTenantId(tenantId);
         entity.setUserName(dto.getUserName());
         entity.setUserPwd(md5PasswordEncoder.encode(dto.getUserPwd()));
         entity.setUserAvatar(dto.getUserAvatar());
@@ -204,7 +214,7 @@ public class UserServiceImpl implements UserService {
         entity.setUserEmail(emptyToNull(dto.getUserEmail()));
         entity.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         userMapper.insert(entity);
-        return toResponse(userMapper.selectById(entity.getId()));
+        return toResponse(userMapper.selectByIdAndTenant(entity.getId(), tenantId));
     }
 
     @Override
@@ -216,34 +226,37 @@ public class UserServiceImpl implements UserService {
     @Override
     @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#id")
     public void deleteById(Long id) {
-        ensureExists(id);
-        userMapper.deleteById(id);
+        Long tenantId = currentTenantId();
+        ensureTenantUserExists(id, tenantId);
+        userMapper.deleteByIdAndTenant(id, tenantId);
     }
 
     @Override
     @CacheEvict(value = CacheConfig.USER_AUTH_CACHE, key = "#id")
     public UserResponseDTO update(Long id, UserUpdateDTO dto) {
-        UserEntity existing = ensureExists(id);
+        Long tenantId = currentTenantId();
+        UserEntity existing = ensureTenantUserExists(id, tenantId);
         validateUnique(id, dto.getUserName(), dto.getUserPhone(), dto.getUserEmail());
         existing.setUserName(dto.getUserName());
         existing.setUserAvatar(dto.getUserAvatar());
         existing.setUserPhone(emptyToNull(dto.getUserPhone()));
         existing.setUserEmail(emptyToNull(dto.getUserEmail()));
         existing.setStatus(dto.getStatus() == null ? existing.getStatus() : dto.getStatus());
-        userMapper.updateById(existing);
-        return toResponse(userMapper.selectById(id));
+        userMapper.updateByIdAndTenant(existing);
+        return toResponse(userMapper.selectByIdAndTenant(id, tenantId));
     }
 
     @Override
     public UserResponseDTO getById(Long id) {
-        return toResponse(ensureExists(id));
+        return toResponse(ensureTenantUserExists(id, currentTenantId()));
     }
 
     @Override
     public PageResult<UserResponseDTO> list(int page, int size, String userName) {
         int offset = (page - 1) * size;
-        long total = userMapper.countAll(userName);
-        List<UserResponseDTO> list = userMapper.selectPage(offset, size, userName)
+        Long tenantId = currentTenantId();
+        long total = userMapper.countAllByTenant(userName, tenantId);
+        List<UserResponseDTO> list = userMapper.selectPageByTenant(offset, size, userName, tenantId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -262,8 +275,12 @@ public class UserServiceImpl implements UserService {
     }
 
     private void saveImportedRecord(UserEntity imported, CsvImportResultDTO result) {
-        UserEntity existing = userMapper.selectByUserName(imported.getUserName());
+        Long tenantId = currentTenantId();
+        imported.setTenantId(tenantId);
+        UserEntity existing = userMapper.selectByUserNameAndTenant(imported.getUserName(), tenantId);
         if (existing == null) {
+            licenseGuard.requireFeature(LicenseFeature.USER_MANAGE);
+            licenseGuard.requireUserQuotaBeforeCreate();
             if (!StringUtils.hasText(imported.getUserPwd())) {
                 throw new IllegalArgumentException("新增用户必须提供 user_pwd");
             }
@@ -284,7 +301,7 @@ public class UserServiceImpl implements UserService {
             existing.setUserPwd(md5PasswordEncoder.encode(imported.getUserPwd().trim()));
             userMapper.updatePasswordById(existing.getId(), existing.getUserPwd());
         }
-        userMapper.updateById(existing);
+        userMapper.updateByIdAndTenant(existing);
         result.incrementUpdated();
     }
 
@@ -292,6 +309,14 @@ public class UserServiceImpl implements UserService {
         UserEntity entity = userMapper.selectById(id);
         if (entity == null) {
             throw new ResourceNotFoundException("记录不存在，id=" + id);
+        }
+        return entity;
+    }
+
+    private UserEntity ensureTenantUserExists(Long id, Long tenantId) {
+        UserEntity entity = userMapper.selectByIdAndTenant(id, tenantId);
+        if (entity == null) {
+            throw new ResourceNotFoundException("璁板綍涓嶅瓨鍦紝id=" + id);
         }
         return entity;
     }
@@ -309,6 +334,11 @@ public class UserServiceImpl implements UserService {
             throw new UnauthorizedException("未登录或登录状态已失效");
         }
         return currentUserId;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private void validateUnique(Long id, String userName, String userPhone, String userEmail) {

@@ -11,5 +11,12 @@ public interface HostPatchStatusMapper {
 
     HostPatchStatusEntity selectLatestByHostId(@Param("hostId") Long hostId);
 
+    HostPatchStatusEntity selectLatestByHostIdAndTenant(@Param("hostId") Long hostId,
+                                                        @Param("tenantId") Long tenantId);
+
     int deleteByHostIdAndExcludeId(@Param("hostId") Long hostId, @Param("excludeId") Long excludeId);
+
+    int deleteByHostIdAndTenantExcludeId(@Param("hostId") Long hostId,
+                                         @Param("tenantId") Long tenantId,
+                                         @Param("excludeId") Long excludeId);
 }

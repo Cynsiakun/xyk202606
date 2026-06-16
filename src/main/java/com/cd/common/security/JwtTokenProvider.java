@@ -33,6 +33,7 @@ public class JwtTokenProvider {
                 .claims(Map.of(
                         "userId", securityUser.getUserId(),
                         "userName", securityUser.getUsername(),
+                        "tenantId", securityUser.getTenantId() == null ? 0L : securityUser.getTenantId(),
                         "roles", roles,
                         "authorities", securityUser.getAuthorities().stream().map(Object::toString).toList()
                 ))
@@ -84,6 +85,20 @@ public class JwtTokenProvider {
 
     public String getUserName(String token) {
         return String.valueOf(parseClaims(token).get("userName"));
+    }
+
+    public Long getTenantId(String token) {
+        Object tenantId = parseClaims(token).get("tenantId");
+        if (tenantId == null) {
+            return null;
+        }
+        if (tenantId instanceof Integer intValue) {
+            return intValue.longValue();
+        }
+        if (tenantId instanceof Long longValue) {
+            return longValue;
+        }
+        return Long.valueOf(String.valueOf(tenantId));
     }
 
     private String toBase64(String raw) {

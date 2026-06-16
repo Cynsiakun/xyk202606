@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/api/user/login",
+                                "/api/license/activate",
                                 "/login.html",
                                 "/index.html",
                                 "/favicon.ico",

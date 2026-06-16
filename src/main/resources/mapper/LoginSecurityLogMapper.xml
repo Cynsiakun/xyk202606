@@ -6,11 +6,11 @@
 
     <insert id="insertBatchIgnore">
         INSERT IGNORE INTO login_security_logs
-            (source_log_id, host_id, event_id, event_time, username,
+            (tenant_id, source_log_id, host_id, event_id, event_time, username,
              login_result, login_type, source_ip, process_name, is_elevated)
         VALUES
         <foreach collection="list" item="it" separator=",">
-            (#{it.sourceLogId}, #{it.hostId}, #{it.eventId}, #{it.eventTime}, #{it.username},
+            (COALESCE(#{it.tenantId}, 0), #{it.sourceLogId}, #{it.hostId}, #{it.eventId}, #{it.eventTime}, #{it.username},
              #{it.loginResult}, #{it.loginType}, #{it.sourceIp}, #{it.processName}, #{it.isElevated})
         </foreach>
     </insert>
@@ -42,6 +42,7 @@
 
     <select id="selectFailedWithinWindow" resultType="com.cd.entity.LoginSecurityLogEntity">
         SELECT id,
+               tenant_id AS tenantId,
                source_log_id AS sourceLogId,
                host_id AS hostId,
                event_id AS eventId,

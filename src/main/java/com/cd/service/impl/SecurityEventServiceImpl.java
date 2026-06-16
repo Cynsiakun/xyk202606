@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.HostOptionDTO;
 import com.cd.dto.PopupAlertDTO;
 import com.cd.dto.SecurityEventDetailDTO;
@@ -44,6 +45,7 @@ public class SecurityEventServiceImpl implements SecurityEventService {
 
     @Override
     public PageResult<SecurityEventItemDTO> page(SecurityEventQueryDTO query, int page, int size, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         query.setSize(size);
         query.setOffset((page - 1) * size);
@@ -54,38 +56,40 @@ public class SecurityEventServiceImpl implements SecurityEventService {
 
     @Override
     public SecurityEventStatDTO stats() {
+        Long tenantId = currentTenantId();
         SecurityEventStatDTO stat = new SecurityEventStatDTO();
-        stat.setCritical(mapper.countByLevel("Critical"));
-        stat.setHigh(mapper.countByLevel("High"));
-        stat.setMedium(mapper.countByLevel("Medium"));
-        stat.setUntreated(mapper.countByStatus("new"));
+        stat.setCritical(mapper.countByLevel("Critical", tenantId));
+        stat.setHigh(mapper.countByLevel("High", tenantId));
+        stat.setMedium(mapper.countByLevel("Medium", tenantId));
+        stat.setUntreated(mapper.countByStatus("new", tenantId));
         return stat;
     }
 
     @Override
     public SecurityEventDetailDTO detail(Long id) {
-        return mapper.selectDetailById(id);
+        return mapper.selectDetailById(id, currentTenantId());
     }
 
     @Override
     public List<HostOptionDTO> hostOptions() {
-        return mapper.selectHostOptions();
+        return mapper.selectHostOptions(currentTenantId());
     }
 
     @Override
     public int ack(List<Long> ids) {
         // 仅把 new 推进为 acked
-        return mapper.updateStatus(ids, "acked", List.of("new"));
+        return mapper.updateStatus(ids, "acked", List.of("new"), currentTenantId());
     }
 
     @Override
     public int resolve(List<Long> ids) {
         // new / acked 都可直接处理为 resolved
-        return mapper.updateStatus(ids, "resolved", List.of("new", "acked"));
+        return mapper.updateStatus(ids, "resolved", List.of("new", "acked"), currentTenantId());
     }
 
     @Override
     public byte[] exportCsv(SecurityEventQueryDTO query, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         List<SecurityEventItemDTO> rows = mapper.selectForExport(query, EXPORT_LIMIT);
 
@@ -136,10 +140,23 @@ public class SecurityEventServiceImpl implements SecurityEventService {
         return mapper.selectRecentHighCritical(20);
     }
 
+    @Override
+    public List<PopupAlertDTO> recentHighCritical(Long tenantId, boolean includeAllTenants) {
+        if (includeAllTenants) {
+            return mapper.selectRecentHighCritical(20);
+        }
+        return mapper.selectRecentHighCriticalByTenant(tenantId == null ? 0L : tenantId, 20);
+    }
+
     private void applySort(SecurityEventQueryDTO query, String sortField, String sortOrder) {
         // SORT_COLUMNS 由 Map.of 创建，不允许 null 键查找，先判空
         String column = sortField == null ? null : SORT_COLUMNS.get(sortField);
         query.setSortColumn(column != null ? column : "event_time");
         query.setSortDirection("asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC");
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

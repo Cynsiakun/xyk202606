@@ -23,6 +23,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/vuln-ops-dashboard")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('VULN')")
 public class VulnOpsDashboardController {
 
     private final VulnOpsDashboardService vulnOpsDashboardService;

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.TenantMapper">
+
+    <resultMap id="TenantEntityResultMap" type="com.cd.entity.TenantEntity">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="contact" property="contact"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, name, contact, status, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.cd.entity.TenantEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tenant (id, name, contact, status)
+        VALUES (#{id}, #{name}, #{contact}, #{status})
+    </insert>
+
+    <update id="updateById" parameterType="com.cd.entity.TenantEntity">
+        UPDATE tenant
+        SET name = #{name},
+            contact = #{contact},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusById">
+        UPDATE tenant
+        SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM tenant WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="TenantEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM tenant
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="TenantEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM tenant
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectPage" resultMap="TenantEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM tenant
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%')
+                 OR contact LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY id ASC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1)
+        FROM tenant
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%')
+                 OR contact LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+</mapper>

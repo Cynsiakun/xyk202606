@@ -39,6 +39,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/baseline")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('BASELINE')")
 public class BaselineHostController {
 
     private final BaselineHostService baselineHostService;

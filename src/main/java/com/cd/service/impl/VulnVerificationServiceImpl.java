@@ -3,6 +3,7 @@ package com.cd.service.impl;
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.VulnVerificationRuleDTO;
 import com.cd.dto.VulnVerificationTaskResponseDTO;
 import com.cd.entity.HostEntity;
@@ -54,7 +55,8 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     @Transactional
     public VulnVerificationTaskResponseDTO verifyHost(Long hostId) {
         HostEntity host = requireHost(hostId);
-        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectPendingVerificationRules(hostId);
+        Long tenantId = currentTenantId();
+        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectPendingVerificationRulesByTenant(hostId, tenantId);
         if (rules.isEmpty()) {
             throw new IllegalArgumentException("该主机没有可下发的待验证漏洞规则");
         }
@@ -65,7 +67,8 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     @Transactional
     public VulnVerificationTaskResponseDTO verifyResult(Long hostId, Long resultId) {
         HostEntity host = requireHost(hostId);
-        VulnVerificationRuleDTO rule = hostVulnResultMapper.selectVerificationRuleByResultId(hostId, resultId);
+        Long tenantId = currentTenantId();
+        VulnVerificationRuleDTO rule = hostVulnResultMapper.selectVerificationRuleByResultIdAndTenant(hostId, resultId, tenantId);
         if (rule == null) {
             throw new IllegalArgumentException("该漏洞结果不存在或不可下发验证");
         }
@@ -86,7 +89,8 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
             return Map.of();
         }
 
-        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectVerificationRulesByResultIds(distinctIds);
+        Long tenantId = currentTenantId();
+        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectVerificationRulesByResultIdsAndTenant(distinctIds, tenantId);
         Map<Long, List<VulnVerificationRuleDTO>> rulesByHost = rules.stream()
                 .filter(rule -> rule.getHostId() != null)
                 .collect(Collectors.groupingBy(VulnVerificationRuleDTO::getHostId, LinkedHashMap::new, Collectors.toList()));
@@ -114,13 +118,14 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         Map<String, Object> agentMessage = buildAgentMessage(task.getId(), host.getMacAddress(), rules);
         List<Long> resultIds = rules.stream().map(VulnVerificationRuleDTO::getResultId).toList();
         String summaryJson = buildSummaryJson(agentMessage, resultIds, null);
-        hostVulnResultMapper.updateTaskIdByIds(resultIds, task.getId());
-        hostVulnTaskMapper.updateStatus(task.getId(), STATUS_PENDING, summaryJson);
+        Long tenantId = currentTenantId();
+        hostVulnResultMapper.updateTaskIdByIdsAndTenant(resultIds, task.getId(), tenantId);
+        hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_PENDING, summaryJson, tenantId);
 
         boolean sent = sendToAgent(host.getMacAddress(), agentMessage);
         if (sent) {
-            hostVulnTaskMapper.updateStatus(task.getId(), STATUS_RUNNING, summaryJson);
-            hostVulnResultMapper.updateVerifyStatusByIds(resultIds, VERIFYING);
+            hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_RUNNING, summaryJson, tenantId);
+            hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(resultIds, VERIFYING, tenantId);
         }
         return response(task.getId(), rules.size(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
                 sent ? "验证任务已下发" : "验证任务已创建，但消息下发失败，可稍后重试");
@@ -144,7 +149,8 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     @Override
     @Transactional
     public VulnVerificationTaskResponseDTO retry(Long taskId) {
-        HostVulnTaskEntity task = hostVulnTaskMapper.selectById(taskId);
+        Long tenantId = currentTenantId();
+        HostVulnTaskEntity task = hostVulnTaskMapper.selectByIdAndTenant(taskId, tenantId);
         if (task == null) {
             throw new ResourceNotFoundException("漏洞验证任务不存在: " + taskId);
         }
@@ -162,10 +168,10 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         Map<String, Object> agentMessage = objectMapper.convertValue(messageNode, Map.class);
         boolean sent = sendToAgent(task.getMacAddress(), agentMessage);
         if (sent) {
-            hostVulnTaskMapper.updateStatus(task.getId(), STATUS_RUNNING, task.getSummaryJson());
+            hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_RUNNING, task.getSummaryJson(), tenantId);
             List<Long> resultIds = readResultIds(summary.path("resultIds"));
             if (!resultIds.isEmpty()) {
-                hostVulnResultMapper.updateVerifyStatusByIds(resultIds, VERIFYING);
+                hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(resultIds, VERIFYING, tenantId);
             }
         }
         return response(task.getId(), task.getRuleCount(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
@@ -173,7 +179,7 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     }
 
     private HostEntity requireHost(Long hostId) {
-        HostEntity host = hostMapper.selectById(hostId);
+        HostEntity host = hostMapper.selectByIdAndTenant(hostId, currentTenantId());
         if (host == null) {
             throw new ResourceNotFoundException("主机不存在: " + hostId);
         }
@@ -193,6 +199,7 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         task.setScanMode(SCAN_MODE);
         task.setRuleCount(ruleCount);
         task.setStatus(STATUS_PENDING);
+        task.setTenantId(currentTenantId());
         task.setTriggeredBy(currentUsername());
         task.setStartedAt(now);
         task.setCreatedAt(now);
@@ -276,6 +283,11 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     private String currentUsername() {
         String username = SecurityUtils.getCurrentUsername();
         return StringUtils.hasText(username) ? username : "system";
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private VulnVerificationTaskResponseDTO response(Long taskId,

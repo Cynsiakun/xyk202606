@@ -3,6 +3,7 @@ package com.cd.service.impl;
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.BaselineHostDispatchDTO;
 import com.cd.dto.BaselineTaskCreateRequestDTO;
 import com.cd.dto.BaselineTaskDispatchResponseDTO;
@@ -62,18 +63,19 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     public BaselineTaskDispatchResponseDTO createAndDispatch(BaselineTaskCreateRequestDTO request) {
         List<Long> hostIds = distinctPositiveIds(request.getHostIds(), "主机范围不能为空");
         List<Long> ruleIds = distinctPositiveIds(request.getRuleIds(), "规则范围不能为空");
-        List<HostEntity> hosts = loadHosts(hostIds);
+        Long tenantId = resolveTenantId(hostIds);
+        List<HostEntity> hosts = loadHosts(hostIds, tenantId);
         List<BaselineRuleEntity> rules = loadRules(ruleIds);
         Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = loadRuleItems(ruleIds);
 
-        BaselineTaskEntity task = createTask(request, hostIds, rules);
+        BaselineTaskEntity task = createTask(request, hostIds, rules, tenantId);
         List<BaselineHostDispatchDTO> dispatchResults = new ArrayList<>();
         int sentCount = 0;
         int failedCount = 0;
 
         for (HostEntity host : hosts) {
-            BaselineTaskHostEntity taskHost = createTaskHost(task.getId(), host.getId());
-            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, itemsByRuleId);
+            BaselineTaskHostEntity taskHost = createTaskHost(task.getId(), host.getId(), tenantId);
+            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, itemsByRuleId, tenantId);
             dispatchResults.add(result);
             if (Boolean.TRUE.equals(result.getSent())) {
                 sentCount++;
@@ -83,7 +85,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         }
 
         String taskStatus = sentCount > 0 ? STATUS_RUNNING : STATUS_FAILED;
-        baselineTaskMapper.updateTaskStatus(task.getId(), taskStatus, sentCount, failedCount);
+        baselineTaskMapper.updateTaskStatusByTenant(task.getId(), taskStatus, sentCount, failedCount, tenantId);
 
         BaselineTaskDispatchResponseDTO response = new BaselineTaskDispatchResponseDTO();
         response.setTaskId(task.getId());
@@ -96,10 +98,52 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         return response;
     }
 
+    @Override
+    @Transactional
+    public BaselineTaskDispatchResponseDTO createAndDispatchForTenant(BaselineTaskCreateRequestDTO request, Long tenantId) {
+        List<Long> hostIds = distinctPositiveIds(request.getHostIds(), "host scope cannot be empty");
+        List<Long> ruleIds = distinctPositiveIds(request.getRuleIds(), "rule scope cannot be empty");
+        Long resolvedTenantId = tenantId == null ? 0L : tenantId;
+        List<HostEntity> hosts = loadHosts(hostIds, resolvedTenantId);
+        List<BaselineRuleEntity> rules = loadRules(ruleIds);
+        Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = loadRuleItems(ruleIds);
+
+        BaselineTaskEntity task = createTask(request, hostIds, rules, resolvedTenantId);
+        List<BaselineHostDispatchDTO> dispatchResults = new ArrayList<>();
+        int sentCount = 0;
+        int failedCount = 0;
+
+        for (HostEntity host : hosts) {
+            BaselineTaskHostEntity taskHost = createTaskHost(task.getId(), host.getId(), resolvedTenantId);
+            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, itemsByRuleId, resolvedTenantId);
+            dispatchResults.add(result);
+            if (Boolean.TRUE.equals(result.getSent())) {
+                sentCount++;
+            } else {
+                failedCount++;
+            }
+        }
+
+        String taskStatus = sentCount > 0 ? STATUS_RUNNING : STATUS_FAILED;
+        baselineTaskMapper.updateTaskStatusByTenant(task.getId(), taskStatus, sentCount, failedCount, resolvedTenantId);
+
+        BaselineTaskDispatchResponseDTO response = new BaselineTaskDispatchResponseDTO();
+        response.setTaskId(task.getId());
+        response.setStatus(taskStatus);
+        response.setTotalHostCount(hosts.size());
+        response.setSentCount(sentCount);
+        response.setFailedCount(failedCount);
+        response.setHosts(dispatchResults);
+        response.setMessage(sentCount > 0 ? "baseline task created and dispatched" : "baseline task created but dispatch failed");
+        return response;
+    }
+
     private BaselineTaskEntity createTask(BaselineTaskCreateRequestDTO request,
                                           List<Long> hostIds,
-                                          List<BaselineRuleEntity> rules) {
+                                          List<BaselineRuleEntity> rules,
+                                          Long tenantId) {
         BaselineTaskEntity task = new BaselineTaskEntity();
+        task.setTenantId(tenantId);
         task.setTaskName(request.getTaskName().trim());
         task.setExecuteType(normalizeExecuteType(request.getExecuteType()));
         task.setCronExpr(emptyToNull(request.getCronExpr()));
@@ -117,8 +161,9 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         return task;
     }
 
-    private BaselineTaskHostEntity createTaskHost(Long taskId, Long hostId) {
+    private BaselineTaskHostEntity createTaskHost(Long taskId, Long hostId, Long tenantId) {
         BaselineTaskHostEntity taskHost = new BaselineTaskHostEntity();
+        taskHost.setTenantId(tenantId);
         taskHost.setTaskId(taskId);
         taskHost.setHostId(hostId);
         taskHost.setStatus(STATUS_PENDING);
@@ -130,14 +175,15 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
                                                  BaselineTaskHostEntity taskHost,
                                                  HostEntity host,
                                                  List<BaselineRuleEntity> rules,
-                                                 Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId) {
+                                                 Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId,
+                                                 Long tenantId) {
         BaselineHostDispatchDTO result = new BaselineHostDispatchDTO();
         result.setHostId(host.getId());
         result.setTaskHostId(taskHost.getId());
         result.setMacAddress(host.getMacAddress());
 
         if (!StringUtils.hasText(host.getMacAddress())) {
-            return markDispatchFailed(taskHost.getId(), result, "主机缺少 MAC 地址，无法下发");
+            return markDispatchFailed(taskHost.getId(), result, "主机缺少 MAC 地址，无法下发", tenantId);
         }
 
         Map<String, Object> payload = buildAgentMessage(task, taskHost, host, rules, itemsByRuleId);
@@ -146,7 +192,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
                     + normalizeMac(host.getMacAddress())
                     + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
             if (amqpAdmin.getQueueProperties(queueName) == null) {
-                return markDispatchFailed(taskHost.getId(), result, "客户端队列不存在，无法下发: " + queueName);
+                return markDispatchFailed(taskHost.getId(), result, "客户端队列不存在，无法下发: " + queueName, tenantId);
             }
 
             amqpAdmin.declareExchange(new DirectExchange(RabbitMQConfig.AGENT_EXCHANGE, true, false));
@@ -160,8 +206,8 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
                         mqMessage.getMessageProperties().setContentType("application/json");
                         return mqMessage;
                     });
-            baselineTaskMapper.updateTaskHostStatus(taskHost.getId(), STATUS_RUNNING,
-                    writeJson(Map.of("dispatchAt", nowText())));
+            baselineTaskMapper.updateTaskHostStatusByTenant(taskHost.getId(), STATUS_RUNNING,
+                    writeJson(Map.of("dispatchAt", nowText())), tenantId);
             result.setSent(true);
             result.setMessage("下发成功");
             log.info("基线检测任务已下发: taskId={}, taskHostId={}, hostId={}, routingKey={}, payload={}",
@@ -170,7 +216,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         } catch (Exception e) {
             log.error("基线检测任务下发失败: taskId={}, taskHostId={}, hostId={}",
                     task.getId(), taskHost.getId(), host.getId(), e);
-            return markDispatchFailed(taskHost.getId(), result, "下发失败: " + e.getMessage());
+            return markDispatchFailed(taskHost.getId(), result, "下发失败: " + e.getMessage(), tenantId);
         }
     }
 
@@ -214,18 +260,19 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
 
     private BaselineHostDispatchDTO markDispatchFailed(Long taskHostId,
                                                        BaselineHostDispatchDTO result,
-                                                       String message) {
-        baselineTaskMapper.updateTaskHostStatus(taskHostId, STATUS_FAILED,
-                writeJson(Map.of("dispatchAt", nowText(), "error", message)));
+                                                       String message,
+                                                       Long tenantId) {
+        baselineTaskMapper.updateTaskHostStatusByTenant(taskHostId, STATUS_FAILED,
+                writeJson(Map.of("dispatchAt", nowText(), "error", message)), tenantId);
         result.setSent(false);
         result.setMessage(message);
         return result;
     }
 
-    private List<HostEntity> loadHosts(List<Long> hostIds) {
+    private List<HostEntity> loadHosts(List<Long> hostIds, Long tenantId) {
         List<HostEntity> hosts = new ArrayList<>();
         for (Long hostId : hostIds) {
-            HostEntity host = hostMapper.selectById(hostId);
+            HostEntity host = hostMapper.selectByIdAndTenant(hostId, tenantId);
             if (host == null) {
                 throw new ResourceNotFoundException("主机不存在: " + hostId);
             }
@@ -334,5 +381,24 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
 
     private String emptyToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private Long resolveTenantId(List<Long> hostIds) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            return tenantId;
+        }
+        if (hostIds != null && !hostIds.isEmpty()) {
+            HostEntity host = hostMapper.selectById(hostIds.get(0));
+            if (host != null && host.getTenantId() != null) {
+                return host.getTenantId();
+            }
+        }
+        return 0L;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

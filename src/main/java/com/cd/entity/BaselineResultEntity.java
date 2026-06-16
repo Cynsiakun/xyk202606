@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class BaselineResultEntity {
 
     private Long id;
+    private Long tenantId;
     private Long taskId;
     private Long taskHostId;
     private Long hostId;

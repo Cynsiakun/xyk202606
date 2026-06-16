@@ -6,6 +6,7 @@
 
     <sql id="filterConditions">
         <where>
+            w.tenant_id = #{q.tenantId}
             <if test="q.logType != null and q.logType != ''">
                 AND w.log_type = #{q.logType}
             </if>
@@ -47,7 +48,7 @@
                w.message       AS message,
                w.record_number AS recordNumber
         FROM windows_event_logs w
-        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = w.tenant_id
         <include refid="filterConditions"/>
         ORDER BY w.${q.sortColumn} ${q.sortDirection}, w.id DESC
         LIMIT #{q.size} OFFSET #{q.offset}
@@ -72,7 +73,7 @@
                w.message       AS message,
                w.record_number AS recordNumber
         FROM windows_event_logs w
-        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = w.tenant_id
         <include refid="filterConditions"/>
         ORDER BY w.${q.sortColumn} ${q.sortDirection}, w.id DESC
         LIMIT #{limit}
@@ -93,14 +94,16 @@
                w.raw_json      AS rawXml,
                w.create_time   AS createTime
         FROM windows_event_logs w
-        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = w.tenant_id
         WHERE w.id = #{id}
+          AND w.tenant_id = #{tenantId}
     </select>
 
     <select id="countTodayByType" resultType="long">
         SELECT COUNT(1)
         FROM windows_event_logs
         WHERE log_type = #{logType}
+          AND tenant_id = #{tenantId}
           AND DATE(event_time) = CURDATE()
     </select>
 
@@ -108,6 +111,7 @@
         SELECT COUNT(1)
         FROM windows_event_logs
         WHERE level IN ('Error', 'Critical')
+          AND tenant_id = #{tenantId}
           AND DATE(event_time) = CURDATE()
     </select>
 
@@ -116,6 +120,7 @@
                h.hostname AS hostname,
                h.ipv4     AS ipv4
         FROM hosts h
+        WHERE h.tenant_id = #{tenantId}
         ORDER BY h.id ASC
     </select>
 </mapper>

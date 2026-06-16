@@ -10,39 +10,35 @@ layui.use(["element", "layer"], function () {
     var appSidebar = document.getElementById("appSidebar");
     var logoutButton = document.getElementById("logoutButton");
     var profileButton = document.getElementById("profileButton");
+    var tenantBadge = document.getElementById("tenantBadge");
+    var licenseBadge = document.getElementById("licenseBadge");
+    var quotaBadge = document.getElementById("quotaBadge");
 
     var API_CONFIG = {
         currentUser: "/api/current-user",
         logout: "/api/user/logout",
         currentMenus: "/api/rbac/menu/current",
-        currentPermissions: "/api/rbac/permission/current"
+        currentPermissions: "/api/rbac/permission/current",
+        currentLicense: "/api/license/current"
     };
 
-    var menuDescriptions = {
-        "后台首页": "查看用户、登录和活跃情况统计。",
-        "用户管理": "维护后台用户，支持新增、编辑、删除、搜索和分页。",
-        "登录日志": "审计登录成功和失败记录，支持用户名与状态筛选。",
-        "个人信息": "查看并维护当前登录账户的基础资料和密码。",
-        "角色管理": "角色管理模块。",
-        "权限管理": "权限管理模块。",
-        "主机管理": "查看与维护上报的主机系统信息，支持搜索、新增、编辑和删除。",
-        "资产管理": "查看各主机资产探测记录，包括账号、服务、进程、APP。",
-        "账号资产": "浏览与搜索主机账号探测记录，支持详情与删除。",
-        "服务资产": "浏览与搜索主机服务探测记录，支持详情与删除。",
-        "进程资产": "浏览与搜索主机进程探测记录，支持详情与删除。",
-        "APP资产": "浏览与搜索主机安装软件探测记录，支持详情与删除。",
-        "风险发现": "聚合安全风险入口，优先呈现需要处置的主机与证据。",
-        "补丁安全": "查看存在补丁风险的主机、风险证据与处置建议，支持重新分析和补丁扫描。",
-        "补丁管理": "维护主机已安装补丁记录，支持分页查询、筛选、编辑、详情与批量删除。",
-        "CVE管理": "维护补丁与CVE映射情报，支持分页查询、筛选、编辑、详情与批量删除。",
-        "漏洞检测": "展示漏洞规则命中结果，围绕待验证、验证中、已验证和待修复推进处置。",
-        "漏洞库管理": "维护漏洞规则库，支持分页查询、条件检索、新增、编辑、查看与批量删除。",
-        "漏洞运营仪表盘": "面向安全管理层的漏洞运营驾驶舱，聚焦趋势、效能与资产健康度。",
-        "日志中心": "浏览 Windows 原始事件日志，支持类型切换、关键字与高级筛选、服务端分页与详情查看。",
-        "安全事件": "SIEM 事件中心，按等级与状态研判安全告警，支持确认、处理、批量处置与关联原始日志查看。",
-        "账户变更日志": "审计 Windows 账户管理事件（创建/修改/删除/加组等），支持动作筛选、关键字与高级搜索、服务端分页与详情查看。",
-        "主机日志管理": "从主机维度查看日志，左侧选择主机，右侧切换安全/系统/应用日志类型，服务端分页与详情查看。"
-    };
+    var pageFeatureMap = [
+        {pattern: "host.html", feature: "HOST_VIEW"},
+        {pattern: "user.html", feature: "USER_MANAGE"},
+        {pattern: "role.html", feature: "ROLE_MANAGE"},
+        {pattern: "permission.html", feature: "ROLE_MANAGE"},
+        {pattern: "asset-", feature: "ASSET_MANAGE"},
+        {pattern: "patch-", feature: "PATCH"},
+        {pattern: "cve-", feature: "PATCH"},
+        {pattern: "vuln-", feature: "VULN"},
+        {pattern: "log.html", feature: "LOG"},
+        {pattern: "security-log", feature: "LOG"},
+        {pattern: "security-event", feature: "LOG"},
+        {pattern: "account-change-log", feature: "LOG"},
+        {pattern: "login-security-log", feature: "LOG"},
+        {pattern: "host-log", feature: "LOG"},
+        {pattern: "baseline-", feature: "BASELINE"}
+    ];
 
     init();
 
@@ -54,11 +50,15 @@ layui.use(["element", "layer"], function () {
 
         bindSidebarToggle();
         bindLogout();
+        bindProfileButton();
+        bindFrameGuard();
         fillCurrentUser();
+        renderLicenseStatus(null);
+
         await syncCurrentUserFromApi();
         await loadPermissions();
+        await loadCurrentLicense();
         await loadMenus();
-        bindProfileButton();
     }
 
     async function loadPermissions() {
@@ -68,6 +68,80 @@ layui.use(["element", "layer"], function () {
         } catch (error) {
             AppAuth.setPermissions([]);
         }
+    }
+
+    async function loadCurrentLicense() {
+        try {
+            var result = await AppRequest.request(API_CONFIG.currentLicense, {method: "GET"}, {showErrorMessage: false});
+            AppAuth.setLicenseInfo(result.data || null);
+            renderLicenseStatus(result.data || null);
+        } catch (error) {
+            AppAuth.setLicenseInfo(null);
+            renderLicenseStatus(null);
+        }
+    }
+
+    async function loadMenus() {
+        try {
+            var result = await AppRequest.request(API_CONFIG.currentMenus, {method: "GET"});
+            var menus = normalizeMenus(result.data || []);
+            renderMenus(menus);
+            bindMenuEvents();
+            element.render("nav");
+            activateDefaultMenu();
+        } catch (error) {
+            layer.msg("\u83dc\u5355\u52a0\u8f7d\u5931\u8d25", {icon: 2});
+        }
+    }
+
+    function normalizeMenus(menus) {
+        var filtered = filterMenusByLicense(menus);
+        if (AppAuth.isSuperAdmin()) {
+            filtered.push({
+                title: "\u5e73\u53f0\u7ba1\u7406",
+                icon: "layui-icon-component",
+                children: [
+                    {
+                        title: "\u79df\u6237\u7ba1\u7406",
+                        page: "./pages/platform-tenant.html",
+                        icon: "layui-icon-template-1"
+                    }
+                ]
+            });
+        }
+        return filtered;
+    }
+
+    function filterMenusByLicense(menus) {
+        return (menus || []).map(function (menu) {
+            var copied = Object.assign({}, menu);
+            if (Array.isArray(menu.children) && menu.children.length > 0) {
+                copied.children = filterMenusByLicense(menu.children);
+                return copied.children.length > 0 ? copied : null;
+            }
+            return isMenuAllowed(copied) ? copied : null;
+        }).filter(Boolean);
+    }
+
+    function isMenuAllowed(menu) {
+        var page = String(menu.page || "");
+        if (!page) {
+            return true;
+        }
+        if (page.indexOf("dashboard.html") > -1 || page.indexOf("profile.html") > -1) {
+            return true;
+        }
+        var feature = findRequiredFeature(page);
+        return !feature || AppAuth.hasFeature(feature);
+    }
+
+    function findRequiredFeature(page) {
+        for (var i = 0; i < pageFeatureMap.length; i++) {
+            if (page.indexOf(pageFeatureMap[i].pattern) > -1) {
+                return pageFeatureMap[i].feature;
+            }
+        }
+        return null;
     }
 
     function bindMenuEvents() {
@@ -83,8 +157,6 @@ layui.use(["element", "layer"], function () {
             appSidebar.classList.toggle("is-collapsed");
         });
     }
-
-    bindFrameGuard();
 
     function bindLogout() {
         logoutButton.addEventListener("click", async function () {
@@ -109,8 +181,7 @@ layui.use(["element", "layer"], function () {
     function bindFrameGuard() {
         contentFrame.addEventListener("load", function () {
             try {
-                var frameWindow = contentFrame.contentWindow;
-                var frameLocation = frameWindow.location.href;
+                var frameLocation = contentFrame.contentWindow.location.href;
                 if (frameLocation === "http://localhost:8080/" || frameLocation === "http://127.0.0.1:8080/") {
                     AppAuth.redirectToLogin();
                 }
@@ -122,7 +193,7 @@ layui.use(["element", "layer"], function () {
     }
 
     function fillCurrentUser() {
-        currentUserName.textContent = AppAuth.getCurrentUserName() || "管理员";
+        currentUserName.textContent = AppAuth.getCurrentUserName() || "\u7ba1\u7406\u5458";
     }
 
     async function syncCurrentUserFromApi() {
@@ -134,19 +205,6 @@ layui.use(["element", "layer"], function () {
             }
         } catch (error) {
             return null;
-        }
-    }
-
-    async function loadMenus() {
-        try {
-            var result = await AppRequest.request(API_CONFIG.currentMenus, {method: "GET"});
-            var menus = result.data || [];
-            renderMenus(menus);
-            bindMenuEvents();
-            element.render("nav");
-            activateDefaultMenu();
-        } catch (error) {
-            layer.msg("菜单加载失败", {icon: 2});
         }
     }
 
@@ -162,27 +220,27 @@ layui.use(["element", "layer"], function () {
                 var childHtml = '<dl class="layui-nav-child">'
                     + menu.children.map(function (child) {
                         return '<dd>'
-                            + '<a href="javascript:;" data-title="' + child.title + '" data-page="' + child.page + '">'
-                            + (child.icon ? '<i class="layui-icon ' + child.icon + '"></i>' : '')
-                            + '<span>' + child.title + '</span>'
-                            + '</a>'
-                            + '</dd>';
+                            + '<a href="javascript:;" data-title="' + escapeAttr(child.title) + '" data-page="' + escapeAttr(child.page) + '">'
+                            + (child.icon ? '<i class="layui-icon ' + escapeAttr(child.icon) + '"></i>' : "")
+                            + '<span>' + escapeHtml(child.title) + "</span>"
+                            + "</a>"
+                            + "</dd>";
                     }).join("")
                     + "</dl>";
 
                 return '<li class="layui-nav-item">'
                     + '<a href="javascript:;">'
-                    + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
-                    + '<span>' + menu.title + "</span>"
+                    + (menu.icon ? '<i class="layui-icon ' + escapeAttr(menu.icon) + '"></i>' : "")
+                    + '<span>' + escapeHtml(menu.title) + "</span>"
                     + "</a>"
                     + childHtml
                     + "</li>";
             }
 
             return '<li class="layui-nav-item">'
-                + '<a href="javascript:;" data-title="' + menu.title + '" data-page="' + menu.page + '">'
-                + (menu.icon ? '<i class="layui-icon ' + menu.icon + '"></i>' : '')
-                + '<span>' + menu.title + "</span>"
+                + '<a href="javascript:;" data-title="' + escapeAttr(menu.title) + '" data-page="' + escapeAttr(menu.page) + '">'
+                + (menu.icon ? '<i class="layui-icon ' + escapeAttr(menu.icon) + '"></i>' : "")
+                + '<span>' + escapeHtml(menu.title) + "</span>"
                 + "</a>"
                 + "</li>";
         }).join("");
@@ -200,7 +258,7 @@ layui.use(["element", "layer"], function () {
         var page = link.dataset.page;
         setActiveMenu(link);
         pageTitle.textContent = title;
-        pageDescription.textContent = menuDescriptions[title] || "";
+        pageDescription.textContent = "";
         contentFrame.src = page;
     }
 
@@ -223,19 +281,102 @@ layui.use(["element", "layer"], function () {
         element.render("nav");
     }
 
-    // 供全局告警弹窗「查看详情」调用：切到安全事件页并定位到该告警
+    function renderLicenseStatus(info) {
+        var tenantId = AppAuth.getTenantId();
+        tenantBadge.textContent = tenantId == null ? "Tenant -" : "Tenant " + tenantId;
+        setPillState(tenantBadge, "muted");
+
+        if (!info) {
+            licenseBadge.textContent = "License loading";
+            quotaBadge.textContent = "Quota -";
+            setPillState(licenseBadge, "muted");
+            setPillState(quotaBadge, "muted");
+            return;
+        }
+
+        if (info.effective === false) {
+            licenseBadge.textContent = "\u672a\u6388\u6743";
+            quotaBadge.textContent = info.message || "\u65e0\u6709\u6548 License";
+            setPillState(licenseBadge, "danger");
+            setPillState(quotaBadge, "danger");
+            return;
+        }
+
+        licenseBadge.textContent = formatEdition(info.edition) + formatExpire(info.expireTime);
+        quotaBadge.textContent = "\u4e3b\u673a " + formatQuota(info.hostUsed, info.hostLimit)
+            + " / \u7528\u6237 " + formatQuota(info.userUsed, info.userLimit);
+        setPillState(licenseBadge, info.edition === "TRIAL" ? "warn" : "");
+        setPillState(quotaBadge, quotaIsNearLimit(info) ? "warn" : "");
+    }
+
+    function setPillState(element, state) {
+        element.classList.remove("muted", "warn", "danger");
+        if (state) {
+            element.classList.add(state);
+        }
+    }
+
+    function formatEdition(edition) {
+        var labels = {
+            PLATFORM: "\u5e73\u53f0\u79df\u6237",
+            TRIAL: "Trial",
+            STANDARD: "Standard",
+            PROFESSIONAL: "Professional",
+            NONE: "\u672a\u6388\u6743"
+        };
+        return labels[edition] || edition || "-";
+    }
+
+    function formatExpire(expireTime) {
+        if (!expireTime) {
+            return "";
+        }
+        return " · " + AppUtils.formatDateTime(expireTime).slice(0, 10);
+    }
+
+    function formatQuota(used, limit) {
+        var current = Number(used || 0);
+        if (Number(limit || 0) === 0) {
+            return current + "/\u4e0d\u9650";
+        }
+        return current + "/" + limit;
+    }
+
+    function quotaIsNearLimit(info) {
+        return isNearLimit(info.hostUsed, info.hostLimit) || isNearLimit(info.userUsed, info.userLimit);
+    }
+
+    function isNearLimit(used, limit) {
+        var safeLimit = Number(limit || 0);
+        return safeLimit > 0 && Number(used || 0) / safeLimit >= 0.8;
+    }
+
+    function escapeHtml(text) {
+        return String(text == null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttr(text) {
+        return escapeHtml(text).replace(/`/g, "&#96;");
+    }
+
     window.AppShell = {
         navigateToAlert: function (alertId) {
             var page = "./pages/security-event.html";
             var link = sideNav.querySelector('a[data-page="' + page + '"]');
             if (link) {
                 setActiveMenu(link);
-                pageTitle.textContent = link.dataset.title || "安全事件";
-                pageDescription.textContent = menuDescriptions[link.dataset.title] || "";
+                pageTitle.textContent = link.dataset.title || "\u5b89\u5168\u4e8b\u4ef6";
+                pageDescription.textContent = "";
             } else {
-                pageTitle.textContent = "安全事件";
+                pageTitle.textContent = "\u5b89\u5168\u4e8b\u4ef6";
             }
             contentFrame.src = page + "?focus=" + encodeURIComponent(alertId);
-        }
+        },
+        refreshLicense: loadCurrentLicense
     };
 });

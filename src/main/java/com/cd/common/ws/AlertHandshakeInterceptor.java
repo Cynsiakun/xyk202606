@@ -20,6 +20,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AlertHandshakeInterceptor implements HandshakeInterceptor {
 
+    static final String ATTR_TENANT_ID = "tenantId";
+    static final String ATTR_PLATFORM_ADMIN = "platformAdmin";
     private static final String VIEW_PERMISSION = "security-alert:view";
     private static final String SUPER_ADMIN = "ROLE_SUPER_ADMIN";
     private static final String WILDCARD = "*";
@@ -40,8 +42,12 @@ public class AlertHandshakeInterceptor implements HandshakeInterceptor {
         if (!allowed) {
             return false;
         }
+        Long tenantId = jwtTokenProvider.getTenantId(token);
+        Long currentTenantId = tenantId == null ? 0L : tenantId;
         attributes.put("userId", jwtTokenProvider.getUserId(token));
         attributes.put("userName", jwtTokenProvider.getUserName(token));
+        attributes.put(ATTR_TENANT_ID, currentTenantId);
+        attributes.put(ATTR_PLATFORM_ADMIN, isPlatformAdmin(currentTenantId, authorities));
         return true;
     }
 
@@ -63,5 +69,10 @@ public class AlertHandshakeInterceptor implements HandshakeInterceptor {
             }
         }
         return null;
+    }
+
+    private boolean isPlatformAdmin(Long tenantId, List<String> authorities) {
+        return Long.valueOf(0L).equals(tenantId)
+                && (authorities.contains(SUPER_ADMIN) || authorities.contains(WILDCARD));
     }
 }

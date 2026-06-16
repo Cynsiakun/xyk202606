@@ -37,14 +37,14 @@
                COALESCE(JSON_LENGTH(JSON_EXTRACT(t.rule_scope, '$.ruleIds')), 0) AS ruleCount,
                t.total_host_count           AS hostCount,
                (SELECT COUNT(*) FROM baseline_task_host th
-                WHERE th.task_id = t.id AND th.status = 'FINISHED') AS finishedHostCount,
+                WHERE th.task_id = t.id AND th.tenant_id = #{tenantId} AND th.status = 'FINISHED') AS finishedHostCount,
                (SELECT ROUND(AVG(s.compliance_rate), 2)
                 FROM baseline_summary s
-                WHERE s.task_id = t.id)    AS avgPassRate,
+                WHERE s.task_id = t.id AND s.tenant_id = #{tenantId})    AS avgPassRate,
                t.status                     AS status,
                t.create_time                AS createTime
         FROM baseline_task t
-        WHERE 1 = 1
+        WHERE t.tenant_id = #{tenantId}
         <include refid="taskFilter"/>
         ORDER BY t.id DESC
         LIMIT #{offset}, #{limit}
@@ -53,7 +53,7 @@
     <select id="countTasks" resultType="long">
         SELECT COUNT(*)
         FROM baseline_task t
-        WHERE 1 = 1
+        WHERE t.tenant_id = #{tenantId}
         <include refid="taskFilter"/>
     </select>
 
@@ -61,29 +61,31 @@
         SELECT t.id               AS taskId,
                t.total_host_count AS totalHostCount,
                (SELECT COUNT(*) FROM baseline_task_host h
-                WHERE h.task_id = t.id AND h.status = 'FINISHED')   AS finishedHostCount,
+                WHERE h.task_id = t.id AND h.tenant_id = #{tenantId} AND h.status = 'FINISHED')   AS finishedHostCount,
                (SELECT ROUND(AVG(s.compliance_rate), 2)
                 FROM baseline_summary s
-                WHERE s.task_id = t.id)                             AS avgComplianceRate,
+                WHERE s.task_id = t.id AND s.tenant_id = #{tenantId})                             AS avgComplianceRate,
                (SELECT COUNT(*)
                 FROM (
                     SELECT r.host_id
                     FROM baseline_result r
                     WHERE r.task_id = #{taskId}
+                      AND r.tenant_id = #{tenantId}
                     GROUP BY r.host_id
                     HAVING SUM(CASE WHEN r.status IN ('FAIL', 'ERROR') THEN 1 ELSE 0 END) > 0
                 ) problem_hosts)                                    AS failHostCount,
                (SELECT COUNT(DISTINCT r.rule_id)
                 FROM baseline_result r
-                WHERE r.task_id = t.id AND r.status IN ('FAIL', 'ERROR')) AS problemRuleCount,
+                WHERE r.task_id = t.id AND r.tenant_id = #{tenantId} AND r.status IN ('FAIL', 'ERROR')) AS problemRuleCount,
                (SELECT COUNT(*) FROM baseline_result r
-                WHERE r.task_id = t.id AND r.status = 'PASS')       AS passRuleCount,
+                WHERE r.task_id = t.id AND r.tenant_id = #{tenantId} AND r.status = 'PASS')       AS passRuleCount,
                (SELECT COUNT(*) FROM baseline_result r
-                WHERE r.task_id = t.id AND r.status = 'FAIL')       AS failRuleCount,
+                WHERE r.task_id = t.id AND r.tenant_id = #{tenantId} AND r.status = 'FAIL')       AS failRuleCount,
                (SELECT COUNT(*) FROM baseline_result r
-                WHERE r.task_id = t.id AND r.status = 'ERROR')      AS errorRuleCount
+                WHERE r.task_id = t.id AND r.tenant_id = #{tenantId} AND r.status = 'ERROR')      AS errorRuleCount
         FROM baseline_task t
         WHERE t.id = #{taskId}
+          AND t.tenant_id = #{tenantId}
     </select>
 
     <select id="selectProblemHostPage" resultType="com.cd.dto.BaselineProblemHostDTO">
@@ -102,9 +104,10 @@
                    SUM(CASE WHEN r.status = 'ERROR' THEN 1 ELSE 0 END) AS errorRuleCount
             FROM baseline_result r
             WHERE r.task_id = #{taskId}
+              AND r.tenant_id = #{tenantId}
             GROUP BY r.host_id
         ) agg
-        LEFT JOIN hosts h ON h.id = agg.host_id
+        LEFT JOIN hosts h ON h.id = agg.host_id AND h.tenant_id = #{tenantId}
         ORDER BY (agg.failRuleCount + agg.errorRuleCount) DESC, agg.host_id ASC
         LIMIT #{offset}, #{limit}
     </select>
@@ -115,6 +118,7 @@
             SELECT r.host_id
             FROM baseline_result r
             WHERE r.task_id = #{taskId}
+              AND r.tenant_id = #{tenantId}
             GROUP BY r.host_id
         ) agg
     </select>
@@ -136,6 +140,7 @@
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
         WHERE r.task_id = #{taskId}
           AND r.host_id = #{hostId}
+          AND r.tenant_id = #{tenantId}
         ORDER BY r.rule_id ASC, r.id ASC
     </select>
 
@@ -152,8 +157,9 @@
                r.status              AS status,
                r.remediation_status  AS remediationStatus,
                (SELECT w.status
-                FROM baseline_workorder w
-                WHERE w.result_id = r.id
+               FROM baseline_workorder w
+               WHERE w.result_id = r.id
+                 AND w.tenant_id = #{tenantId}
                 ORDER BY w.update_time DESC, w.id DESC
                 LIMIT 1)              AS workorderStatus,
                r.expected_value      AS expectedValue,
@@ -161,9 +167,10 @@
                r.evidence            AS evidence,
                r.scan_time           AS scanTime
         FROM baseline_result r
-        LEFT JOIN hosts h ON h.id = r.host_id
+        LEFT JOIN hosts h ON h.id = r.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
         WHERE r.task_id = #{taskId}
+          AND r.tenant_id = #{tenantId}
         ORDER BY r.host_id ASC, r.rule_id ASC, r.id ASC
     </select>
 
@@ -180,8 +187,9 @@
                r.status              AS status,
                r.remediation_status  AS remediationStatus,
                (SELECT w.status
-                FROM baseline_workorder w
-                WHERE w.result_id = r.id
+               FROM baseline_workorder w
+               WHERE w.result_id = r.id
+                 AND w.tenant_id = #{tenantId}
                 ORDER BY w.update_time DESC, w.id DESC
                 LIMIT 1)              AS workorderStatus,
                r.expected_value      AS expectedValue,
@@ -189,13 +197,15 @@
                COALESCE(r.evidence, r.message) AS evidence,
                r.scan_time           AS scanTime
         FROM baseline_result r
-        LEFT JOIN hosts h ON h.id = r.host_id
+        LEFT JOIN hosts h ON h.id = r.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
         WHERE r.host_id = #{hostId}
+          AND r.tenant_id = #{tenantId}
           AND NOT EXISTS (
               SELECT 1
               FROM baseline_result newer
               WHERE newer.host_id = r.host_id
+                AND newer.tenant_id = #{tenantId}
                 AND newer.rule_id = r.rule_id
                 AND COALESCE(newer.check_key, '') = COALESCE(r.check_key, '')
                 AND (
@@ -262,10 +272,12 @@
                    ROUND(SUM(CASE WHEN latest.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS compliance_rate,
                    MAX(latest.scan_time) AS last_scan_time
             FROM baseline_result latest
-            WHERE NOT EXISTS (
+            WHERE latest.tenant_id = #{tenantId}
+              AND NOT EXISTS (
                 SELECT 1
                 FROM baseline_result newer
                 WHERE newer.host_id = latest.host_id
+                  AND newer.tenant_id = #{tenantId}
                   AND newer.rule_id = latest.rule_id
                   AND COALESCE(newer.check_key, '') = COALESCE(latest.check_key, '')
                   AND (
@@ -278,8 +290,8 @@
             )
             GROUP BY latest.host_id
         ) snap
-        LEFT JOIN hosts h ON h.id = snap.host_id
-        WHERE 1 = 1
+        LEFT JOIN hosts h ON h.id = snap.host_id AND h.tenant_id = #{tenantId}
+        WHERE h.tenant_id = #{tenantId}
         <include refid="hostOverviewFilter"/>
         ORDER BY snap.compliance_rate ASC, snap.host_id ASC
         LIMIT #{offset}, #{limit}
@@ -291,10 +303,12 @@
             SELECT latest.host_id,
                    ROUND(SUM(CASE WHEN latest.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS compliance_rate
             FROM baseline_result latest
-            WHERE NOT EXISTS (
+            WHERE latest.tenant_id = #{tenantId}
+              AND NOT EXISTS (
                 SELECT 1
                 FROM baseline_result newer
                 WHERE newer.host_id = latest.host_id
+                  AND newer.tenant_id = #{tenantId}
                   AND newer.rule_id = latest.rule_id
                   AND COALESCE(newer.check_key, '') = COALESCE(latest.check_key, '')
                   AND (
@@ -307,8 +321,8 @@
             )
             GROUP BY latest.host_id
         ) snap
-        LEFT JOIN hosts h ON h.id = snap.host_id
-        WHERE 1 = 1
+        LEFT JOIN hosts h ON h.id = snap.host_id AND h.tenant_id = #{tenantId}
+        WHERE h.tenant_id = #{tenantId}
         <include refid="hostOverviewFilter"/>
     </select>
 
@@ -337,16 +351,19 @@
             FROM baseline_remediation br
             LEFT JOIN baseline_result rr ON rr.id = br.result_id
             WHERE br.host_id = r.host_id
+              AND br.tenant_id = #{tenantId}
               AND br.rule_id = r.rule_id
               AND COALESCE(rr.check_key, '') = COALESCE(r.check_key, '')
             ORDER BY br.create_time DESC, br.id DESC
             LIMIT 1
         )
         WHERE r.host_id = #{hostId}
+          AND r.tenant_id = #{tenantId}
           AND NOT EXISTS (
               SELECT 1
               FROM baseline_result newer
               WHERE newer.host_id = r.host_id
+                AND newer.tenant_id = #{tenantId}
                 AND newer.rule_id = r.rule_id
                 AND COALESCE(newer.check_key, '') = COALESCE(r.check_key, '')
                 AND (

@@ -443,6 +443,7 @@ public class SecurityAlertRuleEngineImpl implements SecurityAlertRuleEngine {
     private SecurityAlertEntity buildAlert(SecurityEventContext ctx, String ruleCode, String level, int riskScore,
                                            String alertName, String description, Map<String, Object> evidence) {
         SecurityAlertEntity alert = new SecurityAlertEntity();
+        alert.setTenantId(ctx.getEventLog().getTenantId() == null ? 0L : ctx.getEventLog().getTenantId());
         alert.setSourceLogId(ctx.getSourceLogId());
         alert.setHostId(ctx.getEventLog().getHostId());
         alert.setEventId(ctx.getEventLog().getEventId());

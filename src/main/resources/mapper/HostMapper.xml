@@ -6,6 +6,7 @@
 
     <resultMap id="HostEntityResultMap" type="com.cd.entity.HostEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="hostname" property="hostname"/>
         <result column="ipv4" property="ipv4"/>
         <result column="mac_address" property="macAddress"/>
@@ -27,7 +28,7 @@
     </resultMap>
 
     <sql id="baseColumns">
-        id, hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
+        id, tenant_id, hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
         cpu_model, cpu_physical_cores, cpu_logical_cores,
         mem_total, mem_used, mem_available, mem_usage,
         status, last_scan_time, created_at, updated_at
@@ -41,11 +42,19 @@
         </if>
     </sql>
 
+    <sql id="keywordAnd">
+        <if test="keyword != null and keyword != ''">
+            AND (hostname LIKE CONCAT('%', #{keyword}, '%')
+                 OR ipv4 LIKE CONCAT('%', #{keyword}, '%')
+                 OR mac_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </sql>
+
     <insert id="insert" parameterType="com.cd.entity.HostEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO hosts (hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
+        INSERT INTO hosts (tenant_id, hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
                            cpu_model, cpu_physical_cores, cpu_logical_cores,
                            mem_total, mem_used, mem_available, mem_usage, status, last_scan_time)
-        VALUES (#{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
+        VALUES (COALESCE(#{tenantId}, 0), #{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
                 #{cpuModel}, #{cpuPhysicalCores}, #{cpuLogicalCores},
                 #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status}, #{lastScanTime})
     </insert>
@@ -69,10 +78,17 @@
             status = #{status},
             last_scan_time = #{lastScanTime}
         WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </update>
 
     <delete id="deleteById">
         DELETE FROM hosts WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByIdAndTenant">
+        DELETE FROM hosts
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </delete>
 
     <select id="selectById" resultMap="HostEntityResultMap">
@@ -81,10 +97,24 @@
         WHERE id = #{id}
     </select>
 
+    <select id="selectByIdAndTenant" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+    </select>
+
     <select id="selectByMac" resultMap="HostEntityResultMap">
         SELECT <include refid="baseColumns"/>
         FROM hosts
         WHERE mac_address = #{macAddress}
+    </select>
+
+    <select id="selectByMacAndTenant" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE mac_address = #{macAddress}
+          AND tenant_id = #{tenantId}
     </select>
 
     <select id="selectByNormalizedMac" resultMap="HostEntityResultMap">
@@ -94,11 +124,19 @@
         LIMIT 1
     </select>
 
+    <select id="selectByNormalizedMacAndTenant" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE LOWER(REPLACE(REPLACE(REPLACE(mac_address, ':', ''), '-', ''), ' ', '')) = #{normalizedMac}
+          AND tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
+
     <insert id="upsertByMac" parameterType="com.cd.entity.HostEntity">
-        INSERT INTO hosts (hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
+        INSERT INTO hosts (tenant_id, hostname, ipv4, mac_address, os_name, os_version, os_arch, os_release,
                            cpu_model, cpu_physical_cores, cpu_logical_cores,
                            mem_total, mem_used, mem_available, mem_usage, status, last_scan_time)
-        VALUES (#{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
+        VALUES (COALESCE(#{tenantId}, 0), #{hostname}, #{ipv4}, #{macAddress}, #{osName}, #{osVersion}, #{osArch}, #{osRelease},
                 #{cpuModel}, #{cpuPhysicalCores}, #{cpuLogicalCores},
                 #{memTotal}, #{memUsed}, #{memAvailable}, #{memUsage}, #{status}, #{lastScanTime})
         ON DUPLICATE KEY UPDATE
@@ -121,8 +159,8 @@
     </insert>
 
     <insert id="heartbeatByMac">
-        INSERT INTO hosts (mac_address, status, updated_at)
-        VALUES (#{macAddress}, 1, NOW())
+        INSERT INTO hosts (tenant_id, mac_address, status, updated_at)
+        VALUES (0, #{macAddress}, 1, NOW())
         ON DUPLICATE KEY UPDATE
             status = 1,
             updated_at = NOW()
@@ -171,6 +209,13 @@
         ORDER BY id ASC
     </select>
 
+    <select id="selectAllIdsByTenant" resultType="long">
+        SELECT id
+        FROM hosts
+        WHERE tenant_id = #{tenantId}
+        ORDER BY id ASC
+    </select>
+
     <select id="selectPage" resultMap="HostEntityResultMap">
         SELECT <include refid="baseColumns"/>
         FROM hosts
@@ -179,8 +224,30 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <select id="selectPageByTenant" resultMap="HostEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM hosts
+        WHERE tenant_id = #{tenantId}
+        <include refid="keywordAnd"/>
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
     <select id="countAll" resultType="long">
         SELECT COUNT(1) FROM hosts
         <include refid="keywordWhere"/>
+    </select>
+
+    <select id="countAllByTenant" resultType="long">
+        SELECT COUNT(1)
+        FROM hosts
+        WHERE tenant_id = #{tenantId}
+        <include refid="keywordAnd"/>
+    </select>
+
+    <select id="countByTenantId" resultType="long">
+        SELECT COUNT(1)
+        FROM hosts
+        WHERE tenant_id = #{tenantId}
     </select>
 </mapper>

@@ -2,6 +2,8 @@ package com.cd.service.impl;
 
 import com.cd.common.ai.AiException;
 import com.cd.common.ai.AiProperties;
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
 import com.cd.dto.AiChatResponseDTO;
 import com.cd.service.AiService;
 import lombok.Data;
@@ -28,11 +30,13 @@ public class DashScopeAiServiceImpl implements AiService {
 
     private final AiProperties aiProperties;
     private final ResourceLoader resourceLoader;
+    private final LicenseGuard licenseGuard;
     private final RestClient restClient;
 
-    public DashScopeAiServiceImpl(AiProperties aiProperties, ResourceLoader resourceLoader) {
+    public DashScopeAiServiceImpl(AiProperties aiProperties, ResourceLoader resourceLoader, LicenseGuard licenseGuard) {
         this.aiProperties = aiProperties;
         this.resourceLoader = resourceLoader;
+        this.licenseGuard = licenseGuard;
         this.restClient = RestClient.builder()
                 .baseUrl(removeTrailingSlash(aiProperties.getBaseUrl()))
                 .build();
@@ -40,6 +44,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chat(String promptName, Map<String, Object> variables) {
+        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
         validateConfig();
         String prompt = renderPrompt(promptName, variables == null ? Map.of() : variables);
         return sendMessages(promptName, List.of(Map.of(
@@ -50,6 +55,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chatWithSystem(String systemPromptName, String userMessage) {
+        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
         validateConfig();
         String systemPrompt = loadPrompt(systemPromptName);
         return sendMessages(systemPromptName, List.of(
@@ -60,6 +66,7 @@ public class DashScopeAiServiceImpl implements AiService {
 
     @Override
     public AiChatResponseDTO chatJsonWithSystem(String systemPromptName, String userMessage, Integer maxTokens) {
+        licenseGuard.requireFeature(LicenseFeature.AI_ANALYSIS);
         validateConfig();
         String systemPrompt = loadPrompt(systemPromptName);
         return sendMessages(systemPromptName, List.of(

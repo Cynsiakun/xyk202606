@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class HostPatchRiskEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private String riskId;
     private String riskType;

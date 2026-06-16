@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.dto.VulnOpsDashboardResponseDTO;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.service.VulnOpsDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,8 +39,9 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
         RangeWindow window = resolveWindow(range, startDate, endDate);
         RangeWindow previousWindow = window.previousWindow();
 
-        List<ResultRecord> records = loadResultRecords(window.end());
-        List<HostRecord> hosts = loadHosts();
+        Long tenantId = currentTenantId();
+        List<ResultRecord> records = loadResultRecords(window.end(), tenantId);
+        List<HostRecord> hosts = loadHosts(tenantId);
 
         VulnOpsDashboardResponseDTO response = new VulnOpsDashboardResponseDTO();
         fillKpis(response.getKpis(), records, hosts, window, previousWindow);
@@ -342,7 +344,7 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
                 });
     }
 
-    private List<ResultRecord> loadResultRecords(LocalDateTime endTime) {
+    private List<ResultRecord> loadResultRecords(LocalDateTime endTime, Long tenantId) {
         return jdbcTemplate.query("""
                         SELECT hvr.host_id,
                                hvr.rule_id,
@@ -356,6 +358,7 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
                         FROM host_vuln_result hvr
                         LEFT JOIN vuln_rule vr ON vr.id = hvr.rule_id
                         WHERE hvr.status = 1
+                          AND hvr.tenant_id = ?
                           AND hvr.rule_id IS NOT NULL
                           AND hvr.rule_id > 0
                           AND hvr.created_at <= ?
@@ -373,13 +376,14 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
                     record.productType = rs.getString("product_type");
                     return record;
                 },
-                Timestamp.valueOf(endTime));
+                tenantId, Timestamp.valueOf(endTime));
     }
 
-    private List<HostRecord> loadHosts() {
+    private List<HostRecord> loadHosts(Long tenantId) {
         return jdbcTemplate.query("""
                         SELECT id, hostname, ipv4, status, updated_at
                         FROM hosts
+                        WHERE tenant_id = ?
                         """,
                 (rs, rowNum) -> {
                     HostRecord record = new HostRecord();
@@ -389,7 +393,8 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
                     record.status = rs.getInt("status");
                     record.updatedAt = toLocalDateTime(rs.getTimestamp("updated_at"));
                     return record;
-                });
+                },
+                tenantId);
     }
 
     private RangeWindow resolveWindow(String range, LocalDate startDate, LocalDate endDate) {
@@ -653,6 +658,11 @@ public class VulnOpsDashboardServiceImpl implements VulnOpsDashboardService {
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private static class Aggregate {

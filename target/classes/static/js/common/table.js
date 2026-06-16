@@ -17,10 +17,14 @@
             where: config.where || {},
             parseData: function (res) {
                 if (res.code !== 200) {
-                    if (window.AppRequest && typeof window.AppRequest.showMessage === "function") {
-                        window.AppRequest.showMessage(res.message || "请求失败", 2, 2200);
+                    var message = res.message || "请求失败";
+                    if (window.AppRequest && typeof window.AppRequest.normalizeErrorMessage === "function") {
+                        message = window.AppRequest.normalizeErrorMessage(message);
                     }
-                    if ((res.code === 401 || res.code === 403) && window.AppAuth) {
+                    if (window.AppRequest && typeof window.AppRequest.showMessage === "function") {
+                        window.AppRequest.showMessage(message, 2, 2200);
+                    }
+                    if (res.code === 401 && window.AppAuth) {
                         window.AppAuth.clearLogin();
                         window.AppAuth.redirectToLogin();
                     }

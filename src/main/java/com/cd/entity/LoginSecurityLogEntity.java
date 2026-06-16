@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class LoginSecurityLogEntity {
 
     private Long id;
+    private Long tenantId;
     /** 来源 windows_event_logs.id，去重键。 */
     private Long sourceLogId;
     private Long hostId;

@@ -63,6 +63,8 @@
 
     <sql id="riskHostWhere">
         WHERE hpr.status = 'open'
+          AND hpr.tenant_id = #{tenantId}
+          AND h.tenant_id = #{tenantId}
         <if test="keyword != null and keyword != ''">
             AND (
                 h.hostname LIKE CONCAT('%', #{keyword}, '%')
@@ -101,11 +103,13 @@
             COUNT(DISTINCT CASE WHEN hpr.status = 'open' AND hpr.risk_type = 'eol' THEN hpr.host_id END) AS eol_host_count,
             (SELECT COUNT(1)
              FROM hosts h
-             LEFT JOIN host_patch_status s ON s.host_id = h.id
-             WHERE s.host_id IS NULL) AS unscanned_host_count,
+             LEFT JOIN host_patch_status s ON s.host_id = h.id AND s.tenant_id = #{tenantId}
+             WHERE h.tenant_id = #{tenantId}
+               AND s.host_id IS NULL) AS unscanned_host_count,
             MAX(hpr.scan_time) AS latest_scan_time
         FROM host_patch_risk hpr
-        LEFT JOIN host_patch_status hps ON hps.host_id = hpr.host_id
+        LEFT JOIN host_patch_status hps ON hps.host_id = hpr.host_id AND hps.tenant_id = #{tenantId}
+        WHERE hpr.tenant_id = #{tenantId}
     </select>
 
     <select id="selectRiskHostPage" resultMap="PatchRiskHostResultMap">
@@ -131,7 +135,7 @@
             MAX(COALESCE(hps.scan_time, hpr.scan_time)) AS last_patch_scan_time
         FROM host_patch_risk hpr
         INNER JOIN hosts h ON h.id = hpr.host_id
-        LEFT JOIN host_patch_status hps ON hps.host_id = h.id
+        LEFT JOIN host_patch_status hps ON hps.host_id = h.id AND hps.tenant_id = #{tenantId}
         <include refid="riskHostWhere"/>
         GROUP BY h.id, h.hostname, h.ipv4, h.mac_address, h.os_name, h.os_version, hps.os_build, h.status
         ORDER BY MAX(<include refid="riskLevelRank"/>) DESC, COUNT(hpr.id) DESC, MAX(hpr.scan_time) DESC
@@ -144,7 +148,7 @@
             SELECT h.id
             FROM host_patch_risk hpr
             INNER JOIN hosts h ON h.id = hpr.host_id
-            LEFT JOIN host_patch_status hps ON hps.host_id = h.id
+            LEFT JOIN host_patch_status hps ON hps.host_id = h.id AND hps.tenant_id = #{tenantId}
             <include refid="riskHostWhere"/>
             GROUP BY h.id
         ) t
@@ -155,6 +159,7 @@
                related_patch_id, related_cve, evidence, recommendation, status, scan_time
         FROM host_patch_risk
         WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
           AND status = 'open'
         ORDER BY CASE LOWER(risk_level)
             WHEN 'critical' THEN 4
@@ -168,12 +173,14 @@
     <select id="selectHostIdsWithPatchStatus" resultType="long">
         SELECT DISTINCT host_id
         FROM host_patch_status
+        WHERE tenant_id = #{tenantId}
     </select>
 
     <select id="selectOnlineHostIds" resultType="long">
         SELECT id
         FROM hosts
         WHERE status = 1
+          AND tenant_id = #{tenantId}
         ORDER BY id ASC
     </select>
 </mapper>
