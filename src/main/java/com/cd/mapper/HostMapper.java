@@ -38,6 +38,14 @@ public interface HostMapper {
      */
     int heartbeatByMac(@Param("macAddress") String macAddress);
 
+    int claimTenantByNormalizedMac(@Param("normalizedMac") String normalizedMac,
+                                   @Param("tenantId") Long tenantId,
+                                   @Param("hostname") String hostname);
+
+    int insertAuthorizedPlaceholder(@Param("tenantId") Long tenantId,
+                                    @Param("hostname") String hostname,
+                                    @Param("macAddress") String macAddress);
+
     /**
      * 离线检测：将所有 status=1 且 updated_at 早于（当前时间 - seconds 秒）的主机置为离线（status=0）。
      *
@@ -64,6 +72,8 @@ public interface HostMapper {
     List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
 
     List<HostEntity> selectPortScanCandidates(@Param("limit") int limit);
+
+    List<String> selectAllMacAddresses();
 
     List<Long> selectAllIds();
 

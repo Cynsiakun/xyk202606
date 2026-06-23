@@ -7,6 +7,7 @@ import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.BaselineHostDispatchDTO;
 import com.cd.dto.BaselineTaskCreateRequestDTO;
 import com.cd.dto.BaselineTaskDispatchResponseDTO;
+import com.cd.entity.BaselineProtectionLevelEntity;
 import com.cd.entity.BaselineRuleEntity;
 import com.cd.entity.BaselineRuleItemEntity;
 import com.cd.entity.BaselineTaskEntity;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,6 +52,7 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_RUNNING = "RUNNING";
     private static final String STATUS_FAILED = "FAILED";
+    private static final String DEFAULT_PROTECTION_LEVEL_CODE = "L3";
 
     private final BaselineRuleMapper baselineRuleMapper;
     private final BaselineTaskMapper baselineTaskMapper;
@@ -63,19 +66,19 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     public BaselineTaskDispatchResponseDTO createAndDispatch(BaselineTaskCreateRequestDTO request) {
         List<Long> hostIds = distinctPositiveIds(request.getHostIds(), "主机范围不能为空");
         List<Long> ruleIds = distinctPositiveIds(request.getRuleIds(), "规则范围不能为空");
+        BaselineTaskContext taskContext = resolveTaskContext(request);
         Long tenantId = resolveTenantId(hostIds);
         List<HostEntity> hosts = loadHosts(hostIds, tenantId);
-        List<BaselineRuleEntity> rules = loadRules(ruleIds);
-        Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = loadRuleItems(ruleIds);
+        List<BaselineRuleEntity> rules = loadRules(ruleIds, taskContext.assetTypeCodes());
 
-        BaselineTaskEntity task = createTask(request, hostIds, rules, tenantId);
+        BaselineTaskEntity task = createTask(request, hostIds, rules, tenantId, taskContext);
         List<BaselineHostDispatchDTO> dispatchResults = new ArrayList<>();
         int sentCount = 0;
         int failedCount = 0;
 
         for (HostEntity host : hosts) {
             BaselineTaskHostEntity taskHost = createTaskHost(task.getId(), host.getId(), tenantId);
-            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, itemsByRuleId, tenantId);
+            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, taskContext.protectionLevelId(), tenantId);
             dispatchResults.add(result);
             if (Boolean.TRUE.equals(result.getSent())) {
                 sentCount++;
@@ -103,19 +106,19 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     public BaselineTaskDispatchResponseDTO createAndDispatchForTenant(BaselineTaskCreateRequestDTO request, Long tenantId) {
         List<Long> hostIds = distinctPositiveIds(request.getHostIds(), "host scope cannot be empty");
         List<Long> ruleIds = distinctPositiveIds(request.getRuleIds(), "rule scope cannot be empty");
+        BaselineTaskContext taskContext = resolveTaskContext(request);
         Long resolvedTenantId = tenantId == null ? 0L : tenantId;
         List<HostEntity> hosts = loadHosts(hostIds, resolvedTenantId);
-        List<BaselineRuleEntity> rules = loadRules(ruleIds);
-        Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = loadRuleItems(ruleIds);
+        List<BaselineRuleEntity> rules = loadRules(ruleIds, taskContext.assetTypeCodes());
 
-        BaselineTaskEntity task = createTask(request, hostIds, rules, resolvedTenantId);
+        BaselineTaskEntity task = createTask(request, hostIds, rules, resolvedTenantId, taskContext);
         List<BaselineHostDispatchDTO> dispatchResults = new ArrayList<>();
         int sentCount = 0;
         int failedCount = 0;
 
         for (HostEntity host : hosts) {
             BaselineTaskHostEntity taskHost = createTaskHost(task.getId(), host.getId(), resolvedTenantId);
-            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, itemsByRuleId, resolvedTenantId);
+            BaselineHostDispatchDTO result = dispatchHost(task, taskHost, host, rules, taskContext.protectionLevelId(), resolvedTenantId);
             dispatchResults.add(result);
             if (Boolean.TRUE.equals(result.getSent())) {
                 sentCount++;
@@ -141,15 +144,19 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     private BaselineTaskEntity createTask(BaselineTaskCreateRequestDTO request,
                                           List<Long> hostIds,
                                           List<BaselineRuleEntity> rules,
-                                          Long tenantId) {
+                                          Long tenantId,
+                                          BaselineTaskContext taskContext) {
         BaselineTaskEntity task = new BaselineTaskEntity();
         task.setTenantId(tenantId);
         task.setTaskName(request.getTaskName().trim());
         task.setExecuteType(normalizeExecuteType(request.getExecuteType()));
         task.setCronExpr(emptyToNull(request.getCronExpr()));
-        task.setRuleScope(writeJson(Map.of("ruleIds", rules.stream().map(BaselineRuleEntity::getId).toList())));
+        task.setProtectionLevelId(taskContext.protectionLevelId());
+        task.setTargetLevel(taskContext.targetLevel());
+        task.setAssetTypeFilter(taskContext.assetTypeFilter());
+        task.setRuleScope(writeJson(buildRuleScope(rules, taskContext)));
         task.setRuleSnapshotJson(writeJson(rules.stream()
-                .map(rule -> Map.of("ruleId", rule.getId(), "version", defaultVersion(rule)))
+                .map(rule -> buildRuleSnapshot(rule, taskContext))
                 .toList()));
         task.setStatus(STATUS_PENDING);
         task.setTotalHostCount(hostIds.size());
@@ -174,8 +181,8 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     private BaselineHostDispatchDTO dispatchHost(BaselineTaskEntity task,
                                                  BaselineTaskHostEntity taskHost,
                                                  HostEntity host,
-                                                 List<BaselineRuleEntity> rules,
-                                                 Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId,
+                                                 List<BaselineRuleEntity> candidateRules,
+                                                 Long protectionLevelId,
                                                  Long tenantId) {
         BaselineHostDispatchDTO result = new BaselineHostDispatchDTO();
         result.setHostId(host.getId());
@@ -186,7 +193,14 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
             return markDispatchFailed(taskHost.getId(), result, "主机缺少 MAC 地址，无法下发", tenantId);
         }
 
-        Map<String, Object> payload = buildAgentMessage(task, taskHost, host, rules, itemsByRuleId);
+        List<BaselineRuleEntity> hostRules = filterRulesForHost(candidateRules, host);
+        if (hostRules.isEmpty()) {
+            return markDispatchFailed(taskHost.getId(), result,
+                    "主机未匹配到适用的基线规则，os=" + host.getOsName(), tenantId);
+        }
+        Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = loadRuleItems(
+                hostRules.stream().map(BaselineRuleEntity::getId).toList(), protectionLevelId);
+        Map<String, Object> payload = buildAgentMessage(task, taskHost, host, hostRules, itemsByRuleId);
         try {
             String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX
                     + normalizeMac(host.getMacAddress())
@@ -247,6 +261,83 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         return message;
     }
 
+    private List<BaselineRuleEntity> filterRulesForHost(List<BaselineRuleEntity> candidateRules, HostEntity host) {
+        String hostAssetTypeCode = resolveHostAssetTypeCode(host);
+        if (!StringUtils.hasText(hostAssetTypeCode)) {
+            return List.of();
+        }
+        return candidateRules.stream()
+                .filter(rule -> ruleMatchesAssetType(rule, hostAssetTypeCode))
+                .toList();
+    }
+
+    private boolean ruleMatchesAssetType(BaselineRuleEntity rule, String hostAssetTypeCode) {
+        if (!StringUtils.hasText(hostAssetTypeCode)) {
+            return false;
+        }
+        if (!isOsScopedRule(rule)) {
+            return true;
+        }
+        if (StringUtils.hasText(rule.getAssetTypeCode())) {
+            Set<String> assetTypeCodes = splitUpperCsv(rule.getAssetTypeCode());
+            if (!assetTypeCodes.isEmpty()) {
+                return assetTypeCodes.contains(hostAssetTypeCode);
+            }
+        }
+        String legacyAssetType = normalizeLegacyAssetType(rule);
+        return hostAssetTypeCode.equals(legacyAssetType);
+    }
+
+    private boolean isOsScopedRule(BaselineRuleEntity rule) {
+        if (rule == null) {
+            return false;
+        }
+        Set<String> assetTypeCodes = splitUpperCsv(rule.getAssetTypeCode());
+        if (!assetTypeCodes.isEmpty()) {
+            return assetTypeCodes.stream().allMatch(code -> code.startsWith("OS_"));
+        }
+        String legacyAssetType = normalizeLegacyAssetType(rule);
+        return "OS_WINDOWS".equals(legacyAssetType) || "OS_LINUX".equals(legacyAssetType);
+    }
+
+    private String resolveHostAssetTypeCode(HostEntity host) {
+        if (host == null || !StringUtils.hasText(host.getOsName())) {
+            return null;
+        }
+        String osName = host.getOsName().trim().toLowerCase();
+        if (osName.contains("windows")) {
+            return "OS_WINDOWS";
+        }
+        if (osName.contains("linux")
+                || osName.contains("centos")
+                || osName.contains("ubuntu")
+                || osName.contains("debian")
+                || osName.contains("red hat")
+                || osName.contains("rhel")
+                || osName.contains("rocky")
+                || osName.contains("alma")
+                || osName.contains("suse")
+                || osName.contains("kylin")
+                || osName.contains("uos")) {
+            return "OS_LINUX";
+        }
+        return null;
+    }
+
+    private String normalizeLegacyAssetType(BaselineRuleEntity rule) {
+        if (rule == null) {
+            return null;
+        }
+        String osType = normalizeUpper(rule.getOsType());
+        if ("WINDOWS".equals(osType)) {
+            return "OS_WINDOWS";
+        }
+        if ("LINUX".equals(osType)) {
+            return "OS_LINUX";
+        }
+        return normalizeUpper(rule.getAssetType());
+    }
+
     private Map<String, Object> buildCheckItem(BaselineRuleEntity rule, BaselineRuleItemEntity item) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("itemId", item.getId());
@@ -281,18 +372,21 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         return hosts;
     }
 
-    private List<BaselineRuleEntity> loadRules(List<Long> ruleIds) {
-        List<BaselineRuleEntity> rules = baselineRuleMapper.selectPublishedByIds(ruleIds);
+    private List<BaselineRuleEntity> loadRules(List<Long> ruleIds, List<String> assetTypeCodes) {
+        List<BaselineRuleEntity> rules = assetTypeCodes.isEmpty()
+                ? baselineRuleMapper.selectPublishedByIds(ruleIds)
+                : baselineRuleMapper.selectPublishedByIdsAndAssetTypes(ruleIds, assetTypeCodes);
         Set<Long> foundIds = rules.stream().map(BaselineRuleEntity::getId).collect(Collectors.toCollection(LinkedHashSet::new));
         List<Long> missingIds = ruleIds.stream().filter(id -> !foundIds.contains(id)).toList();
         if (!missingIds.isEmpty()) {
-            throw new ResourceNotFoundException("规则不存在、未启用或未发布: " + missingIds);
+            String reason = assetTypeCodes.isEmpty() ? "" : "，或不适用于资产类型 " + assetTypeCodes;
+            throw new ResourceNotFoundException("规则不存在、未启用、未发布" + reason + ": " + missingIds);
         }
         return rules;
     }
 
-    private Map<Long, List<BaselineRuleItemEntity>> loadRuleItems(List<Long> ruleIds) {
-        List<BaselineRuleItemEntity> items = baselineRuleMapper.selectItemsByRuleIds(ruleIds);
+    private Map<Long, List<BaselineRuleItemEntity>> loadRuleItems(List<Long> ruleIds, Long protectionLevelId) {
+        List<BaselineRuleItemEntity> items = baselineRuleMapper.selectItemsByRuleIdsAndProtectionLevel(ruleIds, protectionLevelId);
         Map<Long, List<BaselineRuleItemEntity>> itemsByRuleId = items.stream()
                 .collect(Collectors.groupingBy(BaselineRuleItemEntity::getRuleId, LinkedHashMap::new, Collectors.toList()));
         List<Long> emptyRuleIds = ruleIds.stream()
@@ -302,6 +396,94 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
             throw new IllegalArgumentException("规则缺少检查项，无法下发: " + emptyRuleIds);
         }
         return itemsByRuleId;
+    }
+
+    private BaselineTaskContext resolveTaskContext(BaselineTaskCreateRequestDTO request) {
+        BaselineProtectionLevelEntity level = resolveProtectionLevel(request);
+        List<String> assetTypeCodes = normalizeAssetTypeCodes(request.getAssetTypeCodes());
+        return new BaselineTaskContext(
+                level.getId(),
+                level.getLevelCode(),
+                level.getLevelName(),
+                levelOrderToTargetLevel(level),
+                assetTypeCodes,
+                assetTypeCodes.isEmpty() ? null : String.join(",", assetTypeCodes)
+        );
+    }
+
+    private BaselineProtectionLevelEntity resolveProtectionLevel(BaselineTaskCreateRequestDTO request) {
+        BaselineProtectionLevelEntity level = null;
+        if (request.getProtectionLevelId() != null && request.getProtectionLevelId() > 0) {
+            level = baselineRuleMapper.selectProtectionLevelById(request.getProtectionLevelId());
+            if (level == null) {
+                throw new ResourceNotFoundException("等保等级不存在或未启用: id=" + request.getProtectionLevelId());
+            }
+            return level;
+        }
+        String levelCode = StringUtils.hasText(request.getProtectionLevelCode())
+                ? request.getProtectionLevelCode().trim()
+                : DEFAULT_PROTECTION_LEVEL_CODE;
+        level = baselineRuleMapper.selectProtectionLevelByCode(levelCode);
+        if (level == null) {
+            throw new ResourceNotFoundException("等保等级不存在或未启用: code=" + levelCode);
+        }
+        return level;
+    }
+
+    private List<String> normalizeAssetTypeCodes(List<String> assetTypeCodes) {
+        if (assetTypeCodes == null) {
+            return List.of();
+        }
+        return assetTypeCodes.stream()
+                .filter(StringUtils::hasText)
+                .map(value -> value.trim().toUpperCase())
+                .distinct()
+                .toList();
+    }
+
+    private Set<String> splitUpperCsv(String text) {
+        if (!StringUtils.hasText(text)) {
+            return Collections.emptySet();
+        }
+        return List.of(text.split(",")).stream()
+                .map(this::normalizeUpper)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Integer levelOrderToTargetLevel(BaselineProtectionLevelEntity level) {
+        if (level == null || !StringUtils.hasText(level.getLevelCode())) {
+            return 3;
+        }
+        String code = level.getLevelCode().trim().toUpperCase();
+        if (code.matches("L[1-5]")) {
+            return Integer.parseInt(code.substring(1));
+        }
+        Integer order = level.getLevelOrder();
+        if (order == null || order < 1) {
+            return 3;
+        }
+        return Math.min(order, 5);
+    }
+
+    private Map<String, Object> buildRuleScope(List<BaselineRuleEntity> rules, BaselineTaskContext taskContext) {
+        Map<String, Object> scope = new LinkedHashMap<>();
+        scope.put("ruleIds", rules.stream().map(BaselineRuleEntity::getId).toList());
+        scope.put("protectionLevelId", taskContext.protectionLevelId());
+        scope.put("protectionLevelCode", taskContext.protectionLevelCode());
+        scope.put("assetTypes", taskContext.assetTypeCodes());
+        return scope;
+    }
+
+    private Map<String, Object> buildRuleSnapshot(BaselineRuleEntity rule, BaselineTaskContext taskContext) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("ruleId", rule.getId());
+        snapshot.put("version", defaultVersion(rule));
+        snapshot.put("ruleCode", rule.getRuleCode());
+        snapshot.put("assetType", rule.getAssetType());
+        snapshot.put("protectionLevelId", taskContext.protectionLevelId());
+        snapshot.put("protectionLevelCode", taskContext.protectionLevelCode());
+        return snapshot;
     }
 
     private List<Long> distinctPositiveIds(List<Long> ids, String emptyMessage) {
@@ -383,6 +565,10 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
+    private String normalizeUpper(String value) {
+        return StringUtils.hasText(value) ? value.trim().toUpperCase() : null;
+    }
+
     private Long resolveTenantId(List<Long> hostIds) {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId != null) {
@@ -400,5 +586,13 @@ public class BaselineTaskServiceImpl implements BaselineTaskService {
     private Long currentTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         return tenantId == null ? 0L : tenantId;
+    }
+
+    private record BaselineTaskContext(Long protectionLevelId,
+                                       String protectionLevelCode,
+                                       String protectionLevelName,
+                                       Integer targetLevel,
+                                       List<String> assetTypeCodes,
+                                       String assetTypeFilter) {
     }
 }

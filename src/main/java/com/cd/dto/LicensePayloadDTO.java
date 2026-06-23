@@ -3,6 +3,7 @@ package com.cd.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class LicensePayloadDTO {
@@ -14,4 +15,5 @@ public class LicensePayloadDTO {
     private Integer userLimit;
     private LocalDateTime expireTime;
     private String machineId;
+    private List<String> featureFlags;
 }

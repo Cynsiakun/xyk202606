@@ -15,6 +15,8 @@ public class BaselineTaskEntity {
     private String ruleScope;
     private String ruleSnapshotJson;
     private String status;
+    private Integer targetLevel;
+    private String assetTypeFilter;
     private Integer totalHostCount;
     private Integer successCount;
     private Integer failCount;
@@ -22,4 +24,5 @@ public class BaselineTaskEntity {
     private LocalDateTime createTime;
     private LocalDateTime startTime;
     private LocalDateTime finishTime;
+    private Long protectionLevelId;
 }

@@ -1,7 +1,7 @@
 ﻿/**
  * 资产详情工具：
  *  - openAssetDetail：资产页面内，按记录 id 打开单类型详情弹窗；
- *  - openHostAssetTabs：主机管理页内，按 MAC 打开「账号 / 服务 / 进程 / APP」四 Tab 资产弹窗。
+ *  - openHostAssetTabs：主机管理页内，按 MAC 打开「账号 / 服务 / 进程 / APP / 端口」Tab 资产弹窗。
  *
  * <p>两者复用同一套「信息表 + 原始JSON切换 + 客户端分页表格」渲染逻辑。</p>
  */
@@ -12,11 +12,12 @@ window.AssetUtils = (function () {
         account: "账号资产",
         service: "服务资产",
         process: "进程资产",
-        app: "APP资产"
+        app: "APP资产",
+        port: "端口资产"
     };
 
     /** 涓绘満璧勪骇 Tab 椤哄簭銆?*/
-    var TAB_TYPES = ["account", "service", "process", "app"];
+    var TAB_TYPES = ["account", "service", "process", "app", "port"];
 
     var ANALYZABLE_TYPES = {
         account: {
@@ -171,9 +172,13 @@ window.AssetUtils = (function () {
         AppRequest.request("/api/assets/host-latest?type=" + type + "&mac=" + encodeURIComponent(mac), {method: "GET"})
             .then(function (result) {
                 var record = result.data;
+                if (!record) {
+                    pane.html('<div class="host-asset-state">暂无' + (TYPE_LABELS[type] || "资产") + '</div>');
+                    return;
+                }
                 var assetData = parseAssetJson(record, true);
                 if (assetData == null) {
-                    pane.html('<div class="host-asset-state">加载中...</div>');
+                    pane.html('<div class="host-asset-state">该任务资产数据解析失败</div>');
                     return;
                 }
                 pane.html('<div class="asset-detail-wrap"></div>');
@@ -182,10 +187,38 @@ window.AssetUtils = (function () {
                     {label: "MAC地址", value: record.macAddress},
                     {label: "任务ID", value: record.taskId}
                 ], type, false);
+                if (type === "port") {
+                    renderPortRematchAction(pane, record);
+                }
             })
-            .catch(function () {
-                pane.html('<div class="host-asset-state">加载中...</div>');
+            .catch(function (error) {
+                var message = error && error.message ? error.message : "资产加载失败";
+                pane.html('<div class="host-asset-state">' + escapeHtml(message) + '</div>');
             });
+    }
+
+    function renderPortRematchAction(pane, record) {
+        var wrap = pane.find(".asset-detail-wrap");
+        if (!wrap.length) {
+            return;
+        }
+        var actionBar = document.createElement("div");
+        actionBar.className = "asset-detail-actions";
+        actionBar.innerHTML = '<button type="button" class="layui-btn layui-btn-sm layui-btn-normal asset-port-rematch">重新匹配</button>';
+        wrap[0].insertBefore(actionBar, wrap[0].firstChild);
+        actionBar.querySelector(".asset-port-rematch").addEventListener("click", async function (event) {
+            var button = event.currentTarget;
+            button.disabled = true;
+            try {
+                var result = await AppRequest.request("/api/assets/port/rematch-by-mac?mac=" + encodeURIComponent(record.macAddress), {
+                    method: "POST"
+                }, {successMessage: "重新匹配完成"});
+                AppRequest.showMessage("重新匹配完成，本次生成 " + ((result && result.data) || 0) + " 条端口资产", 1, 1800);
+                loadHostAssetPane(pane, "port", record.macAddress);
+            } catch (error) {
+                button.disabled = false;
+            }
+        });
     }
 
     // ============ 鍏辩敤娓叉煋 ============
@@ -196,6 +229,8 @@ window.AssetUtils = (function () {
         var state = {
             record: record,
             assetData: assetData,
+            detailKeyword: "",
+            detailType: "ALL",
             columns: columns || [],
             assetType: assetType,
             enableAnalysis: !!enableAnalysis,
@@ -216,21 +251,26 @@ window.AssetUtils = (function () {
         }
 
         var columns = state.columns || [];
-        var keys = buildDisplayKeys(assetData, false);
-        var total = assetData.length;
+        var filteredData = filterDetailAssetData(assetData, state);
+        var keys = buildDisplayKeys(filteredData.length ? filteredData : assetData, false);
+        var total = filteredData.length;
+        var searchEnabled = state.assetType === "port";
+        var typeOptions = searchEnabled ? buildDetailTypeOptions(assetData) : [];
 
         var infoRows = columns.map(function (c) {
             return '<tr><td class="detail-label">' + c.label + '</td><td>' + formatCell(c.value) + '</td></tr>';
         }).join("");
-        infoRows += '<tr><td class="detail-label">资产数量</td><td>' + (record.assetCount != null ? record.assetCount : total) + '</td></tr>';
+        infoRows += '<tr><td class="detail-label">资产数量</td><td>' + total + '</td></tr>';
         infoRows += '<tr><td class="detail-label">更新时间</td><td>'
             + (window.AppUtils ? AppUtils.formatDateTime(record.updatedAt) : (record.updatedAt || "-")) + '</td></tr>';
 
         var headerHtml = '<tr>' + keys.map(function (k) { return '<th>' + escapeHtml(displayKey(k)) + '</th>'; }).join("") + '</tr>';
         var rawJson = JSON.stringify(assetData, null, 2);
+        var filterHtml = searchEnabled ? renderDetailFilters(state, typeOptions) : "";
 
         $wrap.html(''
             + '<div class="asset-detail-info"><table class="layui-table asset-info-table"><tbody>' + infoRows + '</tbody></table></div>'
+            + filterHtml
             + '<div class="asset-detail-actions"><button type="button" class="layui-btn layui-btn-xs layui-btn-primary asset-json-toggle">展开原始JSON</button></div>'
             + '<div class="asset-detail-array">'
             +   '<div class="asset-table-scroll"><table class="layui-table asset-data-table"><thead>' + headerHtml + '</thead><tbody class="asset-tbody"></tbody></table></div>'
@@ -238,8 +278,9 @@ window.AssetUtils = (function () {
             + '</div>'
             + '<div class="asset-detail-json" style="display:none;"><pre class="json-block">' + escapeHtml(rawJson) + '</pre></div>');
 
-        bindPagedTable($wrap, assetData, keys);
+        bindPagedTable($wrap, filteredData, keys);
         bindJsonToggle($wrap);
+        bindDetailFilters($wrap, state);
     }
 
     function renderAccountDetailState($wrap, state, config) {
@@ -425,6 +466,95 @@ window.AssetUtils = (function () {
         }
 
         renderPage(1);
+    }
+
+    function renderDetailFilters(state, typeOptions) {
+        var optionsHtml = ['<option value="ALL">全部资产类型</option>'].concat(typeOptions.map(function (item) {
+            var selected = item.value === state.detailType ? ' selected' : '';
+            return '<option value="' + escapeHtml(item.value) + '"' + selected + '>' + escapeHtml(item.label) + '</option>';
+        })).join("");
+        return ''
+            + '<div class="asset-detail-filters">'
+            +   '<select class="native-select asset-detail-type" lay-ignore>' + optionsHtml + '</select>'
+            +   '<input type="text" class="layui-input asset-detail-search" placeholder="搜索产品名 / 子类 / 端口 / 协议 / 厂商" value="' + escapeHtml(state.detailKeyword || "") + '">'
+            + '</div>';
+    }
+
+    function bindDetailFilters($wrap, state) {
+        var typeSelect = $wrap.find(".asset-detail-type");
+        var searchInput = $wrap.find(".asset-detail-search");
+        if (!typeSelect.length && !searchInput.length) {
+            return;
+        }
+        typeSelect.on("change", function () {
+            state.detailType = this.value || "ALL";
+            renderDetailState($wrap, state);
+        });
+        searchInput.on("input", function () {
+            state.detailKeyword = (this.value || "").trim();
+            renderDetailState($wrap, state);
+        });
+    }
+
+    function buildDetailTypeOptions(assetData) {
+        var seen = {};
+        var options = [];
+        assetData.forEach(function (item) {
+            var raw = firstNonEmptyValue(item, ["productType", "category", "subCategory"]);
+            var value = raw ? String(raw).trim() : "";
+            if (!value) {
+                return;
+            }
+            var normalized = value.toLowerCase();
+            if (seen[normalized]) {
+                return;
+            }
+            seen[normalized] = true;
+            options.push({value: value, label: value});
+        });
+        return options.sort(function (a, b) {
+            return a.label.localeCompare(b.label);
+        });
+    }
+
+    function filterDetailAssetData(assetData, state) {
+        var type = (state.detailType || "ALL").toLowerCase();
+        var keyword = (state.detailKeyword || "").trim().toLowerCase();
+        return assetData.filter(function (item) {
+            if (type !== "all") {
+                var itemType = String(firstNonEmptyValue(item, ["productType", "category", "subCategory"]) || "").trim().toLowerCase();
+                if (itemType !== type) {
+                    return false;
+                }
+            }
+            if (!keyword) {
+                return true;
+            }
+            var haystack = [
+                item.productName,
+                item.productType,
+                item.subCategory,
+                item.vendor,
+                item.protocol,
+                item.port,
+                item.bannerRaw,
+                item.service,
+                item.category
+            ].filter(function (value) {
+                return value !== null && value !== undefined && value !== "";
+            }).join(" ").toLowerCase();
+            return haystack.indexOf(keyword) > -1;
+        });
+    }
+
+    function firstNonEmptyValue(obj, fields) {
+        for (var i = 0; i < fields.length; i++) {
+            var value = obj ? obj[fields[i]] : null;
+            if (value !== null && value !== undefined && String(value).trim() !== "") {
+                return value;
+            }
+        }
+        return null;
     }
     function bindJsonToggle($wrap) {
         var toggled = false;

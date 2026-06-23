@@ -35,17 +35,17 @@ public class RoleMatrixInitializer {
                     "dashboard:view",
                     "user:view", "user:create", "user:update", "user:delete",
                     "host:view", "host:create", "host:update", "host:delete",
-                    "asset:view", "asset:delete", "asset:export",
+                    "asset:view", "asset:delete", "asset:export", "asset-stats:view",
                     "role:view", "permission:view", "login-log:view");
 
             grant("ANALYST",
                     "dashboard:view",
-                    "host:view", "host:update", "host:asset:view",
+                    "host:view", "host:update", "host:asset:view", "asset-stats:view",
                     "login-log:view");
 
             grant("AUDITOR",
                     "dashboard:view",
-                    "user:view", "host:view", "host:asset:view", "asset:export",
+                    "user:view", "host:view", "host:asset:view", "asset:export", "asset-stats:view",
                     "role:view", "permission:view", "login-log:view");
 
             insertDemoUser("security", "SECURITY_ADMIN");

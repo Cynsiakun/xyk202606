@@ -25,12 +25,15 @@ layui.use(["element", "layer"], function () {
     var MENU_SCHEMA = [
         {title: "仪表盘", page: "./pages/dashboard.html", icon: "layui-icon-chart", policyKey: "COMMON_DASHBOARD_VIEW"},
         {title: "主机管理", page: "./pages/host.html", icon: "layui-icon-component", policyKey: "TENANT_HOST_VIEW"},
-        {title: "授权主机", page: "./pages/tenant-machine.html", icon: "layui-icon-auz", policyKey: "TENANT_HOST_AUTHORIZE"},
+        {title: "授权主机", page: "./pages/tenant-machine.html", icon: "layui-icon-auz", policyKey: "TENANT_MACHINE_VIEW"},
         {title: "资产管理", icon: "layui-icon-tabs", children: [
             {title: "账号资产", page: "./pages/asset-account.html", icon: "layui-icon-user", policyKey: "TENANT_ASSET_VIEW"},
             {title: "服务资产", page: "./pages/asset-service.html", icon: "layui-icon-engine", policyKey: "TENANT_ASSET_VIEW"},
             {title: "进程资产", page: "./pages/asset-process.html", icon: "layui-icon-console", policyKey: "TENANT_ASSET_VIEW"},
-            {title: "应用资产", page: "./pages/asset-app.html", icon: "layui-icon-app", policyKey: "TENANT_ASSET_VIEW"}
+            {title: "应用资产", page: "./pages/asset-app.html", icon: "layui-icon-app", policyKey: "TENANT_ASSET_VIEW"},
+            {title: "端口资产", page: "./pages/asset-port.html", icon: "layui-icon-release", policyKey: "TENANT_ASSET_VIEW"},
+            {title: "资产统计概览", page: "./pages/asset-statistics.html", icon: "layui-icon-chart-screen", policyKey: "TENANT_ASSET_STATS_VIEW"},
+            {title: "端口资产规则管理", page: "./pages/asset-fingerprint-rule.html", icon: "layui-icon-auz", policyKey: "PLATFORM_ASSET_FINGERPRINT_RULE_VIEW"}
         ]},
         {title: "补丁安全", icon: "layui-icon-vercode", children: [
             {title: "补丁风险", page: "./pages/patch-security.html", icon: "layui-icon-shield", policyKey: "TENANT_PATCH_VIEW"},
@@ -153,6 +156,9 @@ layui.use(["element", "layer"], function () {
     function isPolicyAllowed(policyKey) {
         if (!policyKey) {
             return true;
+        }
+        if (policyKey === "PLATFORM_ASSET_FINGERPRINT_RULE_VIEW") {
+            return AppAuth.isSuperAdmin() && AppAuth.getTenantId() === 0 && AppAuth.canPolicy(policyKey);
         }
         return AppAuth.canPolicy(policyKey);
     }

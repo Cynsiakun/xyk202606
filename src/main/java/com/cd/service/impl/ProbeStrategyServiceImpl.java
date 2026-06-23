@@ -17,6 +17,7 @@ public class ProbeStrategyServiceImpl implements ProbeStrategyService {
     private static final Set<Integer> ALLOWED_PERIODS = Set.of(1, 4, 8, 12, 24);
 
     private final ProbeStrategyMapper probeStrategyMapper;
+    private final AgentCommandCleanupService agentCommandCleanupService;
 
     @Override
     public ProbeStrategyDTO getStrategy() {
@@ -40,6 +41,9 @@ public class ProbeStrategyServiceImpl implements ProbeStrategyService {
         entity.setPortScanRange(dto.getPortScanRange());
         entity.setPortScanCustomPorts(dto.getPortScanCustomPorts());
         probeStrategyMapper.updateStrategy(entity);
+        if (!Boolean.TRUE.equals(dto.getEnabled()) || !dto.isPortScan()) {
+            agentCommandCleanupService.clearPendingPortScanCommandsForAllHosts();
+        }
         return getStrategy();
     }
 

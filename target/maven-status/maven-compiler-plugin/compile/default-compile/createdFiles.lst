@@ -89,6 +89,7 @@ com\cd\util\VersionCompareUtil.class
 com\cd\dto\TenantStatusUpdateDTO.class
 com\cd\dto\AssetInfoDTO$AssetInfoDTOBuilder.class
 com\cd\mapper\BaselineQueryMapper.class
+com\cd\common\config\AssetModuleInitializer$RuleSeed.class
 com\cd\dto\UserAvatarUploadResponseDTO.class
 com\cd\service\impl\InstalledPatchManagementServiceImpl.class
 com\cd\controller\BaselineTaskController.class
@@ -129,6 +130,7 @@ com\cd\common\security\JwtTokenProvider.class
 com\cd\dto\BaselineProblemHostDTO.class
 com\cd\mapper\SysPermissionMapper.class
 com\cd\controller\PageController.class
+com\cd\service\impl\BaselineTaskServiceImpl$BaselineTaskContext.class
 com\cd\dto\AccountChangeLogDetailDTO.class
 com\cd\service\impl\LicenseServiceImpl.class
 com\cd\dto\DashboardStatisticsDTO.class
@@ -183,6 +185,7 @@ com\cd\common\exception\UnauthorizedException.class
 com\cd\common\license\LicenseGuard$Plan.class
 com\cd\service\impl\BaselineQueryServiceImpl$CategoryStat.class
 com\cd\entity\AccountChangeLogEntity.class
+com\cd\service\impl\AgentCommandCleanupService.class
 com\cd\service\impl\BaselineRuleManagementServiceImpl.class
 com\cd\entity\TenantEntity.class
 com\cd\controller\CurrentUserController.class
@@ -305,6 +308,7 @@ com\cd\service\impl\AssetAiAnalysisServiceImpl.class
 com\cd\dto\CsvImportResultDTO.class
 com\cd\common\security\JwtAuthenticationFilter.class
 com\cd\controller\SecurityLogCenterController.class
+com\cd\mq\PortScanResultListener.class
 com\cd\dto\InstalledPatchBatchDeleteDTO.class
 com\cd\dto\AccountChangeLogStatDTO.class
 com\cd\entity\HostVulnResultEntity.class

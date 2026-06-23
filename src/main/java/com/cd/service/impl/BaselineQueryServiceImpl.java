@@ -8,6 +8,8 @@ import com.cd.dto.BaselineRuleOptionDTO;
 import com.cd.dto.BaselineTaskExportRowDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
+import com.cd.entity.BaselineAssetTypeEntity;
+import com.cd.entity.BaselineProtectionLevelEntity;
 import com.cd.mapper.BaselineQueryMapper;
 import com.cd.service.BaselineQueryService;
 import lombok.RequiredArgsConstructor;
@@ -70,13 +72,14 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
     }
 
     @Override
-    public PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size) {
+    public PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size, String assetTypeCode) {
         int safePage = normalizePage(page);
         int safeSize = normalizeSize(size);
+        String safeAssetTypeCode = normalizeAssetTypeCode(assetTypeCode);
         Long tenantId = currentTenantId();
-        long total = baselineQueryMapper.countProblemHosts(taskId, tenantId);
+        long total = baselineQueryMapper.countProblemHosts(taskId, tenantId, safeAssetTypeCode);
         List<BaselineProblemHostDTO> list = baselineQueryMapper.selectProblemHostPage(
-                taskId, tenantId, (safePage - 1) * safeSize, safeSize);
+                taskId, tenantId, safeAssetTypeCode, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
@@ -86,9 +89,20 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
     }
 
     @Override
-    public List<BaselineRuleOptionDTO> listRuleOptions(String keyword) {
+    public List<BaselineRuleOptionDTO> listRuleOptions(String keyword, List<String> assetTypeCodes, String protectionLevelCode) {
         String trimmed = keyword == null ? null : keyword.trim();
-        return baselineQueryMapper.selectRuleOptions(trimmed);
+        return baselineQueryMapper.selectRuleOptions(trimmed, normalizeAssetTypeCodes(assetTypeCodes),
+                normalizeText(protectionLevelCode));
+    }
+
+    @Override
+    public List<BaselineProtectionLevelEntity> listProtectionLevels() {
+        return baselineQueryMapper.selectProtectionLevels();
+    }
+
+    @Override
+    public List<BaselineAssetTypeEntity> listAssetTypes() {
+        return baselineQueryMapper.selectAssetTypes();
     }
 
     @Override
@@ -849,6 +863,22 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
 
     private String normalizeText(String text) {
         return text == null || text.trim().isEmpty() ? null : text.trim();
+    }
+
+    private List<String> normalizeAssetTypeCodes(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        return values.stream()
+                .filter(this::hasText)
+                .map(value -> value.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+    }
+
+    private String normalizeAssetTypeCode(String value) {
+        String normalized = normalizeText(value);
+        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
     private String normalizeEnum(String value, List<String> allowed) {

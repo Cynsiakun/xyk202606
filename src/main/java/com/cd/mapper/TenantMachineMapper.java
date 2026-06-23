@@ -22,6 +22,10 @@ public interface TenantMachineMapper {
     TenantMachineEntity selectActiveByMachineOrMac(@Param("machineId") String machineId,
                                                    @Param("macAddress") String macAddress);
 
+    TenantMachineEntity selectActiveByMacAddress(@Param("macAddress") String macAddress);
+
+    int bindMachineIdIfEmpty(@Param("id") Long id, @Param("machineId") String machineId);
+
     List<TenantMachineEntity> selectPageByTenant(@Param("offset") int offset,
                                                  @Param("size") int size,
                                                  @Param("keyword") String keyword,

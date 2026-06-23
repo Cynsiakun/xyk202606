@@ -14,6 +14,8 @@ public class BaselineHostResultItemDTO {
     private Long ruleId;
     private String ruleName;
     private String category;
+    private String assetType;
+    private String protectionLevel;
     private String checkKey;
     private String expectedValue;
     private String actualValue;

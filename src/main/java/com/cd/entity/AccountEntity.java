@@ -18,6 +18,7 @@ public class AccountEntity {
     private String taskId;
     private String hostName;
     private String macAddress;
+    private String source;
     private Integer assetCount;
     private String assetJson;
     private Integer deleted;

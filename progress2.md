@@ -469,3 +469,38 @@
 - `POST /api/client/machine/validate` remains available for backward compatibility.
 - Added `/api/license/check` to security and License-interceptor public exclusions.
 - `mvn test` passed.
+
+## V15 follow-up: MAC-first machine binding
+
+- Tenant administrators now authorize machines by `macAddress`; `machineId` is no longer manually entered in the authorized-machine form.
+- Added nullable `tenant_machine.machine_bound_at`.
+- Client authorization check now looks up active authorized machines by `macAddress` first.
+- If the authorized machine has no `machine_id`, the first client check writes the submitted `machineId` and `machine_bound_at`.
+- If `machine_id` is already bound, the submitted `machineId` must match; mismatches return `authorized = false` and `reason = MACHINE_ID_MISMATCH`.
+- Authorized-machine list now displays `machineId` and binding time, with unbound machines shown as not bound.
+- Applied `machine_bound_at` to local `xyk2026`.
+- Verified real HTTP flow on port `8081`: first check bound machineId, second check passed, mismatched machineId returned `MACHINE_ID_MISMATCH`; temporary data was cleaned up.
+- `mvn test` passed.
+- `node --check` passed for `tenant-machine.js`.
+
+## V15 follow-up: MAC format normalization
+
+- Fixed client authorization lookup to treat MAC separators case-insensitively and consistently.
+- Platform now normalizes incoming MAC addresses to lowercase hyphen format, so `CC:5E:F8:A1:31:B3` matches stored `cc-5e-f8-a1-31-b3`.
+- `TenantMachineMapper.selectByMacAddress` and `selectActiveByMacAddress` now compare with `REPLACE(LOWER(mac_address), ':', '-')`.
+- Confirmed local `xyk2026.tenant_machine` contains active authorized host `id = 11`, `tenant_id = 9905`, `mac_address = cc-5e-f8-a1-31-b3`.
+- `mvn test` and `mvn compile` passed.
+- `node --check` passed for `tenant-machine.js`.
+
+## V15 follow-up: authorized machine host ownership sync
+
+- Authorized machines now synchronize host ownership into `hosts`.
+- Creating or enabling a tenant authorized machine claims any existing Host with the same normalized MAC to the current tenant.
+- Successful client `/api/license/check` authorization also claims the matching Host to the authorized tenant.
+- If no Host exists yet, platform creates a minimal Host placeholder with the authorized tenant, MAC, host name, and online status.
+- Added `HostMapper.claimTenantByNormalizedMac` and `insertAuthorizedPlaceholder`.
+- Tenant-machine create/update/delete/check write paths are now transactional where they touch multiple tables.
+- Applied historical ownership backfill to local `xyk2026`: authorized Host records now have `hosts.tenant_id = tenant_machine.tenant_id`.
+- Verified local records: `CC:5E:F8:A1:31:B3` and `00:0C:29:15:8D:66` now belong to tenant `9905` in `hosts`.
+- `mvn test` passed.
+- `node --check` passed for `tenant-machine.js`.

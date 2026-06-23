@@ -6,14 +6,12 @@ import com.cd.entity.HostEntity;
 import com.cd.entity.MqErrorLogEntity;
 import com.cd.entity.ProcessEntity;
 import com.cd.entity.ServiceEntity;
-import com.cd.entity.PortScanResultEntity;
 import com.cd.mapper.AccountMapper;
 import com.cd.mapper.AppMapper;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.ProcessMapper;
 import com.cd.mapper.ServiceMapper;
-import com.cd.mapper.PortScanResultMapper;
 import com.cd.service.AssetDataService;
 import com.cd.service.VulnRuleEngine;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,12 +34,12 @@ import java.time.LocalDateTime;
 public class AssetDataServiceImpl implements AssetDataService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String SOURCE_PLATFORM = "PLATFORM";
 
     private final AccountMapper accountMapper;
     private final ServiceMapper serviceMapper;
     private final ProcessMapper processMapper;
     private final AppMapper appMapper;
-    private final PortScanResultMapper portScanResultMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final HostMapper hostMapper;
     private final VulnRuleEngine vulnRuleEngine;
@@ -106,7 +104,6 @@ public class AssetDataServiceImpl implements AssetDataService {
                 case "service" -> { arrayField = "services"; countField = "service_count"; }
                 case "process" -> { arrayField = "processes"; countField = "process_count"; }
                 case "app" -> { arrayField = "apps"; countField = "app_count"; }
-                case "port_scan" -> { arrayField = "openPorts"; countField = "openPortCount"; }
                 default -> {
                     saveError(queueName, message, "未知的 type 值: " + type);
                     return;
@@ -141,6 +138,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     accountMapper.insert(entity);
@@ -151,6 +149,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     serviceMapper.insert(entity);
@@ -161,6 +160,7 @@ public class AssetDataServiceImpl implements AssetDataService {
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     processMapper.insert(entity);
@@ -171,19 +171,10 @@ public class AssetDataServiceImpl implements AssetDataService {
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     appMapper.insert(entity);
-                }
-                case "port_scan" -> {
-                    PortScanResultEntity entity = new PortScanResultEntity();
-                    entity.setTenantId(tenantId);
-                    entity.setTaskId(taskId);
-                    entity.setHostName(hostName);
-                    entity.setMacAddress(macAddress);
-                    entity.setPortCount(assetCount);
-                    entity.setPortJson(assetJson);
-                    portScanResultMapper.insert(entity);
                 }
             }
             hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
@@ -217,7 +208,6 @@ public class AssetDataServiceImpl implements AssetDataService {
             case "service_queue" -> "service";
             case "process_queue" -> "process";
             case "app_queue" -> "app";
-            case "port_scan_queue" -> "port_scan";
             default -> null;
         };
     }

@@ -7,7 +7,8 @@ import com.cd.entity.BaselineRuleEntity;
 public interface BaselineRuleManagementService {
 
     PageResult<BaselineRuleEntity> list(Integer page, Integer size, String keyword,
-                                        String category, String severity, String status, Integer enabled);
+                                        String category, String severity, String status, Integer enabled,
+                                        String assetTypeCode, String protectionLevelCode);
 
     BaselineRuleEntity detail(Long id);
 

@@ -34,6 +34,14 @@ public interface HostService {
 
     int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app);
 
+    int autoProbeOnlineHosts(int limit,
+                             boolean account,
+                             boolean service,
+                             boolean process,
+                             boolean app,
+                             boolean portScan,
+                             boolean fingerprint);
+
     void sendAssetProbe(AssetProbeDTO dto);
 
     int autoPortScanOnlineHosts(int limit);

@@ -18,7 +18,7 @@ public interface AssetQueryService {
      * 按 MAC 取某类资产的最新一条记录（含 assetJson），用于主机维度的资产查看弹窗。
      * 无记录时返回 null。
      *
-     * @param assetType account / service / process / app
+     * @param assetType account / service / process / app / port
      */
     AssetRecordDTO latestByMac(String assetType, String macAddress);
 
@@ -49,4 +49,14 @@ public interface AssetQueryService {
     AssetRecordDTO appDetail(Long id);
 
     void deleteApp(Long id);
+
+    PageResult<AssetRecordDTO> portList(int page, int size, String keyword, String hostScope);
+
+    AssetRecordDTO portDetail(Long id);
+
+    void deletePort(Long id);
+
+    int rematchPort(Long id);
+
+    int rematchLatestPortByMac(String macAddress);
 }

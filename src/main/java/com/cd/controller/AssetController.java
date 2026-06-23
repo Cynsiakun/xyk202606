@@ -183,4 +183,39 @@ public class AssetController {
         assetQueryService.deleteApp(id);
         return Result.success();
     }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @GetMapping("/port/list")
+    public Result<PageResult<AssetRecordDTO>> portList(
+            @RequestParam(defaultValue = "1") @Min(1) Integer page,
+            @RequestParam(defaultValue = "10") @Min(1) Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String hostScope) {
+        return Result.success(assetQueryService.portList(page, size, keyword, hostScope));
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @GetMapping("/port/{id}")
+    public Result<AssetRecordDTO> portDetail(@PathVariable @Min(1) Long id) {
+        return Result.success(assetQueryService.portDetail(id));
+    }
+
+    @PreAuthorize("@perm.has('asset:delete')")
+    @DeleteMapping("/port/{id}")
+    public Result<Void> deletePort(@PathVariable @Min(1) Long id) {
+        assetQueryService.deletePort(id);
+        return Result.success();
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/port/{id}/rematch")
+    public Result<Integer> rematchPort(@PathVariable @Min(1) Long id) {
+        return Result.success(assetQueryService.rematchPort(id));
+    }
+
+    @PreAuthorize("@perm.has('host:asset:view') or @perm.has('asset:view')")
+    @PostMapping("/port/rematch-by-mac")
+    public Result<Integer> rematchPortByMac(@RequestParam String mac) {
+        return Result.success(assetQueryService.rematchLatestPortByMac(mac));
+    }
 }

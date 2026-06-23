@@ -62,6 +62,9 @@
                 <h2 id="resultTaskTitle">任务结果</h2>
             </div>
             <div class="result-actions">
+                <select id="resultAssetTypeFilter" class="native-select" lay-ignore>
+                    <option value="">全部资产类型</option>
+                </select>
                 <button type="button" class="layui-btn layui-btn-primary" id="backToListButton">返回列表</button>
                 <button type="button" class="layui-btn layui-btn-primary" id="resultRefreshButton">
                     <i class="layui-icon layui-icon-refresh"></i> 刷新结果
@@ -125,6 +128,18 @@
                     <input type="time" name="scheduleTime" value="02:00" class="layui-input schedule-time" lay-ignore>
                 </div>
                 <div class="schedule-hint" id="scheduleHint">每天 02:00 执行</div>
+            </div>
+        </div>
+
+        <div class="layui-form-item baseline-scope-item">
+            <label class="layui-form-label">规则范围</label>
+            <div class="layui-input-block">
+                <div class="scope-row">
+                    <select name="protectionLevelCode" lay-filter="taskProtectionLevel">
+                        <option value="L3">L3</option>
+                    </select>
+                    <div class="asset-type-options" id="assetTypeOptions"></div>
+                </div>
             </div>
         </div>
 

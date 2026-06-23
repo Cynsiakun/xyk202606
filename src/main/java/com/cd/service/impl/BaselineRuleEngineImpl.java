@@ -5,6 +5,7 @@ import com.cd.entity.BaselineResultEntity;
 import com.cd.entity.BaselineRuleEntity;
 import com.cd.entity.BaselineRuleItemEntity;
 import com.cd.entity.BaselineSummaryEntity;
+import com.cd.entity.BaselineTaskEntity;
 import com.cd.entity.BaselineTaskHostEntity;
 import com.cd.mapper.BaselineResultMapper;
 import com.cd.mapper.BaselineRuleMapper;
@@ -23,9 +24,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -60,6 +66,10 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
     private static final String MATCH_EXACT = "EXACT";
     private static final String MATCH_CONTAINS = "CONTAINS";
     private static final String MATCH_REGEX = "REGEX";
+    private static final String VALUE_NUMBER = "NUMBER";
+    private static final String VALUE_STRING = "STRING";
+    private static final String VALUE_BOOLEAN = "BOOLEAN";
+    private static final String VALUE_ENUM = "ENUM";
 
     private final BaselineRuleMapper baselineRuleMapper;
     private final BaselineResultMapper baselineResultMapper;
@@ -93,6 +103,8 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         }
         Long taskHostId = taskHost.getId();
         Long tenantId = taskHost.getTenantId() == null ? (checkData.getTenantId() == null ? 0L : checkData.getTenantId()) : taskHost.getTenantId();
+        BaselineTaskEntity task = baselineTaskMapper.selectTaskById(taskId);
+        Long protectionLevelId = task == null ? null : task.getProtectionLevelId();
 
         // 幂等：同一 task_host 已生成结果则跳过
         if (baselineResultMapper.countByTaskHostId(taskHostId) > 0) {
@@ -109,33 +121,42 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         LocalDateTime scanTime = parseScanTime(root.path("scanTime"));
         LocalDateTime now = LocalDateTime.now();
 
-        // 预加载本次涉及的规则项与规则元数据
+        // 预加载本次涉及的规则项、规则元数据与冗余维度。
         List<Long> itemIds = collectLongs(results, "itemId");
         List<Long> ruleIds = collectLongs(results, "ruleId");
+        List<String> checkKeys = collectTexts(results, "checkKey");
         Map<Long, BaselineRuleItemEntity> itemMap = loadItemMap(itemIds);
+        Map<String, BaselineRuleItemEntity> fallbackItemMap = loadFallbackItemMap(ruleIds, checkKeys, protectionLevelId);
         Map<Long, BaselineRuleEntity> ruleMap = loadRuleMap(ruleIds);
+        Map<Long, Long> assetTypeIdMap = loadAssetTypeIdMap(ruleIds);
 
         int passCount = 0;
         int failCount = 0;
         int score = 0;
+        Map<Long, int[]> assetTypeStats = new LinkedHashMap<>();
 
         for (JsonNode result : results) {
-            BaselineResultEntity entity = buildResult(result, taskId, taskHostId, hostId, tenantId, itemMap, scanTime, now);
+            BaselineResultEntity entity = buildResult(result, taskId, taskHostId, hostId, tenantId, protectionLevelId,
+                    itemMap, fallbackItemMap, assetTypeIdMap, scanTime, now);
             baselineResultMapper.insert(entity);
             inheritRemediationStatus(entity);
             switch (entity.getStatus()) {
                 case STATUS_PASS -> {
                     passCount++;
                     score += ruleScore(ruleMap, entity.getRuleId());
+                    countAssetTypeStat(assetTypeStats, entity.getAssetTypeId(), true);
                 }
-                case STATUS_FAIL, STATUS_ERROR -> failCount++;
+                case STATUS_FAIL, STATUS_ERROR -> {
+                    failCount++;
+                    countAssetTypeStat(assetTypeStats, entity.getAssetTypeId(), false);
+                }
                 default -> { /* UNKNOWN 不计入合规率分母 */ }
             }
         }
 
         // 写入汇总并将 task_host 置为 FINISHED
         writeSummary(hostId, taskId, tenantId, passCount, failCount, score, scanTime != null ? scanTime : now);
-        String summaryJson = buildHostSummaryJson(passCount, failCount, score);
+        String summaryJson = buildHostSummaryJson(passCount, failCount, score, assetTypeStats, protectionLevelId);
         baselineTaskMapper.finishTaskHost(taskHostId, HOST_STATUS_FINISHED, summaryJson,
                 scanTime != null ? scanTime : now);
         log.info("基线规则引擎完成主机判定: taskId={}, hostId={}, taskHostId={}, pass={}, fail={}",
@@ -154,7 +175,10 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
                                              Long taskHostId,
                                              Long hostId,
                                              Long tenantId,
+                                             Long protectionLevelId,
                                              Map<Long, BaselineRuleItemEntity> itemMap,
+                                             Map<String, BaselineRuleItemEntity> fallbackItemMap,
+                                             Map<Long, Long> assetTypeIdMap,
                                              LocalDateTime scanTime,
                                              LocalDateTime now) {
         Long ruleId = longValue(result.path("ruleId"));
@@ -167,8 +191,17 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         String checkKey = textValue(result.path("checkKey"));
 
         BaselineRuleItemEntity item = itemId == null ? null : itemMap.get(itemId);
+        if (item == null && ruleId != null && StringUtils.hasText(checkKey)) {
+            item = fallbackItemMap.get(ruleItemKey(ruleId, checkKey));
+            if (item != null) {
+                itemId = item.getId();
+            }
+        }
         if (item != null && !StringUtils.hasText(checkKey)) {
             checkKey = item.getCheckKey();
+        }
+        if (ruleId == null && item != null) {
+            ruleId = item.getRuleId();
         }
         String expectedValue = item == null ? null : item.getExpectedValue();
 
@@ -192,6 +225,9 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         entity.setRemediationStatus(REMEDIATION_NONE);
         entity.setScanTime(scanTime);
         entity.setCreateTime(now);
+        entity.setItemId(itemId);
+        entity.setProtectionLevelId(resolveResultProtectionLevelId(item, protectionLevelId));
+        entity.setAssetTypeId(resolveAssetTypeId(entity.getRuleId(), assetTypeIdMap));
 
         if (STATUS_ERROR.equalsIgnoreCase(executeStatus) && !missingRegistryValue) {
             entity.setStatus(STATUS_ERROR);
@@ -244,17 +280,29 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         String matchType = StringUtils.hasText(item.getMatchType()) ? item.getMatchType().trim().toUpperCase() : MATCH_EXACT;
         String actual = actualValue == null ? "" : actualValue;
         String exp = expected == null ? "" : expected;
+        List<String> valueSet = parseValueSet(item.getValueSet());
+        String valueType = normalizeValueType(item, exp, valueSet);
+
+        if (!valueSet.isEmpty()) {
+            return compareValueSet(operator, actual, valueSet, valueType);
+        }
+        if (VALUE_NUMBER.equals(valueType)) {
+            return compareNumber(operator, actual, exp);
+        }
+        if (VALUE_BOOLEAN.equals(valueType)) {
+            return compareBoolean(operator, actual, exp);
+        }
 
         if ("CONTAINS".equalsIgnoreCase(operator)) {
-            return actual.toLowerCase().contains(exp.toLowerCase());
+            return actual.toLowerCase(Locale.ROOT).contains(exp.toLowerCase(Locale.ROOT));
         }
         if ("NOT_CONTAINS".equalsIgnoreCase(operator)) {
-            return !actual.toLowerCase().contains(exp.toLowerCase());
+            return !actual.toLowerCase(Locale.ROOT).contains(exp.toLowerCase(Locale.ROOT));
         }
 
         return switch (matchType) {
             case MATCH_CONTAINS -> {
-                boolean contains = actual.toLowerCase().contains(exp.toLowerCase());
+                boolean contains = actual.toLowerCase(Locale.ROOT).contains(exp.toLowerCase(Locale.ROOT));
                 yield "!=".equals(operator) ? !contains : contains;
             }
             case MATCH_REGEX -> {
@@ -268,6 +316,119 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
                 yield "!=".equals(operator) ? !matches : matches;
             }
             default -> compareExact(operator, actual, exp);
+        };
+    }
+
+    private boolean compareNumber(String operator, String actual, String expected) {
+        Double expectedNum = parseStrictDouble(expected);
+        Double actualNum = parseActualDouble(actual);
+        if (actualNum == null || expectedNum == null) {
+            return false;
+        }
+        return switch (operator) {
+            case "=" -> actualNum.compareTo(expectedNum) == 0;
+            case "!=" -> actualNum.compareTo(expectedNum) != 0;
+            case ">" -> actualNum > expectedNum;
+            case ">=" -> actualNum >= expectedNum;
+            case "<" -> actualNum < expectedNum;
+            case "<=" -> actualNum <= expectedNum;
+            default -> {
+                log.warn("基线 NUMBER 规则未知运算符: {}", operator);
+                yield actualNum.compareTo(expectedNum) == 0;
+            }
+        };
+    }
+
+    private boolean compareBoolean(String operator, String actual, String expected) {
+        Boolean actualBool = parseBoolean(actual);
+        Boolean expectedBool = parseBoolean(expected);
+        if (actualBool == null || expectedBool == null) {
+            return false;
+        }
+        boolean equals = actualBool.equals(expectedBool);
+        return "!=".equals(operator) ? !equals : equals;
+    }
+
+    private boolean compareValueSet(String operator, String actual, List<String> valueSet, String valueType) {
+        boolean contains;
+        if (VALUE_NUMBER.equals(valueType)) {
+            Double actualNum = parseActualDouble(actual);
+            contains = actualNum != null && valueSet.stream()
+                    .map(this::parseStrictDouble)
+                    .anyMatch(expectedNum -> expectedNum != null && actualNum.compareTo(expectedNum) == 0);
+        } else if (VALUE_BOOLEAN.equals(valueType)) {
+            Boolean actualBool = parseBoolean(actual);
+            contains = actualBool != null && valueSet.stream()
+                    .map(this::parseBoolean)
+                    .anyMatch(expectedBool -> expectedBool != null && actualBool.equals(expectedBool));
+        } else {
+            String normalizedActual = normalizeEnumValue(actual);
+            contains = valueSet.stream()
+                    .map(this::normalizeEnumValue)
+                    .anyMatch(expected -> expected.equals(normalizedActual));
+        }
+        return "!=".equals(operator) || "NOT_IN".equalsIgnoreCase(operator) ? !contains : contains;
+    }
+
+    private List<String> parseValueSet(String valueSet) {
+        if (!StringUtils.hasText(valueSet)) {
+            return List.of();
+        }
+        String text = valueSet.trim();
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(text);
+            if (node.isArray()) {
+                List<String> values = new ArrayList<>();
+                for (JsonNode item : node) {
+                    if (!item.isNull()) {
+                        values.add(item.isValueNode() ? item.asText() : item.toString());
+                    }
+                }
+                return values;
+            }
+        } catch (Exception ignored) {
+            // Fallback to comma-separated values for lightweight manual input.
+        }
+        return Pattern.compile(",")
+                .splitAsStream(text)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private String normalizeValueType(BaselineRuleItemEntity item, String expected, List<String> valueSet) {
+        String configured = item.getValueType();
+        if (StringUtils.hasText(configured)) {
+            String normalized = configured.trim().toUpperCase(Locale.ROOT);
+            if (Set.of(VALUE_NUMBER, VALUE_STRING, VALUE_BOOLEAN, VALUE_ENUM).contains(normalized)) {
+                return normalized;
+            }
+        }
+        if (!valueSet.isEmpty()) {
+            return VALUE_ENUM;
+        }
+        if (parseStrictDouble(expected) != null) {
+            return VALUE_NUMBER;
+        }
+        if (parseBoolean(expected) != null) {
+            return VALUE_BOOLEAN;
+        }
+        return VALUE_STRING;
+    }
+
+    private String normalizeEnumValue(String value) {
+        return collapseWhitespace(value).toLowerCase(Locale.ROOT);
+    }
+
+    private Boolean parseBoolean(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = collapseWhitespace(value).toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "true", "1", "yes", "y", "on", "enabled", "enable", "running", "success", "成功", "是", "启用" -> true;
+            case "false", "0", "no", "n", "off", "disabled", "disable", "stopped", "fail", "失败", "否", "停用" -> false;
+            default -> null;
         };
     }
 
@@ -386,12 +547,16 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
                 .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     }
 
-    private String buildHostSummaryJson(int passCount, int failCount, int score) {
+    private String buildHostSummaryJson(int passCount, int failCount, int score,
+                                        Map<Long, int[]> assetTypeStats,
+                                        Long protectionLevelId) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("passCount", passCount);
         summary.put("failCount", failCount);
         summary.put("score", score);
         summary.put("complianceRate", complianceRate(passCount, failCount));
+        summary.put("protectionLevelId", protectionLevelId);
+        summary.put("assetTypeSummary", buildAssetTypeSummary(assetTypeStats));
         try {
             return OBJECT_MAPPER.writeValueAsString(summary);
         } catch (Exception e) {
@@ -405,6 +570,35 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
         }
         return baselineRuleMapper.selectItemsByItemIds(itemIds).stream()
                 .collect(Collectors.toMap(BaselineRuleItemEntity::getId, item -> item, (a, b) -> a));
+    }
+
+    private Map<String, BaselineRuleItemEntity> loadFallbackItemMap(List<Long> ruleIds, List<String> checkKeys, Long protectionLevelId) {
+        if (ruleIds.isEmpty() || checkKeys.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, BaselineRuleItemEntity> map = new HashMap<>();
+        for (BaselineRuleItemEntity item : baselineRuleMapper.selectItemsByRuleIdsAndCheckKeys(ruleIds, checkKeys, protectionLevelId)) {
+            String key = ruleItemKey(item.getRuleId(), item.getCheckKey());
+            BaselineRuleItemEntity current = map.get(key);
+            if (current == null || itemPriority(item, protectionLevelId) < itemPriority(current, protectionLevelId)) {
+                map.put(key, item);
+            }
+        }
+        return map;
+    }
+
+    private Map<Long, Long> loadAssetTypeIdMap(List<Long> ruleIds) {
+        if (ruleIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> map = new HashMap<>();
+        for (Long ruleId : ruleIds) {
+            Long assetTypeId = baselineRuleMapper.selectFirstAssetTypeIdByRuleId(ruleId);
+            if (assetTypeId != null) {
+                map.put(ruleId, assetTypeId);
+            }
+        }
+        return map;
     }
 
     private Map<Long, BaselineRuleEntity> loadRuleMap(List<Long> ruleIds) {
@@ -432,6 +626,67 @@ public class BaselineRuleEngineImpl implements BaselineRuleEngine {
             }
         }
         return values;
+    }
+
+    private List<String> collectTexts(JsonNode results, String field) {
+        Set<String> values = new LinkedHashSet<>();
+        for (JsonNode result : results) {
+            String value = textValue(result.path(field));
+            if (StringUtils.hasText(value)) {
+                values.add(value.trim());
+            }
+        }
+        return new ArrayList<>(values);
+    }
+
+    private String ruleItemKey(Long ruleId, String checkKey) {
+        return String.valueOf(ruleId) + "\n" + (checkKey == null ? "" : checkKey.trim());
+    }
+
+    private int itemPriority(BaselineRuleItemEntity item, Long protectionLevelId) {
+        if (protectionLevelId != null && protectionLevelId.equals(item.getProtectionLevelId())) {
+            return 0;
+        }
+        return item.getProtectionLevelId() == null ? 1 : 2;
+    }
+
+    private Long resolveResultProtectionLevelId(BaselineRuleItemEntity item, Long taskProtectionLevelId) {
+        if (item != null && item.getProtectionLevelId() != null) {
+            return item.getProtectionLevelId();
+        }
+        return taskProtectionLevelId;
+    }
+
+    private Long resolveAssetTypeId(Long ruleId, Map<Long, Long> assetTypeIdMap) {
+        return ruleId == null ? null : assetTypeIdMap.get(ruleId);
+    }
+
+    private void countAssetTypeStat(Map<Long, int[]> stats, Long assetTypeId, boolean pass) {
+        if (assetTypeId == null) {
+            return;
+        }
+        int[] counts = stats.computeIfAbsent(assetTypeId, ignored -> new int[2]);
+        if (pass) {
+            counts[0]++;
+        } else {
+            counts[1]++;
+        }
+    }
+
+    private List<Map<String, Object>> buildAssetTypeSummary(Map<Long, int[]> stats) {
+        return stats.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey() == null ? Long.MAX_VALUE : entry.getKey()))
+                .map(entry -> {
+                    int pass = entry.getValue()[0];
+                    int fail = entry.getValue()[1];
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("assetTypeId", entry.getKey());
+                    item.put("passCount", pass);
+                    item.put("failCount", fail);
+                    item.put("complianceRate", complianceRate(pass, fail));
+                    return item;
+                })
+                .toList();
     }
 
     private String comparableActualValue(String rawValue, boolean missingValue, boolean permissionDenied) {

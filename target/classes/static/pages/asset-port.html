@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>端口资产</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/host.css">
+    <link rel="stylesheet" href="../css/asset-account.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row" lay-filter="assetSearchForm">
+            <div class="toolbar-group">
+                <input type="text" name="keyword" placeholder="按主机名 / MAC / 任务ID / 端口搜索" autocomplete="off" class="layui-input toolbar-input">
+                <button type="submit" class="layui-btn" lay-submit lay-filter="assetSearchSubmit">搜索</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
+            </div>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="assetTable" lay-filter="assetTable"></table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/common/asset-utils.js"></script>
+<script src="../js/pages/asset-port.js"></script>
+</body>
+</html>

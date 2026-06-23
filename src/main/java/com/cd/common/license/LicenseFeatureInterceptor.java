@@ -25,7 +25,9 @@ public class LicenseFeatureInterceptor implements HandlerInterceptor {
             new PathPolicy("/api/patch-cve-map/**", "PLATFORM_CVE_VIEW"),
             new PathPolicy("/api/vuln-rule/**", "PLATFORM_VULN_RULE_VIEW"),
             new PathPolicy("/vulnRule/**", "PLATFORM_VULN_RULE_VIEW"),
-            new PathPolicy("/api/baseline/rule-management/**", "PLATFORM_BASELINE_RULE_VIEW")
+            new PathPolicy("/api/baseline/rule-management/**", "PLATFORM_BASELINE_RULE_VIEW"),
+            new PathPolicy("/api/asset-fingerprint-rules/**", "PLATFORM_ASSET_FINGERPRINT_RULE_VIEW"),
+            new PathPolicy("/api/asset-statistics/**", "TENANT_ASSET_STATS_VIEW")
     );
     private static final List<PathFeature> PATH_FEATURES = List.of(
             new PathFeature("/api/ai/**", LicenseFeature.AI),

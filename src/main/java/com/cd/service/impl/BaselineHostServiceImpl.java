@@ -178,7 +178,7 @@ public class BaselineHostServiceImpl implements BaselineHostService {
     }
 
     private List<Long> allPublishedRuleIds() {
-        return baselineQueryMapper.selectRuleOptions(null).stream()
+        return baselineQueryMapper.selectRuleOptions(null, List.of(), null).stream()
                 .map(BaselineRuleOptionDTO::getId)
                 .toList();
     }

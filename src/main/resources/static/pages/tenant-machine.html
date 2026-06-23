@@ -16,9 +16,14 @@
                 <button type="submit" class="layui-btn" lay-submit lay-filter="machineSearchSubmit">搜索</button>
                 <button type="button" class="layui-btn layui-btn-primary" id="resetButton">重置</button>
             </div>
-            <button type="button" class="layui-btn" id="addMachineButton">
-                <i class="layui-icon layui-icon-add-1"></i> 新增授权主机
-            </button>
+            <div class="toolbar-group">
+                <button type="button" class="layui-btn layui-btn-normal" id="importMachineButton">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 导入CSV
+                </button>
+                <button type="button" class="layui-btn" id="addMachineButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增授权主机
+                </button>
+            </div>
         </form>
     </div>
 
@@ -30,15 +35,9 @@
 <template id="machineFormTemplate">
     <form class="layui-form popup-form" lay-filter="machineForm">
         <div class="layui-form-item">
-            <label class="layui-form-label">MachineId</label>
-            <div class="layui-input-block">
-                <input type="text" name="machineId" autocomplete="off" class="layui-input">
-            </div>
-        </div>
-        <div class="layui-form-item">
             <label class="layui-form-label">MAC</label>
             <div class="layui-input-block">
-                <input type="text" name="macAddress" autocomplete="off" class="layui-input">
+                <input type="text" name="macAddress" required lay-verify="required" autocomplete="off" class="layui-input">
             </div>
         </div>
         <div class="layui-form-item">
@@ -67,6 +66,24 @@
             <button type="submit" class="layui-btn" lay-submit lay-filter="saveMachine">保存</button>
         </div>
     </form>
+</template>
+
+<template id="machineImportTemplate">
+    <div class="import-dialog">
+        <div class="import-dialog-body">
+            <p class="import-dialog-tip">请选择 UTF-8 编码的 CSV 文件，首行为表头，仅支持“MAC地址”和“主机名”两个字段。</p>
+            <input type="file" id="machineCsvFile" accept=".csv,text/csv" class="import-file-input">
+            <div class="import-file-name" id="machineCsvFileName">尚未选择文件</div>
+            <div class="import-example">
+                <div class="import-example-title">示例表头</div>
+                <code>MAC地址,主机名</code>
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn layui-btn-normal" id="submitMachineImportButton">开始导入</button>
+        </div>
+    </div>
 </template>
 
 <script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>

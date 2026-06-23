@@ -15,6 +15,7 @@ public class TenantMachineResponseDTO {
     private String hostName;
     private String remark;
     private Integer status;
+    private LocalDateTime machineBoundAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

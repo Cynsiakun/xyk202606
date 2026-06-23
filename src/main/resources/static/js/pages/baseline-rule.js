@@ -4,7 +4,17 @@ layui.use(["table", "form", "layer"], function () {
     var layer = layui.layer;
 
     var tableId = "baselineRuleTable";
-    var state = {page: 1, size: 10, keyword: "", category: "", severity: "", status: "", enabled: ""};
+    var state = {
+        page: 1,
+        size: 10,
+        keyword: "",
+        category: "",
+        severity: "",
+        status: "",
+        enabled: "",
+        assetTypeCode: "",
+        protectionLevelCode: ""
+    };
     var editingRule = null;
 
     init();
@@ -12,6 +22,7 @@ layui.use(["table", "form", "layer"], function () {
     function init() {
         bindToolbar();
         bindDrawer();
+        loadDictionaries();
         renderTable();
     }
 
@@ -45,6 +56,16 @@ layui.use(["table", "form", "layer"], function () {
         });
         form.on("select(enabledFilter)", function (data) {
             state.enabled = data.value || "";
+            state.page = 1;
+            reloadTable(false);
+        });
+        form.on("select(assetTypeFilter)", function (data) {
+            state.assetTypeCode = data.value || "";
+            state.page = 1;
+            reloadTable(false);
+        });
+        form.on("select(protectionLevelFilter)", function (data) {
+            state.protectionLevelCode = data.value || "";
             state.page = 1;
             reloadTable(false);
         });
@@ -85,6 +106,12 @@ layui.use(["table", "form", "layer"], function () {
                 }},
                 {field: "category", title: "分类", width: 120, templet: function (d) {
                     return escapeHtml(d.category || "-");
+                }},
+                {field: "assetType", title: "资产类型", width: 140, templet: function (d) {
+                    return escapeHtml(d.assetType || "-");
+                }},
+                {field: "protectionLevelFlag", title: "等保等级", width: 115, templet: function (d) {
+                    return escapeHtml(d.protectionLevelFlag || "通用");
                 }},
                 {field: "osType", title: "适用系统", width: 105, templet: function (d) {
                     return escapeHtml(d.osType || "-");
@@ -148,8 +175,28 @@ layui.use(["table", "form", "layer"], function () {
             category: state.category,
             severity: state.severity,
             status: state.status,
-            enabled: state.enabled
+            enabled: state.enabled,
+            assetTypeCode: state.assetTypeCode,
+            protectionLevelCode: state.protectionLevelCode
         };
+    }
+
+    function loadDictionaries() {
+        Promise.all([
+            AppRequest.request("/api/baseline/asset-types", {method: "GET"}, {showErrorMessage: false}).catch(function () {
+                return {data: []};
+            }),
+            AppRequest.request("/api/baseline/protection-levels", {method: "GET"}, {showErrorMessage: false}).catch(function () {
+                return {data: []};
+            })
+        ]).then(function (items) {
+            var protectionLevels = (items[1].data || []).filter(function (item) {
+                return (item.levelCode || "").toUpperCase() !== "S3_PLUS";
+            });
+            fillSelect(document.getElementById("assetTypeFilter"), "全部资产", items[0].data || [], "typeCode", "typeName");
+            fillSelect(document.getElementById("protectionLevelFilter"), "全部等保", protectionLevels, "levelCode", "levelName");
+            form.render("select", "ruleSearchForm");
+        });
     }
 
     function parsePageData(res) {
@@ -334,6 +381,8 @@ layui.use(["table", "form", "layer"], function () {
         return '<div class="detail-grid">'
             + detailItem("规则编码", rule.ruleCode)
             + detailItem("分类", rule.category)
+            + detailItem("资产类型", rule.assetType || "-")
+            + detailItem("等保等级", rule.protectionLevelFlag || "通用")
             + detailItem("适用系统", rule.osType)
             + detailItem("检测方式", rule.checkMethod)
             + detailItem("风险等级", severityTag(rule.severity), true)
@@ -351,6 +400,14 @@ layui.use(["table", "form", "layer"], function () {
 
     function detailItem(label, value, raw) {
         return '<div class="detail-item"><label>' + escapeHtml(label) + '</label><div>' + (raw ? value : escapeHtml(value == null ? "-" : value)) + '</div></div>';
+    }
+
+    function fillSelect(select, placeholder, rows, valueKey, textKey) {
+        select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>' + rows.map(function (row) {
+            var value = row[valueKey] || "";
+            var text = row[textKey] || value;
+            return '<option value="' + escapeHtml(value) + '">' + escapeHtml(text) + "（" + escapeHtml(value) + "）</option>";
+        }).join("");
     }
 
     function value(root, name) {

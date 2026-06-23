@@ -43,4 +43,7 @@ public interface PortScanResultMapper {
 
     PortScanResultEntity selectLatestByMacAndTenant(@Param("macAddress") String macAddress,
                                                      @Param("tenantId") Long tenantId);
+
+    PortScanResultEntity selectLatestByTaskIdAndTenant(@Param("taskId") String taskId,
+                                                       @Param("tenantId") Long tenantId);
 }

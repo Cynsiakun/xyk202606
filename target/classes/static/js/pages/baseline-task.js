@@ -7,13 +7,15 @@ layui.use(["table", "form", "layer"], function () {
     var hostResultTableId = "taskHostResultTable";
     var ruleResultTableId = "taskRuleResultTable";
     var taskState = {page: 1, size: 10, keyword: "", executeType: "", taskType: "", status: ""};
-    var resultState = {task: null, page: 1, size: 10, selectedHost: null};
+    var resultState = {task: null, page: 1, size: 10, selectedHost: null, assetTypeCode: ""};
     var hasInProgress = false;
 
     var allHosts = [];
     var allRules = [];
     var selectedHostIds = {};
     var selectedRuleIds = {};
+    var protectionLevels = [];
+    var assetTypes = [];
 
     init();
 
@@ -65,6 +67,11 @@ layui.use(["table", "form", "layer"], function () {
         });
         document.getElementById("resultRefreshButton").addEventListener("click", function () {
             refreshResultPanel();
+        });
+        document.getElementById("resultAssetTypeFilter").addEventListener("change", function () {
+            resultState.assetTypeCode = this.value || "";
+            resultState.page = 1;
+            renderTaskHostTable(resultState.task.id);
         });
         document.getElementById("exportResultButton").addEventListener("click", function () {
             if (resultState.task) {
@@ -186,6 +193,8 @@ layui.use(["table", "form", "layer"], function () {
         allRules = [];
         selectedHostIds = {};
         selectedRuleIds = {};
+        protectionLevels = [];
+        assetTypes = [];
 
         var dialogHeight = Math.min(760, (window.innerHeight || 760) - 30);
         var dialogWidth = Math.min(820, (window.innerWidth || 860) - 30);
@@ -209,9 +218,12 @@ layui.use(["table", "form", "layer"], function () {
                 });
                 bindHostPicker(root);
                 bindRulePicker(root);
+                bindScopePicker(root);
                 updateSubmitState(root);
                 loadHosts(root);
-                loadRules(root);
+                loadScopeDictionaries(root).then(function () {
+                    loadRules(root);
+                });
             }
         });
     }
@@ -226,6 +238,7 @@ layui.use(["table", "form", "layer"], function () {
                 return;
             }
             toggleSelection(selectedHostIds, box.value, box.checked);
+            syncPickerOptionState(box);
             updateHostCount(root);
             updateSubmitState(root);
         });
@@ -241,6 +254,7 @@ layui.use(["table", "form", "layer"], function () {
                 return;
             }
             toggleSelection(selectedRuleIds, box.value, box.checked);
+            syncPickerOptionState(box);
             syncRuleCheckAll(root);
             updateRuleCount(root);
             updateSubmitState(root);
@@ -273,6 +287,18 @@ layui.use(["table", "form", "layer"], function () {
         });
     }
 
+    function bindScopePicker(root) {
+        form.on("select(taskProtectionLevel)", function () {
+            loadRules(root);
+        });
+        root.querySelector("#assetTypeOptions").addEventListener("change", function (event) {
+            if (!event.target.closest("input[type=checkbox]")) {
+                return;
+            }
+            loadRules(root);
+        });
+    }
+
     function loadHosts(root) {
         AppRequest.request("/api/host/list?page=1&size=500", {method: "GET"}, {showErrorMessage: false})
             .then(function (res) {
@@ -286,8 +312,29 @@ layui.use(["table", "form", "layer"], function () {
             });
     }
 
+    function loadScopeDictionaries(root) {
+        return Promise.all([
+            AppRequest.request("/api/baseline/protection-levels", {method: "GET"}, {showErrorMessage: false}).catch(function () {
+                return {data: []};
+            }),
+            AppRequest.request("/api/baseline/asset-types", {method: "GET"}, {showErrorMessage: false}).catch(function () {
+                return {data: []};
+            })
+        ]).then(function (items) {
+            protectionLevels = items[0].data || [];
+            assetTypes = (items[1].data || []).filter(function (assetType) {
+                return ["OS_WINDOWS", "OS_LINUX", "MW_TOMCAT", "DB_MYSQL"].indexOf(assetType.typeCode) > -1;
+            });
+            renderProtectionLevels(root);
+            renderAssetTypes(root);
+            form.render("select", "baselineTaskForm");
+        });
+    }
+
     function loadRules(root) {
-        AppRequest.request("/api/baseline/rules", {method: "GET"}, {showErrorMessage: false})
+        selectedRuleIds = {};
+        root.querySelector("#ruleList").innerHTML = '<div class="picker-empty">加载中...</div>';
+        AppRequest.request(buildRuleUrl(root), {method: "GET"}, {showErrorMessage: false})
             .then(function (res) {
                 allRules = res.data || [];
                 allRules.forEach(function (rule) {
@@ -304,6 +351,53 @@ layui.use(["table", "form", "layer"], function () {
             });
     }
 
+    function renderProtectionLevels(root) {
+        var select = root.querySelector('select[name="protectionLevelCode"]');
+        var hiddenLevelCodes = ["S3", "S3_PLUS"];
+        var levels = protectionLevels.length ? protectionLevels : [
+            {levelCode: "L3", levelName: "等保三级"},
+            {levelCode: "L4", levelName: "等保四级"},
+            {levelCode: "L5", levelName: "等保五级"}
+        ];
+        levels = levels.filter(function (level) {
+            return hiddenLevelCodes.indexOf((level.levelCode || "").toUpperCase()) === -1;
+        });
+        if (!levels.length) {
+            levels = [{levelCode: "L3", levelName: "L3"}];
+        }
+        select.innerHTML = levels.map(function (level) {
+            var selected = level.levelCode === "L3" ? " selected" : "";
+            return '<option value="' + escapeHtml(level.levelCode) + '"' + selected + '>'
+                + escapeHtml(level.levelName || level.levelCode) + "（" + escapeHtml(level.levelCode) + "）</option>";
+        }).join("");
+    }
+
+    function renderAssetTypes(root) {
+        var defaults = ["OS_WINDOWS", "OS_LINUX", "MW_TOMCAT", "DB_MYSQL"];
+        var rows = assetTypes.length ? assetTypes : defaults.map(function (code) {
+            return {typeCode: code, typeName: code};
+        });
+        root.querySelector("#assetTypeOptions").innerHTML = rows.map(function (assetType) {
+            var checked = defaults.indexOf(assetType.typeCode) > -1 ? " checked" : "";
+            return '<label class="asset-type-option">'
+                + '<input type="checkbox" value="' + escapeHtml(assetType.typeCode) + '" lay-ignore' + checked + '>'
+                + '<span>' + escapeHtml(assetType.typeName || assetType.typeCode) + '</span>'
+                + '</label>';
+        }).join("");
+    }
+
+    function buildRuleUrl(root) {
+        var params = [];
+        var level = getProtectionLevelCode(root);
+        if (level) {
+            params.push("protectionLevelCode=" + encodeURIComponent(level));
+        }
+        getSelectedAssetTypeCodes(root).forEach(function (code) {
+            params.push("assetTypeCodes=" + encodeURIComponent(code));
+        });
+        return "/api/baseline/rules" + (params.length ? "?" + params.join("&") : "");
+    }
+
     function renderHostList(root, keyword) {
         var filtered = allHosts.filter(function (host) {
             var text = ((host.hostname || "") + " " + (host.ipv4 || "")).toLowerCase();
@@ -317,7 +411,8 @@ layui.use(["table", "form", "layer"], function () {
         listEl.innerHTML = filtered.map(function (host) {
             var online = isHostOnline(host);
             var checked = selectedHostIds[host.id] ? "checked" : "";
-            return '<label class="picker-option ' + (online ? "" : "disabled") + '">'
+            var selected = selectedHostIds[host.id] ? " selected" : "";
+            return '<label class="picker-option' + selected + (online ? "" : " disabled") + '">'
                 + '<input type="checkbox" value="' + host.id + '" lay-ignore ' + checked + (online ? "" : " disabled") + '>'
                 + '<span class="opt-main">' + escapeHtml(host.hostname || ("主机#" + host.id)) + '</span>'
                 + '<span class="opt-sub">' + escapeHtml(host.ipv4 || "-") + '</span>'
@@ -341,7 +436,8 @@ layui.use(["table", "form", "layer"], function () {
 
     function renderRuleList(root, keyword) {
         var filtered = allRules.filter(function (rule) {
-            var text = ((rule.ruleCode || "") + " " + (rule.ruleName || "") + " " + (rule.category || "")).toLowerCase();
+            var text = ((rule.ruleCode || "") + " " + (rule.ruleName || "") + " " + (rule.category || "") + " "
+                + (rule.assetType || "") + " " + (rule.protectionLevelFlag || "")).toLowerCase();
             return !keyword || text.indexOf(keyword) > -1;
         });
         var listEl = root.querySelector("#ruleList");
@@ -351,10 +447,14 @@ layui.use(["table", "form", "layer"], function () {
         }
         listEl.innerHTML = filtered.map(function (rule) {
             var checked = selectedRuleIds[rule.id] ? "checked" : "";
-            return '<label class="picker-option">'
+            var selected = selectedRuleIds[rule.id] ? " selected" : "";
+            return '<label class="picker-option' + selected + '">'
                 + '<input type="checkbox" value="' + rule.id + '" lay-ignore ' + checked + '>'
                 + '<span class="opt-main">' + escapeHtml(rule.ruleName || ("规则#" + rule.id)) + '</span>'
-                + '<span class="opt-sub">' + escapeHtml(rule.ruleCode || "") + (rule.category ? " · " + escapeHtml(rule.category) : "") + '</span>'
+                + '<span class="opt-sub">' + escapeHtml(rule.ruleCode || "")
+                + (rule.assetType ? " · " + escapeHtml(rule.assetType) : "")
+                + (rule.protectionLevelFlag ? " · " + escapeHtml(rule.protectionLevelFlag) : " · 通用")
+                + (rule.category ? " · " + escapeHtml(rule.category) : "") + '</span>'
                 + (rule.severity ? '<span class="opt-tag">' + escapeHtml(rule.severity) + '</span>' : "")
                 + '</label>';
         }).join("");
@@ -364,6 +464,14 @@ layui.use(["table", "form", "layer"], function () {
         root.querySelector("#ruleCheckAll").checked = allRules.length > 0 && allRules.every(function (rule) {
             return selectedRuleIds[rule.id];
         });
+    }
+
+    function syncPickerOptionState(input) {
+        var option = input && input.closest(".picker-option");
+        if (!option) {
+            return;
+        }
+        option.classList.toggle("selected", !!input.checked);
     }
 
     function updateHostCount(root) {
@@ -387,6 +495,8 @@ layui.use(["table", "form", "layer"], function () {
         var cronExpr = executeType === "SCHEDULED" ? buildCronExpr(root) : null;
         var hostIds = Object.keys(selectedHostIds).map(Number);
         var ruleIds = Object.keys(selectedRuleIds).map(Number);
+        var protectionLevelCode = getProtectionLevelCode(root) || "L3";
+        var assetTypeCodes = getSelectedAssetTypeCodes(root);
         if (!taskName) {
             AppRequest.showMessage("请输入任务名称", 2);
             return;
@@ -403,7 +513,15 @@ layui.use(["table", "form", "layer"], function () {
         button.classList.add("layui-btn-disabled");
         AppRequest.request("/api/baseline/tasks", {
             method: "POST",
-            body: {taskName: taskName, executeType: executeType, cronExpr: executeType === "SCHEDULED" ? cronExpr : null, hostIds: hostIds, ruleIds: ruleIds}
+            body: {
+                taskName: taskName,
+                executeType: executeType,
+                cronExpr: executeType === "SCHEDULED" ? cronExpr : null,
+                protectionLevelCode: protectionLevelCode,
+                assetTypeCodes: assetTypeCodes,
+                hostIds: hostIds,
+                ruleIds: ruleIds
+            }
         }, {successMessage: "任务已创建并下发"})
             .then(function () {
                 layer.close(dialogIndex);
@@ -468,6 +586,9 @@ layui.use(["table", "form", "layer"], function () {
         resultState.task = task;
         resultState.page = 1;
         resultState.selectedHost = null;
+        resultState.assetTypeCode = "";
+        document.getElementById("resultAssetTypeFilter").value = "";
+        loadResultAssetTypeFilter();
         document.getElementById("taskListPanel").style.display = "none";
         document.getElementById("taskResultPanel").style.display = "";
         document.getElementById("resultTaskTitle").textContent = task.taskName || ("任务#" + task.id);
@@ -515,6 +636,7 @@ layui.use(["table", "form", "layer"], function () {
             limit: resultState.size,
             limits: [10, 20, 50],
             request: {pageName: "page", limitName: "size"},
+            where: {assetTypeCode: resultState.assetTypeCode},
             parseData: parsePageData,
             cols: [[
                 {field: "hostName", title: "主机名称", minWidth: 170, templet: function (d) {
@@ -522,6 +644,12 @@ layui.use(["table", "form", "layer"], function () {
                 }},
                 {field: "ipv4", title: "IP 地址", width: 150, templet: function (d) {
                     return escapeHtml(d.ipv4 || "-");
+                }},
+                {field: "assetTypes", title: "资产类型", width: 150, templet: function (d) {
+                    return escapeHtml(d.assetTypes || "-");
+                }},
+                {field: "protectionLevels", title: "等保等级", width: 115, templet: function (d) {
+                    return escapeHtml(d.protectionLevels || "-");
                 }},
                 {field: "complianceRate", title: "合规率", width: 110, align: "center", templet: function (d) {
                     return buildRateCell(d.complianceRate);
@@ -576,6 +704,12 @@ layui.use(["table", "form", "layer"], function () {
                 {field: "category", title: "分类", width: 120, templet: function (d) {
                     return escapeHtml(d.category || "-");
                 }},
+                {field: "assetType", title: "资产类型", width: 125, templet: function (d) {
+                    return escapeHtml(d.assetType || "-");
+                }},
+                {field: "protectionLevel", title: "等保", width: 90, templet: function (d) {
+                    return escapeHtml(d.protectionLevel || "-");
+                }},
                 {field: "status", title: "状态", width: 90, align: "center", templet: function (d) {
                     return buildResultStatusTag(d.status);
                 }},
@@ -615,6 +749,20 @@ layui.use(["table", "form", "layer"], function () {
         } catch (ignore) {
             // table may not have been rendered yet
         }
+    }
+
+    function loadResultAssetTypeFilter() {
+        AppRequest.request("/api/baseline/asset-types", {method: "GET"}, {showErrorMessage: false})
+            .then(function (res) {
+                var rows = res.data || [];
+                var select = document.getElementById("resultAssetTypeFilter");
+                select.innerHTML = '<option value="">全部资产类型</option>' + rows.map(function (assetType) {
+                    return '<option value="' + escapeHtml(assetType.typeCode || "") + '">'
+                        + escapeHtml(assetType.typeName || assetType.typeCode || "-")
+                        + "（" + escapeHtml(assetType.typeCode || "-") + "）</option>";
+                }).join("");
+                select.value = resultState.assetTypeCode || "";
+            });
     }
 
     function recheckHost(hostId) {
@@ -767,6 +915,18 @@ layui.use(["table", "form", "layer"], function () {
         } else {
             delete map[id];
         }
+    }
+
+    function getProtectionLevelCode(root) {
+        var select = root.querySelector('select[name="protectionLevelCode"]');
+        return select ? (select.value || "").trim() : "";
+    }
+
+    function getSelectedAssetTypeCodes(root) {
+        return Array.from(root.querySelectorAll("#assetTypeOptions input[type=checkbox]:checked"))
+            .map(function (input) {
+                return input.value;
+            });
     }
 
     function formatRate(rate) {

@@ -19,8 +19,12 @@ public class AccessPolicyRegistry {
         tenant("TENANT_HOST_CREATE", "HOST", AccessOperation.CREATE, "host:create", false);
         tenant("TENANT_HOST_UPDATE", "HOST", AccessOperation.UPDATE, "host:update", false);
         tenant("TENANT_HOST_DELETE", "HOST", AccessOperation.DELETE, "host:delete", false);
-        tenant("TENANT_HOST_AUTHORIZE", "HOST", AccessOperation.MANAGE, "host:create", true);
+        tenant("TENANT_MACHINE_VIEW", "HOST", AccessOperation.VIEW, "tenant-machine:view", true);
+        tenant("TENANT_MACHINE_CREATE", "HOST", AccessOperation.CREATE, "tenant-machine:create", false);
+        tenant("TENANT_MACHINE_UPDATE", "HOST", AccessOperation.UPDATE, "tenant-machine:update", false);
+        tenant("TENANT_MACHINE_DELETE", "HOST", AccessOperation.DELETE, "tenant-machine:delete", false);
         tenant("TENANT_ASSET_VIEW", "ASSET", AccessOperation.VIEW, "asset:view", true);
+        tenant("TENANT_ASSET_STATS_VIEW", "ASSET_STATS", AccessOperation.VIEW, "asset-stats:view", true);
         tenant("TENANT_ASSET_PROBE", "ASSET", AccessOperation.EXECUTE, "host:probe", false);
         tenant("TENANT_ASSET_EXPORT", "ASSET", AccessOperation.EXPORT, "asset:export", false);
         tenant("TENANT_PATCH_VIEW", "PATCH", AccessOperation.VIEW, "patch-security:view", true);
@@ -38,6 +42,8 @@ public class AccessPolicyRegistry {
         platform("PLATFORM_CVE_VIEW", "CVE_RULE", AccessOperation.VIEW, "patch-cve-map:view", true);
         platform("PLATFORM_VULN_RULE_VIEW", "VULN_RULE", AccessOperation.VIEW, "vuln-rule:view", true);
         platform("PLATFORM_BASELINE_RULE_VIEW", "BASELINE_RULE", AccessOperation.VIEW, "baseline-rule:view", true);
+        platform("PLATFORM_ASSET_FINGERPRINT_RULE_VIEW", "ASSET_FINGERPRINT_RULE", AccessOperation.VIEW, "asset-fingerprint-rule:view", true);
+        platform("PLATFORM_ASSET_STATS_VIEW", "ASSET_STATS", AccessOperation.VIEW, "asset-stats:view", true);
         platform("PLATFORM_RBAC_VIEW", "RBAC", AccessOperation.VIEW, null, true);
     }
 

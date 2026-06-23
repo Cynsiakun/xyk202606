@@ -9,6 +9,8 @@ import com.cd.dto.BaselineTaskCreateRequestDTO;
 import com.cd.dto.BaselineTaskDispatchResponseDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
+import com.cd.entity.BaselineAssetTypeEntity;
+import com.cd.entity.BaselineProtectionLevelEntity;
 import com.cd.service.BaselineQueryService;
 import com.cd.service.BaselineTaskService;
 import jakarta.validation.Valid;
@@ -69,8 +71,9 @@ public class BaselineTaskController {
     public Result<PageResult<BaselineProblemHostDTO>> listProblemHosts(
             @PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,
-            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size must be greater than 0") Integer size) {
-        return Result.success(baselineQueryService.listProblemHosts(id, page, size));
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size must be greater than 0") Integer size,
+            @RequestParam(required = false) String assetTypeCode) {
+        return Result.success(baselineQueryService.listProblemHosts(id, page, size, assetTypeCode));
     }
 
     @PreAuthorize("@perm.has('baseline:view')")
@@ -83,8 +86,22 @@ public class BaselineTaskController {
 
     @PreAuthorize("@perm.has('baseline:view')")
     @GetMapping("/rules")
-    public Result<List<BaselineRuleOptionDTO>> listRules(@RequestParam(required = false) String keyword) {
-        return Result.success(baselineQueryService.listRuleOptions(keyword));
+    public Result<List<BaselineRuleOptionDTO>> listRules(@RequestParam(required = false) String keyword,
+                                                         @RequestParam(required = false) List<String> assetTypeCodes,
+                                                         @RequestParam(required = false) String protectionLevelCode) {
+        return Result.success(baselineQueryService.listRuleOptions(keyword, assetTypeCodes, protectionLevelCode));
+    }
+
+    @PreAuthorize("@perm.has('baseline:view')")
+    @GetMapping("/protection-levels")
+    public Result<List<BaselineProtectionLevelEntity>> listProtectionLevels() {
+        return Result.success(baselineQueryService.listProtectionLevels());
+    }
+
+    @PreAuthorize("@perm.has('baseline:view')")
+    @GetMapping("/asset-types")
+    public Result<List<BaselineAssetTypeEntity>> listAssetTypes() {
+        return Result.success(baselineQueryService.listAssetTypes());
     }
 
     @PreAuthorize("@perm.has('baseline:view')")

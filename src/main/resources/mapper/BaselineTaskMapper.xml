@@ -13,6 +13,8 @@
         <result column="rule_scope" property="ruleScope"/>
         <result column="rule_snapshot_json" property="ruleSnapshotJson"/>
         <result column="status" property="status"/>
+        <result column="target_level" property="targetLevel"/>
+        <result column="asset_type_filter" property="assetTypeFilter"/>
         <result column="total_host_count" property="totalHostCount"/>
         <result column="success_count" property="successCount"/>
         <result column="fail_count" property="failCount"/>
@@ -20,6 +22,7 @@
         <result column="create_time" property="createTime"/>
         <result column="start_time" property="startTime"/>
         <result column="finish_time" property="finishTime"/>
+        <result column="protection_level_id" property="protectionLevelId"/>
     </resultMap>
 
     <resultMap id="BaselineTaskHostResultMap" type="com.cd.entity.BaselineTaskHostEntity">
@@ -35,11 +38,11 @@
 
     <insert id="insertTask" parameterType="com.cd.entity.BaselineTaskEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO baseline_task (tenant_id, task_name, execute_type, cron_expr, rule_scope, rule_snapshot_json,
-                                   status, total_host_count, success_count, fail_count, creator,
-                                   start_time, finish_time)
+                                   status, target_level, asset_type_filter, total_host_count, success_count, fail_count, creator,
+                                   start_time, finish_time, protection_level_id)
         VALUES (COALESCE(#{tenantId}, 0), #{taskName}, #{executeType}, #{cronExpr}, #{ruleScope}, #{ruleSnapshotJson},
-                #{status}, #{totalHostCount}, #{successCount}, #{failCount}, #{creator},
-                #{startTime}, #{finishTime})
+                #{status}, COALESCE(#{targetLevel}, 3), #{assetTypeFilter}, #{totalHostCount}, #{successCount}, #{failCount}, #{creator},
+                #{startTime}, #{finishTime}, #{protectionLevelId})
     </insert>
 
     <insert id="insertTaskHost" parameterType="com.cd.entity.BaselineTaskHostEntity" useGeneratedKeys="true" keyProperty="id">
@@ -83,14 +86,16 @@
 
     <select id="selectTaskById" resultMap="BaselineTaskResultMap">
         SELECT id, tenant_id, task_name, execute_type, cron_expr, rule_scope, rule_snapshot_json, status,
-               total_host_count, success_count, fail_count, creator, create_time, start_time, finish_time
+               target_level, asset_type_filter, total_host_count, success_count, fail_count, creator,
+               create_time, start_time, finish_time, protection_level_id
         FROM baseline_task
         WHERE id = #{id}
     </select>
 
     <select id="selectTaskByIdAndTenant" resultMap="BaselineTaskResultMap">
         SELECT id, tenant_id, task_name, execute_type, cron_expr, rule_scope, rule_snapshot_json, status,
-               total_host_count, success_count, fail_count, creator, create_time, start_time, finish_time
+               target_level, asset_type_filter, total_host_count, success_count, fail_count, creator,
+               create_time, start_time, finish_time, protection_level_id
         FROM baseline_task
         WHERE id = #{id}
           AND tenant_id = #{tenantId}

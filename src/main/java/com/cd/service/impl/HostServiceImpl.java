@@ -1,18 +1,18 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
-import com.cd.common.license.LicenseFeature;
-import com.cd.common.license.LicenseGuard;
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
 import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetProbeDTO;
-import com.cd.dto.PortScanDTO;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
+import com.cd.dto.PortScanDTO;
 import com.cd.entity.HostEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.service.HostService;
@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,30 +166,53 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public int autoProbeOnlineHosts(int limit) {
-        return autoProbeOnlineHosts(limit, true, true, true, true);
+        return autoProbeOnlineHosts(limit, true, true, true, true, false, false);
     }
 
     @Override
     public int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app) {
+        return autoProbeOnlineHosts(limit, account, service, process, app, false, false);
+    }
+
+    @Override
+    public int autoProbeOnlineHosts(int limit,
+                                    boolean account,
+                                    boolean service,
+                                    boolean process,
+                                    boolean app,
+                                    boolean portScan,
+                                    boolean fingerprint) {
         int batchSize = Math.max(1, limit);
         List<HostEntity> hosts = hostMapper.selectAutoProbeCandidates(batchSize);
+        var strategy = probeStrategyService.getStrategyEntity();
         int sentCount = 0;
         for (HostEntity host : hosts) {
             if (host == null || !StringUtils.hasText(host.getMacAddress())) {
                 continue;
             }
-            AssetProbeDTO dto = new AssetProbeDTO();
-            dto.setAccount(account);
-            dto.setService(service);
-            dto.setProcess(process);
-            dto.setApp(app);
-            dto.setMacAddress(host.getMacAddress());
-            dto.setForce(true);
             try {
-                sendAssetProbeInternal(dto, false);
+                if (account || service || process || app) {
+                    AssetProbeDTO dto = new AssetProbeDTO();
+                    dto.setAccount(account);
+                    dto.setService(service);
+                    dto.setProcess(process);
+                    dto.setApp(app);
+                    dto.setMacAddress(host.getMacAddress());
+                    dto.setForce(true);
+                    sendAssetProbeInternal(dto, false);
+                }
+                if (portScan) {
+                    PortScanDTO dto = new PortScanDTO();
+                    dto.setMacAddress(host.getMacAddress());
+                    dto.setScanRange(strategy != null && strategy.getPortScanRange() != null
+                            ? strategy.getPortScanRange() : "common");
+                    dto.setCustomPorts(strategy != null ? strategy.getPortScanCustomPorts() : null);
+                    dto.setGrabBanner(fingerprint);
+                    sendPortScanInternal(dto);
+                }
                 sentCount++;
             } catch (Exception e) {
-                log.warn("自动资产探测下发失败: hostId={}, mac={}, reason={}",
+                log.warn("自动探测下发失败: hostId={}, mac={}, reason={}",
                         host.getId(), host.getMacAddress(), e.getMessage());
             }
         }
@@ -316,9 +340,19 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public int autoPortScanOnlineHosts(int limit) {
+        var strategy = probeStrategyService.getStrategyEntity();
+        if (strategy == null
+                || strategy.getEnabled() == null
+                || strategy.getEnabled() != 1
+                || strategy.getProbePortScan() == null
+                || strategy.getProbePortScan() != 1) {
+            log.info("自动端口扫描入口已跳过: enabled={}, probePortScan={}",
+                    strategy == null ? null : strategy.getEnabled(),
+                    strategy == null ? null : strategy.getProbePortScan());
+            return 0;
+        }
         int batchSize = Math.max(1, limit);
         List<HostEntity> hosts = hostMapper.selectPortScanCandidates(batchSize);
-        var strategy = probeStrategyService.getStrategyEntity();
         int sentCount = 0;
         for (HostEntity host : hosts) {
             if (host == null || !StringUtils.hasText(host.getMacAddress())) {
@@ -364,7 +398,12 @@ public class HostServiceImpl implements HostService {
             throw new IllegalStateException("组装端口扫描消息失败", e);
         }
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, macAddress, payload);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, macAddress, payload, msg -> {
+            msg.getMessageProperties().setExpiration(String.valueOf(RabbitMQConfig.PORT_SCAN_COMMAND_TTL));
+            msg.getMessageProperties().setTimestamp(new Date());
+            msg.getMessageProperties().setHeader("commandType", PROBE_TYPE_PORT_SCAN);
+            return msg;
+        });
         log.info("端口扫描任务已下发: routingKey={}, payload={}", macAddress, payload);
     }
 
@@ -407,7 +446,6 @@ public class HostServiceImpl implements HostService {
             try {
                 return LocalDateTime.parse(text, formatter);
             } catch (DateTimeParseException ignored) {
-                // try next
             }
         }
         throw new IllegalArgumentException(fieldName + " 时间格式不正确，支持 yyyy-MM-dd HH:mm:ss 或 ISO_LOCAL_DATE_TIME");

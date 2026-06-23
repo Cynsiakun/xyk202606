@@ -166,6 +166,19 @@
             updated_at = NOW()
     </insert>
 
+    <update id="claimTenantByNormalizedMac">
+        UPDATE hosts
+        SET tenant_id = #{tenantId},
+            hostname = COALESCE(NULLIF(hostname, ''), #{hostname}),
+            updated_at = updated_at
+        WHERE LOWER(REPLACE(REPLACE(REPLACE(mac_address, ':', ''), '-', ''), ' ', '')) = #{normalizedMac}
+    </update>
+
+    <insert id="insertAuthorizedPlaceholder">
+        INSERT INTO hosts (tenant_id, hostname, mac_address, status)
+        VALUES (#{tenantId}, #{hostname}, #{macAddress}, 1)
+    </insert>
+
     <update id="markOffline">
         UPDATE hosts
         SET status = 0,
@@ -212,6 +225,14 @@
             '1970-01-01'
         ) ASC, h.id ASC
         LIMIT #{limit}
+    </select>
+
+    <select id="selectAllMacAddresses" resultType="string">
+        SELECT DISTINCT mac_address
+        FROM hosts
+        WHERE mac_address IS NOT NULL
+          AND mac_address != ''
+        ORDER BY id ASC
     </select>
 
     <select id="selectAllIds" resultType="long">

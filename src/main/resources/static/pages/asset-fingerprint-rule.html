@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>端口资产规则管理</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/baseline-rule.css">
+</head>
+<body class="page-body">
+<div class="page-shell">
+    <div class="toolbar-card">
+        <form class="layui-form toolbar-row">
+            <div class="toolbar-group">
+                <div class="rule-title">
+                    <div class="section-kicker">PORT FINGERPRINT RULES</div>
+                    <h1>端口资产规则管理</h1>
+                </div>
+            </div>
+            <div class="toolbar-group">
+                <input type="text" id="keywordInput" class="layui-input toolbar-search" placeholder="规则编码 / 名称 / 产品 / 子类型" autocomplete="off">
+                <input type="text" id="categoryInput" class="layui-input toolbar-category" placeholder="分类" autocomplete="off">
+                <input type="number" id="portInput" class="layui-input toolbar-category" placeholder="端口" autocomplete="off">
+                <select id="enabledSelect">
+                    <option value="">全部状态</option>
+                    <option value="1">启用</option>
+                    <option value="0">停用</option>
+                </select>
+                <button type="button" class="layui-btn layui-btn-primary" id="searchButton">
+                    <i class="layui-icon layui-icon-search"></i> 搜索
+                </button>
+                <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新
+                </button>
+                <button type="button" class="layui-btn" id="addButton">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增规则
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <table id="ruleTable" lay-filter="ruleTable"></table>
+    </div>
+</div>
+
+<div class="drawer-mask" id="drawerMask" style="display:none;"></div>
+<aside class="rule-drawer" id="ruleDrawer" style="display:none;">
+    <div class="drawer-head">
+        <div>
+            <div class="section-kicker" id="drawerKicker">RULE FORM</div>
+            <h2 id="drawerTitle">新增规则</h2>
+            <p id="drawerHint">维护 banner_regex / port+service / port fallback 三层规则。</p>
+        </div>
+        <button type="button" class="drawer-close" id="drawerCloseButton">x</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<template id="ruleFormTemplate">
+    <form class="layui-form rule-form" lay-filter="ruleForm">
+        <div class="form-grid">
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则编码</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ruleCode" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="name" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">分类</label>
+                <div class="layui-input-block">
+                    <input type="text" name="category" required autocomplete="off" class="layui-input" placeholder="webapp / database / middleware / unknown">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">子类型</label>
+                <div class="layui-input-block">
+                    <input type="text" name="subCategory" autocomplete="off" class="layui-input" placeholder="http / mysql / ssh">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">协议</label>
+                <div class="layui-input-block">
+                    <select name="protocol">
+                        <option value="tcp">tcp</option>
+                        <option value="udp">udp</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">端口</label>
+                <div class="layui-input-block">
+                    <input type="number" name="port" min="1" max="65535" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">产品名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="product" required autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">厂商</label>
+                <div class="layui-input-block">
+                    <input type="text" name="vendor" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">置信度</label>
+                <div class="layui-input-block">
+                    <input type="number" name="confidence" min="0" max="100" value="80" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">优先级</label>
+                <div class="layui-input-block">
+                    <input type="number" name="priority" min="0" value="100" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">启用</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="enabled" lay-skin="switch" lay-text="启用|停用" checked>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">版本表达式</label>
+                <div class="layui-input-block">
+                    <input type="text" name="versionExpr" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">Banner Regex</label>
+            <div class="layui-input-block">
+                <textarea name="bannerRegex" placeholder="可空；用于最高优先级 banner_regex 匹配" class="layui-textarea script-area"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">描述</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="说明规则用途" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="drawer-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="button" class="layui-btn" id="saveRuleButton">保存</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/common/table.js"></script>
+<script src="../js/pages/asset-fingerprint-rule.js"></script>
+</body>
+</html>

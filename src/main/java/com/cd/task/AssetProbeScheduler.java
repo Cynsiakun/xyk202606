@@ -11,13 +11,6 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
-/**
- * 自动资产探测调度器。
- *
- * <p>每分钟检查一次全局探测策略（{@code probe_strategy} 表），是否真正下发取决于：
- * 策略是否启用、距上次执行是否已满配置周期、以及是否勾选了任一探测内容。
- * 由于每次执行都重新读取数据库配置，修改策略后无需重启系统即可生效。</p>
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -41,7 +34,9 @@ public class AssetProbeScheduler {
             boolean service = strategy.getProbeService() != null && strategy.getProbeService() == 1;
             boolean process = strategy.getProbeProcess() != null && strategy.getProbeProcess() == 1;
             boolean app = strategy.getProbeApp() != null && strategy.getProbeApp() == 1;
-            if (!account && !service && !process && !app) {
+            boolean portScan = strategy.getProbePortScan() != null && strategy.getProbePortScan() == 1;
+            boolean fingerprint = strategy.getProbeFingerprint() != null && strategy.getProbeFingerprint() == 1;
+            if (!account && !service && !process && !app && !portScan) {
                 return;
             }
 
@@ -52,12 +47,13 @@ public class AssetProbeScheduler {
                 return;
             }
 
-            // 标记本周期已触发，避免在线主机为空时每分钟重复下发。
             probeStrategyService.markRun(now);
 
-            int sentCount = hostService.autoProbeOnlineHosts(AUTO_PROBE_LIMIT, account, service, process, app);
+            int sentCount = hostService.autoProbeOnlineHosts(
+                    AUTO_PROBE_LIMIT, account, service, process, app, portScan, fingerprint);
             if (sentCount > 0) {
-                log.info("自动资产探测任务已下发: count={}, periodHours={}", sentCount, periodHours);
+                log.info("自动资产探测任务已下发: count={}, periodHours={}, portScan={}",
+                        sentCount, periodHours, portScan);
             }
         } catch (Exception e) {
             log.error("自动资产探测任务执行失败", e);

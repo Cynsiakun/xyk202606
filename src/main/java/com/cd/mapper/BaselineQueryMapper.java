@@ -7,6 +7,8 @@ import com.cd.dto.BaselineRuleOptionDTO;
 import com.cd.dto.BaselineTaskExportRowDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
+import com.cd.entity.BaselineAssetTypeEntity;
+import com.cd.entity.BaselineProtectionLevelEntity;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -35,11 +37,13 @@ public interface BaselineQueryMapper {
 
     List<BaselineProblemHostDTO> selectProblemHostPage(@Param("taskId") Long taskId,
                                                        @Param("tenantId") Long tenantId,
+                                                       @Param("assetTypeCode") String assetTypeCode,
                                                        @Param("offset") int offset,
                                                        @Param("limit") int limit);
 
     long countProblemHosts(@Param("taskId") Long taskId,
-                           @Param("tenantId") Long tenantId);
+                           @Param("tenantId") Long tenantId,
+                           @Param("assetTypeCode") String assetTypeCode);
 
     List<BaselineHostResultItemDTO> selectTaskHostResults(@Param("taskId") Long taskId,
                                                           @Param("hostId") Long hostId,
@@ -51,7 +55,13 @@ public interface BaselineQueryMapper {
     List<BaselineTaskExportRowDTO> selectHostExportRows(@Param("hostId") Long hostId,
                                                         @Param("tenantId") Long tenantId);
 
-    List<BaselineRuleOptionDTO> selectRuleOptions(@Param("keyword") String keyword);
+    List<BaselineRuleOptionDTO> selectRuleOptions(@Param("keyword") String keyword,
+                                                  @Param("assetTypeCodes") List<String> assetTypeCodes,
+                                                  @Param("protectionLevelCode") String protectionLevelCode);
+
+    List<BaselineProtectionLevelEntity> selectProtectionLevels();
+
+    List<BaselineAssetTypeEntity> selectAssetTypes();
 
     /** 主机合规总览：每台主机取最近一次基线汇总，支持关键字与合规等级筛选。 */
     List<BaselineHostOverviewDTO> selectHostOverviewPage(@Param("keyword") String keyword,

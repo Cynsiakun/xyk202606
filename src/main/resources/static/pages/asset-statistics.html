@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资产统计概览</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/asset-statistics.css">
+</head>
+<body class="page-body asset-stats-body">
+<div class="asset-stats-shell">
+    <section class="asset-stats-hero">
+        <div>
+            <div class="hero-kicker">Asset Intelligence Dashboard</div>
+            <h1>资产统计概览</h1>
+            <p>聚焦当前资产库中的主机、最新开放端口、资产类型、软件分布与发现趋势。</p>
+        </div>
+        <div class="hero-actions">
+            <button type="button" class="layui-btn layui-btn-primary" id="refreshButton">刷新数据</button>
+            <span class="generated-at" id="generatedAt">-</span>
+        </div>
+    </section>
+
+    <section class="stats-kpi-grid" id="kpiGrid"></section>
+
+    <section class="chart-grid chart-grid-top">
+        <article class="chart-card">
+            <div class="card-head">
+                <div>
+                    <div class="card-kicker">Host Asset Ranking</div>
+                    <h2>当前资产最丰富主机 Top N</h2>
+                    <div class="card-note">每台主机仅取最新一份端口资产结果，按当前资产数量排序</div>
+                </div>
+            </div>
+            <div class="chart-box" id="topIpChart"></div>
+        </article>
+
+        <article class="chart-card">
+            <div class="card-head">
+                <div>
+                    <div class="card-kicker">Latest Open Port Coverage</div>
+                    <h2>主机最新开放端口覆盖 Top N</h2>
+                    <div class="card-note">每台主机只统计最新一次仍然开放的端口，同主机同端口不重复累计</div>
+                </div>
+            </div>
+            <div class="chart-box" id="topPortChart"></div>
+        </article>
+
+        <article class="chart-card">
+            <div class="card-head">
+                <div>
+                    <div class="card-kicker">Category Mix</div>
+                    <h2>资产类型占比</h2>
+                </div>
+            </div>
+            <div class="chart-box" id="categoryPieChart"></div>
+        </article>
+
+        <article class="chart-card">
+            <div class="card-head">
+                <div>
+                    <div class="card-kicker">Software Ranking</div>
+                    <h2>软件分布统计</h2>
+                </div>
+            </div>
+            <div class="chart-box" id="topProductChart"></div>
+        </article>
+    </section>
+
+    <section class="chart-grid chart-grid-bottom">
+        <article class="chart-card chart-card-wide">
+            <div class="card-head">
+                <div>
+                    <div class="card-kicker">Discovery Timeline</div>
+                    <h2>资产发现时间趋势</h2>
+                </div>
+                <div class="card-meta" id="trendSubtitle">-</div>
+            </div>
+            <div class="chart-box chart-box-wide" id="trendChart"></div>
+        </article>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/asset-statistics.js"></script>
+</body>
+</html>

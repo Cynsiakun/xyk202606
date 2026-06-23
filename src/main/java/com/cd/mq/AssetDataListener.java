@@ -40,11 +40,6 @@ public class AssetDataListener {
         safeProcess(RabbitMQConfig.APP_QUEUE, message);
     }
 
-    @RabbitListener(queues = RabbitMQConfig.PORT_SCAN_QUEUE)
-    public void onPortScanMessage(String message) {
-        safeProcess(RabbitMQConfig.PORT_SCAN_QUEUE, message);
-    }
-
     private void safeProcess(String queueName, String message) {
         try {
             assetDataService.processAssetMessage(queueName, message);

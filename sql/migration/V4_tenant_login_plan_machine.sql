@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS tenant_machine (
     remark VARCHAR(255),
     status TINYINT NOT NULL DEFAULT 1,
     created_by BIGINT,
+    machine_bound_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_tenant_machine_machine_id (machine_id),
@@ -107,3 +108,29 @@ CREATE TABLE IF NOT EXISTS tenant_machine (
     KEY idx_tenant_machine_tenant (tenant_id),
     KEY idx_tenant_machine_status (status)
 );
+
+ALTER TABLE tenant_machine
+    ADD COLUMN IF NOT EXISTS machine_bound_at DATETIME AFTER created_by;
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'tenant-machine:view', '查看授权主机', 'API', '/api/tenant-machines/list', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'tenant-machine:view');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'tenant-machine:create', '新增授权主机', 'API', '/api/tenant-machines', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'tenant-machine:create');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'tenant-machine:update', '修改授权主机', 'API', '/api/tenant-machines/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'tenant-machine:update');
+
+INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
+SELECT 'tenant-machine:delete', '删除授权主机', 'API', '/api/tenant-machines/{id}', 1
+WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'tenant-machine:delete');
+
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM sys_role r
+         JOIN sys_permission p
+              ON p.permission_code IN ('tenant-machine:view', 'tenant-machine:create', 'tenant-machine:update', 'tenant-machine:delete')
+WHERE r.role_code = 'TENANT_ADMIN';

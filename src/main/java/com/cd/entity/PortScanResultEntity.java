@@ -12,6 +12,7 @@ public class PortScanResultEntity {
     private String taskId;
     private String hostName;
     private String macAddress;
+    private String source;
     private Integer portCount;
     private String portJson;
     private Integer deleted;

@@ -13,4 +13,6 @@ public class BaselineRuleOptionDTO {
     private String ruleName;
     private String category;
     private String severity;
+    private String assetType;
+    private String protectionLevelFlag;
 }

@@ -10,6 +10,7 @@
         <result column="task_id" property="taskId"/>
         <result column="host_name" property="hostName"/>
         <result column="mac_address" property="macAddress"/>
+        <result column="source" property="source"/>
         <result column="port_count" property="portCount"/>
         <result column="port_json" property="portJson"/>
         <result column="deleted" property="deleted"/>
@@ -18,7 +19,7 @@
     </resultMap>
 
     <sql id="baseColumns">
-        id, tenant_id, task_id, host_name, mac_address, port_count, port_json, deleted, created_at, updated_at
+        id, tenant_id, task_id, host_name, mac_address, source, port_count, port_json, deleted, created_at, updated_at
     </sql>
 
     <sql id="listWhere">
@@ -46,8 +47,8 @@
 
     <insert id="insert" parameterType="com.cd.entity.PortScanResultEntity"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO port_scan_results (tenant_id, task_id, host_name, mac_address, port_count, port_json)
-        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostName}, #{macAddress}, #{portCount}, #{portJson})
+        INSERT INTO port_scan_results (tenant_id, task_id, host_name, mac_address, source, port_count, port_json)
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostName}, #{macAddress}, #{source}, #{portCount}, #{portJson})
     </insert>
 
     <select id="selectById" resultMap="PortScanResultMap">
@@ -128,6 +129,14 @@
         FROM port_scan_results
         WHERE mac_address = #{macAddress} AND deleted = 0 AND tenant_id = #{tenantId}
         ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestByTaskIdAndTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE task_id = #{taskId} AND deleted = 0 AND tenant_id = #{tenantId}
+        ORDER BY created_at DESC, id DESC
         LIMIT 1
     </select>
 </mapper>

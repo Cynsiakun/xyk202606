@@ -168,6 +168,7 @@ public class TenantServiceImpl implements TenantService {
             sysRolePermissionMapper.insertMissingFromRole(role.getId(), "SECURITY_ADMIN");
             sysRolePermissionMapper.insertMissing(role.getId(), "user:role:assign");
             sysRolePermissionMapper.insertMissing(role.getId(), "host:asset:view");
+            sysRolePermissionMapper.insertMissing(role.getId(), "asset-stats:view");
             sysRolePermissionMapper.insertMissing(role.getId(), "host:probe");
             return role;
         }
@@ -180,6 +181,7 @@ public class TenantServiceImpl implements TenantService {
         sysRolePermissionMapper.insertMissingFromRole(created.getId(), "SECURITY_ADMIN");
         sysRolePermissionMapper.insertMissing(created.getId(), "user:role:assign");
         sysRolePermissionMapper.insertMissing(created.getId(), "host:asset:view");
+        sysRolePermissionMapper.insertMissing(created.getId(), "asset-stats:view");
         sysRolePermissionMapper.insertMissing(created.getId(), "host:probe");
         return created;
     }

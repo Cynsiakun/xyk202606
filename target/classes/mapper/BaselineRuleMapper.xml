@@ -12,6 +12,9 @@
         <result column="description" property="description"/>
         <result column="severity" property="severity"/>
         <result column="score" property="score"/>
+        <result column="level" property="level"/>
+        <result column="asset_type" property="assetType"/>
+        <result column="asset_type_code" property="assetTypeCode"/>
         <result column="os_type" property="osType"/>
         <result column="check_method" property="checkMethod"/>
         <result column="check_script" property="checkScript"/>
@@ -21,6 +24,8 @@
         <result column="is_mandatory" property="isMandatory"/>
         <result column="enabled" property="enabled"/>
         <result column="status" property="status"/>
+        <result column="protection_level_flag" property="protectionLevelFlag"/>
+        <result column="group_combine_logic" property="groupCombineLogic"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -34,13 +39,62 @@
         <result column="expected_value" property="expectedValue"/>
         <result column="match_type" property="matchType"/>
         <result column="remark" property="remark"/>
+        <result column="protection_level_id" property="protectionLevelId"/>
+        <result column="value_type" property="valueType"/>
+        <result column="value_set" property="valueSet"/>
+        <result column="logic_group" property="logicGroup"/>
+        <result column="group_operator" property="groupOperator"/>
         <result column="create_time" property="createTime"/>
     </resultMap>
 
+    <resultMap id="BaselineProtectionLevelResultMap" type="com.cd.entity.BaselineProtectionLevelEntity">
+        <id column="id" property="id"/>
+        <result column="level_code" property="levelCode"/>
+        <result column="level_name" property="levelName"/>
+        <result column="level_order" property="levelOrder"/>
+        <result column="description" property="description"/>
+        <result column="enabled" property="enabled"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <sql id="ruleColumns">
+        id, rule_code, rule_name, category, description, severity, score, level, asset_type, NULL AS asset_type_code, os_type,
+        check_method, check_script, remediation_type, remediation_script, version,
+        is_mandatory, enabled, status, protection_level_flag, group_combine_logic, create_time, update_time
+    </sql>
+
+    <sql id="ruleColumnsWithAssetTypeDisplay">
+        br.id, br.rule_code, br.rule_name, br.category, br.description, br.severity, br.score, br.level,
+        COALESCE(
+            NULLIF((
+                SELECT GROUP_CONCAT(bat.type_code ORDER BY bat.sort_order ASC, bat.id ASC SEPARATOR ',')
+                FROM baseline_rule_asset_ref ref
+                JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+                WHERE ref.rule_id = br.id
+                  AND bat.enabled = 1
+            ), ''),
+            br.asset_type,
+            br.os_type
+        ) AS asset_type,
+        (
+            SELECT GROUP_CONCAT(bat.type_code ORDER BY bat.sort_order ASC, bat.id ASC SEPARATOR ',')
+            FROM baseline_rule_asset_ref ref
+            JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+            WHERE ref.rule_id = br.id
+              AND bat.enabled = 1
+        ) AS asset_type_code,
+        br.os_type, br.check_method, br.check_script, br.remediation_type, br.remediation_script, br.version,
+        br.is_mandatory, br.enabled, br.status, br.protection_level_flag, br.group_combine_logic,
+        br.create_time, br.update_time
+    </sql>
+
+    <sql id="itemColumns">
+        id, rule_id, item_order, check_key, operator, expected_value, match_type, remark,
+        protection_level_id, value_type, value_set, logic_group, group_operator, create_time
+    </sql>
+
     <select id="selectPublishedByIds" resultMap="BaselineRuleResultMap">
-        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
-               check_method, check_script, remediation_type, remediation_script, version,
-               is_mandatory, enabled, status, create_time, update_time
+        SELECT <include refid="ruleColumns"/>
         FROM baseline_rule
         WHERE enabled = 1
           AND status = 'PUBLISHED'
@@ -55,8 +109,36 @@
         )
     </select>
 
+    <select id="selectPublishedByIdsAndAssetTypes" resultMap="BaselineRuleResultMap">
+        SELECT DISTINCT
+               br.id, br.rule_code, br.rule_name, br.category, br.description, br.severity, br.score,
+               br.level, br.asset_type, bat.type_code AS asset_type_code, br.os_type, br.check_method, br.check_script,
+               br.remediation_type, br.remediation_script, br.version, br.is_mandatory,
+               br.enabled, br.status, br.protection_level_flag, br.group_combine_logic,
+               br.create_time, br.update_time
+        FROM baseline_rule br
+        JOIN baseline_rule_asset_ref ref ON ref.rule_id = br.id
+        JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+        WHERE br.enabled = 1
+          AND br.status = 'PUBLISHED'
+          AND br.id IN
+          <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+          </foreach>
+          AND bat.enabled = 1
+          AND bat.type_code IN
+          <foreach collection="assetTypeCodes" item="assetTypeCode" open="(" separator="," close=")">
+              #{assetTypeCode}
+          </foreach>
+        ORDER BY FIELD(br.id,
+          <foreach collection="ids" item="id" separator=",">
+              #{id}
+          </foreach>
+        )
+    </select>
+
     <select id="selectItemsByRuleIds" resultMap="BaselineRuleItemResultMap">
-        SELECT id, rule_id, item_order, check_key, operator, expected_value, match_type, remark, create_time
+        SELECT <include refid="itemColumns"/>
         FROM baseline_rule_item
         WHERE rule_id IN
         <foreach collection="ruleIds" item="ruleId" open="(" separator="," close=")">
@@ -65,8 +147,21 @@
         ORDER BY rule_id ASC, item_order ASC, id ASC
     </select>
 
+    <select id="selectItemsByRuleIdsAndProtectionLevel" resultMap="BaselineRuleItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM baseline_rule_item
+        WHERE rule_id IN
+        <foreach collection="ruleIds" item="ruleId" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+        <if test="protectionLevelId != null">
+            AND (protection_level_id IS NULL OR protection_level_id = #{protectionLevelId})
+        </if>
+        ORDER BY rule_id ASC, item_order ASC, id ASC
+    </select>
+
     <select id="selectItemsByItemIds" resultMap="BaselineRuleItemResultMap">
-        SELECT id, rule_id, item_order, check_key, operator, expected_value, match_type, remark, create_time
+        SELECT <include refid="itemColumns"/>
         FROM baseline_rule_item
         WHERE id IN
         <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
@@ -74,10 +169,38 @@
         </foreach>
     </select>
 
+    <select id="selectItemsByRuleIdsAndCheckKeys" resultMap="BaselineRuleItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM baseline_rule_item
+        WHERE rule_id IN
+        <foreach collection="ruleIds" item="ruleId" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+          AND check_key IN
+        <foreach collection="checkKeys" item="checkKey" open="(" separator="," close=")">
+            #{checkKey}
+        </foreach>
+        <if test="protectionLevelId != null">
+          AND (protection_level_id IS NULL OR protection_level_id = #{protectionLevelId})
+        </if>
+        ORDER BY rule_id ASC,
+                 CASE WHEN protection_level_id = #{protectionLevelId} THEN 0 ELSE 1 END,
+                 item_order ASC,
+                 id ASC
+    </select>
+
+    <select id="selectFirstAssetTypeIdByRuleId" resultType="long">
+        SELECT ref.asset_type_id
+        FROM baseline_rule_asset_ref ref
+        JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+        WHERE ref.rule_id = #{ruleId}
+          AND bat.enabled = 1
+        ORDER BY bat.sort_order ASC, bat.id ASC
+        LIMIT 1
+    </select>
+
     <select id="selectByIds" resultMap="BaselineRuleResultMap">
-        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
-               check_method, check_script, remediation_type, remediation_script, version,
-               is_mandatory, enabled, status, create_time, update_time
+        SELECT <include refid="ruleColumns"/>
         FROM baseline_rule
         WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
@@ -86,66 +209,104 @@
     </select>
 
     <select id="selectById" resultMap="BaselineRuleResultMap">
-        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
-               check_method, check_script, remediation_type, remediation_script, version,
-               is_mandatory, enabled, status, create_time, update_time
+        SELECT <include refid="ruleColumns"/>
         FROM baseline_rule
         WHERE id = #{id}
     </select>
 
     <select id="selectByRuleCode" resultMap="BaselineRuleResultMap">
-        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
-               check_method, check_script, remediation_type, remediation_script, version,
-               is_mandatory, enabled, status, create_time, update_time
+        SELECT <include refid="ruleColumns"/>
         FROM baseline_rule
         WHERE rule_code = #{ruleCode}
     </select>
 
+    <select id="selectProtectionLevelById" resultMap="BaselineProtectionLevelResultMap">
+        SELECT id, level_code, level_name, level_order, description, enabled, create_time
+        FROM baseline_protection_level
+        WHERE id = #{id}
+          AND enabled = 1
+    </select>
+
+    <select id="selectProtectionLevelByCode" resultMap="BaselineProtectionLevelResultMap">
+        SELECT id, level_code, level_name, level_order, description, enabled, create_time
+        FROM baseline_protection_level
+        WHERE UPPER(level_code) = UPPER(#{levelCode})
+          AND enabled = 1
+    </select>
+
     <sql id="manageFilter">
         <if test="keyword != null and keyword != ''">
-            AND (rule_code LIKE CONCAT('%', #{keyword}, '%')
-                 OR rule_name LIKE CONCAT('%', #{keyword}, '%')
-                 OR category LIKE CONCAT('%', #{keyword}, '%'))
+            AND (br.rule_code LIKE CONCAT('%', #{keyword}, '%')
+                 OR br.rule_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR br.category LIKE CONCAT('%', #{keyword}, '%'))
         </if>
         <if test="category != null and category != ''">
-            AND category = #{category}
+            AND br.category = #{category}
         </if>
         <if test="severity != null and severity != ''">
-            AND UPPER(severity) = #{severity}
+            AND UPPER(br.severity) = #{severity}
         </if>
         <if test="status != null and status != ''">
-            AND status = #{status}
+            AND br.status = #{status}
         </if>
         <if test="enabled != null">
-            AND enabled = #{enabled}
+            AND br.enabled = #{enabled}
+        </if>
+        <if test="assetTypeCode != null and assetTypeCode != ''">
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM baseline_rule_asset_ref ref
+                    JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+                    WHERE ref.rule_id = br.id
+                      AND bat.enabled = 1
+                      AND UPPER(bat.type_code) = #{assetTypeCode}
+                )
+                OR UPPER(COALESCE(br.asset_type, br.os_type, '')) = #{assetTypeCode}
+            )
+        </if>
+        <if test="protectionLevelCode != null and protectionLevelCode != ''">
+            AND (
+                br.protection_level_flag IS NULL
+                OR br.protection_level_flag = ''
+                OR FIND_IN_SET(#{protectionLevelCode}, REPLACE(UPPER(br.protection_level_flag), ' ', '')) &gt; 0
+                OR EXISTS (
+                    SELECT 1
+                    FROM baseline_rule_item bri
+                    JOIN baseline_protection_level bpl ON bpl.id = bri.protection_level_id
+                    WHERE bri.rule_id = br.id
+                      AND bpl.enabled = 1
+                      AND UPPER(bpl.level_code) = #{protectionLevelCode}
+                )
+            )
         </if>
     </sql>
 
     <select id="selectManagePage" resultMap="BaselineRuleResultMap">
-        SELECT id, rule_code, rule_name, category, description, severity, score, os_type,
-               check_method, check_script, remediation_type, remediation_script, version,
-               is_mandatory, enabled, status, create_time, update_time
-        FROM baseline_rule
+        SELECT <include refid="ruleColumnsWithAssetTypeDisplay"/>
+        FROM baseline_rule br
         WHERE 1 = 1
         <include refid="manageFilter"/>
-        ORDER BY id DESC
+        ORDER BY br.id DESC
         LIMIT #{offset}, #{limit}
     </select>
 
     <select id="countManagePage" resultType="long">
         SELECT COUNT(*)
-        FROM baseline_rule
+        FROM baseline_rule br
         WHERE 1 = 1
         <include refid="manageFilter"/>
     </select>
 
     <insert id="insertManage" parameterType="com.cd.entity.BaselineRuleEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO baseline_rule (rule_code, rule_name, category, description, severity, score,
-                                   os_type, check_method, check_script, remediation_type,
-                                   remediation_script, version, is_mandatory, enabled, status)
+                                   level, asset_type, os_type, check_method, check_script, remediation_type,
+                                   remediation_script, version, is_mandatory, enabled, status,
+                                   protection_level_flag, group_combine_logic)
         VALUES (#{ruleCode}, #{ruleName}, #{category}, #{description}, #{severity}, #{score},
-                #{osType}, #{checkMethod}, #{checkScript}, #{remediationType},
-                #{remediationScript}, #{version}, #{isMandatory}, #{enabled}, #{status})
+                COALESCE(#{level}, 3), COALESCE(#{assetType}, 'OS'), #{osType}, #{checkMethod}, #{checkScript}, #{remediationType},
+                #{remediationScript}, #{version}, #{isMandatory}, #{enabled}, #{status},
+                #{protectionLevelFlag}, COALESCE(#{groupCombineLogic}, 'AND'))
     </insert>
 
     <update id="updateManage" parameterType="com.cd.entity.BaselineRuleEntity">
@@ -155,6 +316,8 @@
             description = #{description},
             severity = #{severity},
             score = #{score},
+            level = COALESCE(#{level}, level),
+            asset_type = COALESCE(#{assetType}, asset_type),
             os_type = #{osType},
             check_method = #{checkMethod},
             check_script = #{checkScript},
@@ -163,6 +326,8 @@
             is_mandatory = #{isMandatory},
             enabled = #{enabled},
             status = #{status},
+            protection_level_flag = #{protectionLevelFlag},
+            group_combine_logic = COALESCE(#{groupCombineLogic}, 'AND'),
             version = COALESCE(version, 1) + 1
         WHERE id = #{id}
     </update>

@@ -16,6 +16,7 @@ public class TenantMachineEntity {
     private String remark;
     private Integer status;
     private Long createdBy;
+    private LocalDateTime machineBoundAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -14,13 +14,14 @@
         <result column="remark" property="remark"/>
         <result column="status" property="status"/>
         <result column="created_by" property="createdBy"/>
+        <result column="machine_bound_at" property="machineBoundAt"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <sql id="baseColumns">
         tm.id, tm.tenant_id, t.name AS tenant_name, tm.machine_id, tm.mac_address,
-        tm.host_name, tm.remark, tm.status, tm.created_by, tm.created_at, tm.updated_at
+        tm.host_name, tm.remark, tm.status, tm.created_by, tm.machine_bound_at, tm.created_at, tm.updated_at
     </sql>
 
     <insert id="insert" parameterType="com.cd.entity.TenantMachineEntity" useGeneratedKeys="true" keyProperty="id">
@@ -34,9 +35,19 @@
             mac_address = #{macAddress},
             host_name = #{hostName},
             remark = #{remark},
-            status = #{status}
+            status = #{status},
+            machine_bound_at = #{machineBoundAt}
         WHERE id = #{id}
           AND tenant_id = #{tenantId}
+    </update>
+
+    <update id="bindMachineIdIfEmpty">
+        UPDATE tenant_machine
+        SET machine_id = #{machineId},
+            machine_bound_at = NOW()
+        WHERE id = #{id}
+          AND status = 1
+          AND (machine_id IS NULL OR machine_id = '')
     </update>
 
     <delete id="deleteByIdAndTenant">
@@ -65,7 +76,7 @@
         SELECT <include refid="baseColumns"/>
         FROM tenant_machine tm
                  LEFT JOIN tenant t ON t.id = tm.tenant_id
-        WHERE tm.mac_address = #{macAddress}
+        WHERE REPLACE(LOWER(tm.mac_address), ':', '-') = #{macAddress}
         LIMIT 1
     </select>
 
@@ -79,6 +90,15 @@
               OR (#{macAddress} IS NOT NULL AND #{macAddress} != '' AND tm.mac_address = #{macAddress})
           )
         ORDER BY tm.id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectActiveByMacAddress" resultMap="TenantMachineEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM tenant_machine tm
+                 LEFT JOIN tenant t ON t.id = tm.tenant_id
+        WHERE tm.status = 1
+          AND REPLACE(LOWER(tm.mac_address), ':', '-') = #{macAddress}
         LIMIT 1
     </select>
 

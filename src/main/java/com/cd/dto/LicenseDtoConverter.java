@@ -2,6 +2,8 @@ package com.cd.dto;
 
 import com.cd.entity.LicenseEntity;
 
+import java.util.List;
+
 public final class LicenseDtoConverter {
 
     private LicenseDtoConverter() {
@@ -24,6 +26,10 @@ public final class LicenseDtoConverter {
     }
 
     public static LicenseOfflineResponseDTO toOfflineResponse(LicenseEntity entity) {
+        return toOfflineResponse(entity, null);
+    }
+
+    public static LicenseOfflineResponseDTO toOfflineResponse(LicenseEntity entity, List<String> featureFlags) {
         LicensePayloadDTO payload = new LicensePayloadDTO();
         payload.setLicenseKey(entity.getLicenseKey());
         payload.setTenantId(entity.getTenantId());
@@ -32,6 +38,7 @@ public final class LicenseDtoConverter {
         payload.setUserLimit(entity.getUserLimit());
         payload.setExpireTime(entity.getExpireTime());
         payload.setMachineId(entity.getMachineId());
+        payload.setFeatureFlags(featureFlags);
 
         LicenseOfflineResponseDTO dto = new LicenseOfflineResponseDTO();
         dto.setPayload(payload);

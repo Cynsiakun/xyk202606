@@ -1,6 +1,7 @@
 package com.cd.controller;
 
 import com.cd.common.Result;
+import com.cd.dto.DashboardOverviewDTO;
 import com.cd.dto.DashboardStatisticsDTO;
 import com.cd.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -20,5 +21,11 @@ public class DashboardController {
     @GetMapping("/statistics")
     public Result<DashboardStatisticsDTO> statistics() {
         return Result.success(dashboardService.statistics());
+    }
+
+    @PreAuthorize("@perm.has('dashboard:view')")
+    @GetMapping("/overview")
+    public Result<DashboardOverviewDTO> overview() {
+        return Result.success(dashboardService.overview());
     }
 }

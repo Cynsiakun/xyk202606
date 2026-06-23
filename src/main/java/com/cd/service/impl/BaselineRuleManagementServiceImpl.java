@@ -12,13 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class BaselineRuleManagementServiceImpl implements BaselineRuleManagementService {
 
-    private static final Set<String> CHECK_METHODS = Set.of("REGISTRY", "SERVICE", "POWERSHELL", "WMI");
+    private static final Set<String> CHECK_METHODS = Set.of("REGISTRY", "SERVICE", "POWERSHELL", "WMI", "COMMAND");
     private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> STATUSES = Set.of("PUBLISHED", "DRAFT", "ARCHIVED");
 
@@ -26,7 +27,8 @@ public class BaselineRuleManagementServiceImpl implements BaselineRuleManagement
 
     @Override
     public PageResult<BaselineRuleEntity> list(Integer page, Integer size, String keyword,
-                                               String category, String severity, String status, Integer enabled) {
+                                               String category, String severity, String status, Integer enabled,
+                                               String assetTypeCode, String protectionLevelCode) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safeSize = size == null || size < 1 ? 10 : Math.min(size, 200);
         String safeKeyword = normalizeText(keyword);
@@ -34,9 +36,13 @@ public class BaselineRuleManagementServiceImpl implements BaselineRuleManagement
         String safeSeverity = normalizeSeverity(severity, false);
         String safeStatus = normalizeStatus(status, false);
         Integer safeEnabled = enabled == null ? null : (enabled == 1 ? 1 : 0);
-        long total = baselineRuleMapper.countManagePage(safeKeyword, safeCategory, safeSeverity, safeStatus, safeEnabled);
+        String safeAssetTypeCode = normalizeUpper(assetTypeCode);
+        String safeProtectionLevelCode = normalizeUpper(protectionLevelCode);
+        long total = baselineRuleMapper.countManagePage(safeKeyword, safeCategory, safeSeverity, safeStatus,
+                safeEnabled, safeAssetTypeCode, safeProtectionLevelCode);
         List<BaselineRuleEntity> list = baselineRuleMapper.selectManagePage(
-                safeKeyword, safeCategory, safeSeverity, safeStatus, safeEnabled, (safePage - 1) * safeSize, safeSize);
+                safeKeyword, safeCategory, safeSeverity, safeStatus, safeEnabled, safeAssetTypeCode,
+                safeProtectionLevelCode, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
@@ -116,7 +122,7 @@ public class BaselineRuleManagementServiceImpl implements BaselineRuleManagement
     private String normalizeCheckMethod(String value) {
         String normalized = requireText(value, "检测方式不能为空").toUpperCase();
         if (!CHECK_METHODS.contains(normalized)) {
-            throw new IllegalArgumentException("检测方式仅支持 REGISTRY/SERVICE/POWERSHELL/WMI");
+            throw new IllegalArgumentException("检测方式仅支持 REGISTRY/SERVICE/POWERSHELL/WMI/COMMAND");
         }
         return normalized;
     }
@@ -161,5 +167,10 @@ public class BaselineRuleManagementServiceImpl implements BaselineRuleManagement
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeUpper(String value) {
+        String normalized = normalizeText(value);
+        return StringUtils.hasText(normalized) ? normalized.toUpperCase(Locale.ROOT) : null;
     }
 }

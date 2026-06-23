@@ -44,6 +44,9 @@ public class AccessPolicyService {
             if (!permissionChecker.isSuperAdmin()) {
                 return AccessDecision.deny(policyKey, "NOT_PLATFORM_ADMIN", "Platform access requires SUPER_ADMIN");
             }
+            if (!Long.valueOf(0L).equals(currentTenantId())) {
+                return AccessDecision.deny(policyKey, "NOT_PLATFORM_TENANT", "Platform access requires tenant_id=0");
+            }
             return AccessDecision.allow(policyKey);
         }
         if (permissionChecker.isSuperAdmin()) {
@@ -52,6 +55,9 @@ public class AccessPolicyService {
         LicenseEntity license = licenseMapper.selectEffectiveByTenantId(currentTenantId());
         if (license == null) {
             return AccessDecision.deny(policyKey, "NO_EFFECTIVE_LICENSE", "No effective License for current tenant");
+        }
+        if ("ASSET_STATS".equals(definition.getFeatureCode()) && !licenseGuard.isProfessionalOrPlatform()) {
+            return AccessDecision.deny(policyKey, "PLAN_NOT_ALLOWED", "Professional plan required: " + definition.getFeatureCode());
         }
         if (!hasTenantFeature(license, definition.getFeatureCode())) {
             return AccessDecision.deny(policyKey, "FEATURE_NOT_ALLOWED", "License feature not allowed: " + definition.getFeatureCode());
@@ -75,7 +81,7 @@ public class AccessPolicyService {
             dto.setMessage("Platform");
             dto.setTenantFeatures(allTenantFeatures());
             dto.setPlatformFeatures(platformFeatures());
-            dto.setAllowedPolicies(allPolicyKeys());
+            dto.setAllowedPolicies(allowedPolicyKeys());
             dto.setHostLimit(0);
             dto.setUserLimit(0);
             return dto;
@@ -116,6 +122,9 @@ public class AccessPolicyService {
     private boolean hasTenantFeature(LicenseEntity license, String featureCode) {
         if (!StringUtils.hasText(featureCode)) {
             return true;
+        }
+        if ("ASSET_STATS".equals(featureCode)) {
+            return licenseGuard.featureNames(license.getEdition()).contains("ASSET");
         }
         return licenseGuard.featureNames(license.getEdition()).contains(featureCode);
     }

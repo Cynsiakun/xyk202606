@@ -7,10 +7,12 @@
     <insert id="insert" parameterType="com.cd.entity.BaselineResultEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO baseline_result (tenant_id, task_id, task_host_id, host_id, rule_id, rule_version, check_key,
                                      status, actual_value, expected_value, message, evidence,
-                                     remediation_status, scan_time, create_time)
+                                     remediation_status, scan_time, create_time,
+                                     asset_type_id, protection_level_id, item_id)
         VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{taskHostId}, #{hostId}, #{ruleId}, #{ruleVersion}, #{checkKey},
                 #{status}, #{actualValue}, #{expectedValue}, #{message}, #{evidence},
-                #{remediationStatus}, #{scanTime}, #{createTime})
+                #{remediationStatus}, #{scanTime}, #{createTime},
+                #{assetTypeId}, #{protectionLevelId}, #{itemId})
     </insert>
 
     <select id="countByTaskHostId" resultType="int">
@@ -33,7 +35,10 @@
                evidence           AS evidence,
                remediation_status AS remediationStatus,
                scan_time          AS scanTime,
-               create_time        AS createTime
+               create_time        AS createTime,
+               asset_type_id      AS assetTypeId,
+               protection_level_id AS protectionLevelId,
+               item_id            AS itemId
         FROM baseline_result
         WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
@@ -57,7 +62,10 @@
                evidence           AS evidence,
                remediation_status AS remediationStatus,
                scan_time          AS scanTime,
-               create_time        AS createTime
+               create_time        AS createTime,
+               asset_type_id      AS assetTypeId,
+               protection_level_id AS protectionLevelId,
+               item_id            AS itemId
         FROM baseline_result
         WHERE tenant_id = #{tenantId}
           AND id IN
@@ -82,7 +90,10 @@
                evidence           AS evidence,
                remediation_status AS remediationStatus,
                scan_time          AS scanTime,
-               create_time        AS createTime
+               create_time        AS createTime,
+               asset_type_id      AS assetTypeId,
+               protection_level_id AS protectionLevelId,
+               item_id            AS itemId
         FROM baseline_result
         WHERE host_id = #{hostId}
           AND rule_id = #{ruleId}
@@ -108,7 +119,10 @@
                evidence           AS evidence,
                remediation_status AS remediationStatus,
                scan_time          AS scanTime,
-               create_time        AS createTime
+               create_time        AS createTime,
+               asset_type_id      AS assetTypeId,
+               protection_level_id AS protectionLevelId,
+               item_id            AS itemId
         FROM baseline_result
         WHERE host_id = #{hostId}
           AND tenant_id = #{tenantId}

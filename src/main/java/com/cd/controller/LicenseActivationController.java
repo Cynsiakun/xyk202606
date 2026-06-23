@@ -6,8 +6,8 @@ import com.cd.dto.ClientMachineValidateResponseDTO;
 import com.cd.dto.LicenseActivateDTO;
 import com.cd.dto.LicenseCurrentDTO;
 import com.cd.dto.LicenseDtoConverter;
+import com.cd.dto.LicenseOfflineResponseDTO;
 import com.cd.dto.LicensePlanResponseDTO;
-import com.cd.dto.LicenseResponseDTO;
 import com.cd.service.LicenseService;
 import com.cd.service.TenantMachineService;
 import jakarta.annotation.security.PermitAll;
@@ -31,8 +31,8 @@ public class LicenseActivationController {
 
     @PermitAll
     @PostMapping("/activate")
-    public Result<LicenseResponseDTO> activate(@Valid @RequestBody LicenseActivateDTO dto) {
-        return Result.success(LicenseDtoConverter.toResponse(licenseService.activate(dto)));
+    public Result<LicenseOfflineResponseDTO> activate(@Valid @RequestBody LicenseActivateDTO dto) {
+        return Result.success(LicenseDtoConverter.toOfflineResponse(licenseService.activate(dto)));
     }
 
     @PermitAll

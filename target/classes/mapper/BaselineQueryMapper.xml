@@ -92,19 +92,37 @@
         SELECT agg.host_id        AS hostId,
                h.hostname         AS hostName,
                h.ipv4             AS ipv4,
+               agg.assetTypes     AS assetTypes,
+               agg.protectionLevels AS protectionLevels,
                agg.complianceRate AS complianceRate,
                agg.passRuleCount  AS passRuleCount,
                agg.failRuleCount  AS failRuleCount,
                agg.errorRuleCount AS errorRuleCount
         FROM (
             SELECT r.host_id,
+                   GROUP_CONCAT(DISTINCT bat.type_code ORDER BY bat.type_code SEPARATOR ',') AS assetTypes,
+                   GROUP_CONCAT(DISTINCT bpl.level_code ORDER BY bpl.level_order SEPARATOR ',') AS protectionLevels,
                    ROUND(SUM(CASE WHEN r.status = 'PASS' THEN 1 ELSE 0 END) * 100 / NULLIF(COUNT(*), 0), 2) AS complianceRate,
                    SUM(CASE WHEN r.status = 'PASS' THEN 1 ELSE 0 END) AS passRuleCount,
                    SUM(CASE WHEN r.status = 'FAIL' THEN 1 ELSE 0 END) AS failRuleCount,
                    SUM(CASE WHEN r.status = 'ERROR' THEN 1 ELSE 0 END) AS errorRuleCount
             FROM baseline_result r
+            LEFT JOIN baseline_asset_type bat ON bat.id = r.asset_type_id
+            LEFT JOIN baseline_protection_level bpl ON bpl.id = r.protection_level_id
             WHERE r.task_id = #{taskId}
               AND r.tenant_id = #{tenantId}
+            <if test="assetTypeCode != null and assetTypeCode != ''">
+              AND (
+                  UPPER(bat.type_code) = #{assetTypeCode}
+                  OR EXISTS (
+                      SELECT 1
+                      FROM baseline_rule_asset_ref ref
+                      JOIN baseline_asset_type ref_type ON ref_type.id = ref.asset_type_id
+                      WHERE ref.rule_id = r.rule_id
+                        AND UPPER(ref_type.type_code) = #{assetTypeCode}
+                  )
+              )
+            </if>
             GROUP BY r.host_id
         ) agg
         LEFT JOIN hosts h ON h.id = agg.host_id AND h.tenant_id = #{tenantId}
@@ -117,8 +135,21 @@
         FROM (
             SELECT r.host_id
             FROM baseline_result r
+            LEFT JOIN baseline_asset_type bat ON bat.id = r.asset_type_id
             WHERE r.task_id = #{taskId}
               AND r.tenant_id = #{tenantId}
+            <if test="assetTypeCode != null and assetTypeCode != ''">
+              AND (
+                  UPPER(bat.type_code) = #{assetTypeCode}
+                  OR EXISTS (
+                      SELECT 1
+                      FROM baseline_rule_asset_ref ref
+                      JOIN baseline_asset_type ref_type ON ref_type.id = ref.asset_type_id
+                      WHERE ref.rule_id = r.rule_id
+                        AND UPPER(ref_type.type_code) = #{assetTypeCode}
+                  )
+              )
+            </if>
             GROUP BY r.host_id
         ) agg
     </select>
@@ -128,6 +159,8 @@
                r.rule_id                    AS ruleId,
                ru.rule_name                 AS ruleName,
                ru.category                  AS category,
+               COALESCE(bat.type_code, ru.asset_type, ru.os_type) AS assetType,
+               bpl.level_code               AS protectionLevel,
                r.check_key                  AS checkKey,
                r.expected_value             AS expectedValue,
                r.actual_value               AS actualValue,
@@ -138,6 +171,8 @@
                r.scan_time                  AS scanTime
         FROM baseline_result r
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        LEFT JOIN baseline_asset_type bat ON bat.id = r.asset_type_id
+        LEFT JOIN baseline_protection_level bpl ON bpl.id = r.protection_level_id
         WHERE r.task_id = #{taskId}
           AND r.host_id = #{hostId}
           AND r.tenant_id = #{tenantId}
@@ -153,6 +188,8 @@
                ru.rule_name          AS ruleName,
                ru.category           AS category,
                ru.severity           AS severity,
+               COALESCE(bat.type_code, ru.asset_type, ru.os_type) AS assetType,
+               bpl.level_code        AS protectionLevel,
                r.check_key           AS checkKey,
                r.status              AS status,
                r.remediation_status  AS remediationStatus,
@@ -169,6 +206,8 @@
         FROM baseline_result r
         LEFT JOIN hosts h ON h.id = r.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        LEFT JOIN baseline_asset_type bat ON bat.id = r.asset_type_id
+        LEFT JOIN baseline_protection_level bpl ON bpl.id = r.protection_level_id
         WHERE r.task_id = #{taskId}
           AND r.tenant_id = #{tenantId}
         ORDER BY r.host_id ASC, r.rule_id ASC, r.id ASC
@@ -183,6 +222,8 @@
                ru.rule_name          AS ruleName,
                ru.category           AS category,
                ru.severity           AS severity,
+               COALESCE(bat.type_code, ru.asset_type, ru.os_type) AS assetType,
+               bpl.level_code        AS protectionLevel,
                r.check_key           AS checkKey,
                r.status              AS status,
                r.remediation_status  AS remediationStatus,
@@ -199,6 +240,8 @@
         FROM baseline_result r
         LEFT JOIN hosts h ON h.id = r.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule ru ON ru.id = r.rule_id
+        LEFT JOIN baseline_asset_type bat ON bat.id = r.asset_type_id
+        LEFT JOIN baseline_protection_level bpl ON bpl.id = r.protection_level_id
         WHERE r.host_id = #{hostId}
           AND r.tenant_id = #{tenantId}
           AND NOT EXISTS (
@@ -220,20 +263,92 @@
     </select>
 
     <select id="selectRuleOptions" resultType="com.cd.dto.BaselineRuleOptionDTO">
-        SELECT id        AS id,
-               rule_code AS ruleCode,
-               rule_name AS ruleName,
-               category  AS category,
-               severity  AS severity
-        FROM baseline_rule
-        WHERE enabled = 1
-          AND status = 'PUBLISHED'
+        SELECT br.id        AS id,
+               br.rule_code AS ruleCode,
+               br.rule_name AS ruleName,
+               br.category  AS category,
+               br.severity  AS severity,
+               COALESCE(
+                   NULLIF((
+                       SELECT GROUP_CONCAT(bat.type_code ORDER BY bat.sort_order ASC, bat.id ASC SEPARATOR ',')
+                       FROM baseline_rule_asset_ref ref
+                       JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+                       WHERE ref.rule_id = br.id
+                         AND bat.enabled = 1
+                   ), ''),
+                   br.asset_type,
+                   br.os_type
+               ) AS assetType,
+               br.protection_level_flag AS protectionLevelFlag
+        FROM baseline_rule br
+        WHERE br.enabled = 1
+          AND br.status = 'PUBLISHED'
         <if test="keyword != null and keyword != ''">
-            AND (rule_code LIKE CONCAT('%', #{keyword}, '%')
-                 OR rule_name LIKE CONCAT('%', #{keyword}, '%')
-                 OR category LIKE CONCAT('%', #{keyword}, '%'))
+            AND (br.rule_code LIKE CONCAT('%', #{keyword}, '%')
+                 OR br.rule_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR br.category LIKE CONCAT('%', #{keyword}, '%'))
         </if>
-        ORDER BY id ASC
+        <if test="assetTypeCodes != null and assetTypeCodes.size() > 0">
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM baseline_rule_asset_ref ref
+                    JOIN baseline_asset_type bat ON bat.id = ref.asset_type_id
+                    WHERE ref.rule_id = br.id
+                      AND bat.enabled = 1
+                      AND bat.type_code IN
+                      <foreach collection="assetTypeCodes" item="assetTypeCode" open="(" separator="," close=")">
+                          #{assetTypeCode}
+                      </foreach>
+                )
+                OR UPPER(COALESCE(br.asset_type, br.os_type, '')) IN
+                <foreach collection="assetTypeCodes" item="assetTypeCode" open="(" separator="," close=")">
+                    #{assetTypeCode}
+                </foreach>
+            )
+        </if>
+        <if test="protectionLevelCode != null and protectionLevelCode != ''">
+            AND (
+                br.protection_level_flag IS NULL
+                OR br.protection_level_flag = ''
+                OR FIND_IN_SET(#{protectionLevelCode}, REPLACE(UPPER(br.protection_level_flag), ' ', '')) &gt; 0
+                OR EXISTS (
+                    SELECT 1
+                    FROM baseline_rule_item bri
+                    JOIN baseline_protection_level bpl ON bpl.id = bri.protection_level_id
+                    WHERE bri.rule_id = br.id
+                      AND bpl.enabled = 1
+                      AND UPPER(bpl.level_code) = #{protectionLevelCode}
+                )
+            )
+        </if>
+        ORDER BY br.id ASC
+    </select>
+
+    <select id="selectProtectionLevels" resultType="com.cd.entity.BaselineProtectionLevelEntity">
+        SELECT id          AS id,
+               level_code  AS levelCode,
+               level_name  AS levelName,
+               level_order AS levelOrder,
+               description AS description,
+               enabled     AS enabled,
+               create_time AS createTime
+        FROM baseline_protection_level
+        WHERE enabled = 1
+        ORDER BY level_order ASC, id ASC
+    </select>
+
+    <select id="selectAssetTypes" resultType="com.cd.entity.BaselineAssetTypeEntity">
+        SELECT id          AS id,
+               type_code   AS typeCode,
+               type_name   AS typeName,
+               category    AS category,
+               sort_order  AS sortOrder,
+               enabled     AS enabled,
+               create_time AS createTime
+        FROM baseline_asset_type
+        WHERE enabled = 1
+        ORDER BY sort_order ASC, id ASC
     </select>
 
     <sql id="hostOverviewFilter">

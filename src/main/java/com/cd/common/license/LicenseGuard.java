@@ -119,6 +119,14 @@ public class LicenseGuard {
         return license.getUserLimit() == null ? planOf(license).userLimit() : license.getUserLimit();
     }
 
+    public boolean isProfessionalOrPlatform() {
+        if (isPlatformTenant()) {
+            return true;
+        }
+        LicenseEntity license = requireEffectiveLicense();
+        return PROFESSIONAL.equalsIgnoreCase(normalizeEdition(license.getEdition()));
+    }
+
     private LicenseEntity requireEffectiveLicense() {
         LicenseEntity license = licenseMapper.selectEffectiveByTenantId(currentTenantId());
         if (license == null) {

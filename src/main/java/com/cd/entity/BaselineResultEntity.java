@@ -29,4 +29,7 @@ public class BaselineResultEntity {
     private String remediationStatus;
     private LocalDateTime scanTime;
     private LocalDateTime createTime;
+    private Long assetTypeId;
+    private Long protectionLevelId;
+    private Long itemId;
 }
