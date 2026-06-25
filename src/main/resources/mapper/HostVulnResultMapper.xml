@@ -598,6 +598,26 @@
         END ASC, hvr.id DESC
     </select>
 
+    <update id="fixByHostIdAndTenant">
+        UPDATE host_vuln_result
+        SET verify_status = 'FIXED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+          AND status = 1
+          AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX')
+    </update>
+
+    <update id="fixByRuleIdAndTenant">
+        UPDATE host_vuln_result
+        SET verify_status = 'FIXED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE rule_id = #{ruleId}
+          AND tenant_id = #{tenantId}
+          AND status = 1
+          AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX')
+    </update>
+
     <select id="selectAffectedHostsByRuleIdAndTenant" resultMap="VulnAffectedHostMap">
         SELECT
             hvr.id AS result_id,

@@ -84,5 +84,11 @@ public interface HostVulnResultMapper {
     int ignoreByResultIds(@Param("ids") List<Long> ids);
 
     int ignoreByResultIdsAndTenant(@Param("ids") List<Long> ids,
-                                   @Param("tenantId") Long tenantId);
+                                    @Param("tenantId") Long tenantId);
+
+    int fixByHostIdAndTenant(@Param("hostId") Long hostId,
+                             @Param("tenantId") Long tenantId);
+
+    int fixByRuleIdAndTenant(@Param("ruleId") Long ruleId,
+                             @Param("tenantId") Long tenantId);
 }

@@ -32,7 +32,11 @@ License 模块基于 `license_plan`（套餐定义表）和 `license`（授权�
 
 ## 资产探测与管理
 
-资产探测管理涵盖账号（`accounts`）、进程（`processes`）、服务（`services`）和 APP（`apps`）四类资产数据。平台通过 `probe_strategy` 表配置探测策略（周期、启禁、端口范围等），`AssetProbeScheduler` 定时扫描在线主机列表，构建探测消息通过 RabbitMQ 下发给各主机 Agent 的专属队列。Agent 执行探测后将结果推回 MQ 对应的资产队列，`AssetDataListener` 解析入库。端口扫描结果存入 `host_asset_inventory` 表并联动指纹识别。每次资产更新后自动触发漏洞规则引擎重新评估。
+资产探测管理涵盖账号（`accounts`）、进程（`processes`）、服务（`services`）和 APP（`apps`）四类资产数据。平台通过 `probe_strategy` 表配置探测策略（周期、启禁、端口范围等），`AssetProbeScheduler` 定时扫描在线主机列表，构建探测消息通过 RabbitMQ 下发给各主机 Agent 的专属队列。Agent 执行探测后将结果推回 MQ 对应的资产队列，`AssetDataListener` 解析入库。每次资产更新后自动触发漏洞规则引擎重新评估。
+
+## 端口扫描与指纹识别
+
+端口扫描流程：管理端通过 `probe_strategy` 表配置扫描周期与范围，定时任务按周期下发 `port_scan` 指令至各主机 Agent（按 MAC 地址路由到专属队列）。Agent 执行扫描后回传开放端口列表，平台接收并入库原始结果。指纹识别模块随后启动，提取端口、服务、banner 等信息，与指纹规则库进行多层匹配（banner 正则 > 端口+服务 > 端口兜底），生成最终的资产清单并关联分类、厂商、产品等属性。结果入库后自动触发漏洞规则引擎重新评估该主机的漏洞风险。
 
 ## 补丁安全
 
@@ -40,7 +44,7 @@ License 模块基于 `license_plan`（套餐定义表）和 `license`（授权�
 
 ## 漏洞检测
 
-漏洞检测基于规则引擎实现，规则定义在 `vuln_rule` 表中，支持按资产类型（OS/APP/SERVICE/PROCESS）和版本号表达式匹配。引擎在资产数据到达后自动触发，也可手动对指定主机进行评估。`VulnRuleEngineImpl.evaluateHostInternal()` 加载主机信息及其关联资产 JSON，遍历所有缓存规则进行名称模糊匹配与版本表达式比对，匹配结果生成 `host_vuln_result`。旧结果标记为 inactive 后批量插入新结果，支持忽略误报和批量处置。
+漏洞检测基于规则引擎实现，规则定义在 `vuln_rule` 表中，支持按资产类型（OS/APP/SERVICE/PROCESS）和版本号表达式匹配。引擎在资产数据到达后自动触发，也可手动对指定主机进行评估。`VulnRuleEngineImpl.evaluateHostInternal()` 加载主机信息及其关联资产 JSON，遍历所有缓存规则进行名称模糊匹配与版本表达式比对，匹配结果生成 `host_vuln_result`。旧结果标记为 inactive 后批量插入新结果，支持忽略误报、批量验证和**一键修复**。修复为演示需要直接置 verify_status 为 FIXED，后续可扩展为下发真实修复指令。
 
 ## 日志安全
 

@@ -84,4 +84,20 @@ public class VulnDetectionController {
         int updated = vulnDetectionService.ignoreResults(request.getResultIds());
         return Result.success(Map.of("updated", updated));
     }
+
+    @PreAuthorize("@perm.has('vuln-detection:analyze')")
+    @PostMapping("/hosts/{hostId}/fix")
+    public Result<Map<String, Object>> fixHost(
+            @PathVariable @Min(value = 1, message = "hostId必须大于0") Long hostId) {
+        int updated = vulnDetectionService.fixHost(hostId);
+        return Result.success(Map.of("updated", updated));
+    }
+
+    @PreAuthorize("@perm.has('vuln-detection:analyze')")
+    @PostMapping("/vulnerabilities/{ruleId}/fix")
+    public Result<Map<String, Object>> fixByRuleId(
+            @PathVariable @Min(value = 1, message = "ruleId必须大于0") Long ruleId) {
+        int updated = vulnDetectionService.fixByRuleId(ruleId);
+        return Result.success(Map.of("updated", updated));
+    }
 }

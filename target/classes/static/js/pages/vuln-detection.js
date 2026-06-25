@@ -34,6 +34,12 @@ layui.use(["layer"], function () {
         },
         vulnHosts: function (ruleId) {
             return "/api/vuln-detection/vulnerabilities/" + ruleId + "/hosts";
+        },
+        fixHost: function (hostId) {
+            return "/api/vuln-detection/hosts/" + hostId + "/fix";
+        },
+        fixVuln: function (ruleId) {
+            return "/api/vuln-detection/vulnerabilities/" + ruleId + "/fix";
         }
     };
 
@@ -132,6 +138,17 @@ layui.use(["layer"], function () {
                 return;
             }
 
+            var fixHostButton = event.target.closest("[data-action='fix-host']");
+            if (fixHostButton) {
+                event.stopPropagation();
+                var hostId = fixHostButton.dataset.hostId;
+                var count = fixHostButton.dataset.count || "0";
+                confirmAction("一键修复", "将修复该主机上 " + count + " 条已验证漏洞，确认继续？", function () {
+                    fixHost(hostId, fixHostButton);
+                });
+                return;
+            }
+
             var detailButton = event.target.closest("[data-action='view-detail']");
             if (detailButton) {
                 event.stopPropagation();
@@ -182,6 +199,16 @@ layui.use(["layer"], function () {
                 var ruleId = vulnVerify.dataset.ruleId;
                 confirmAction("一键下发验证", "将对该漏洞的所有可验证主机下发任务，确认继续？", function () {
                     verifyRule(ruleId, vulnVerify);
+                });
+                return;
+            }
+
+            var vulnFix = event.target.closest("[data-action='fix-vuln']");
+            if (vulnFix) {
+                var ruleId = vulnFix.dataset.ruleId;
+                var count = vulnFix.dataset.count || "0";
+                confirmAction("一键修复", "将修复该漏洞下 " + count + " 条已验证结果，确认继续？", function () {
+                    fixVuln(ruleId, vulnFix);
                 });
                 return;
             }
@@ -478,6 +505,7 @@ layui.use(["layer"], function () {
             + '<div class="host-actions">'
             + '<button type="button" class="ghost-btn" data-action="toggle-vuln-hosts" data-rule-id="' + escapeHtml(ruleId) + '">' + (expanded ? "收起影响主机" : "查看影响主机") + '</button>'
             + '<button type="button" class="solid-btn" data-action="verify-vuln" data-rule-id="' + escapeHtml(ruleId) + '"' + (total > 0 ? "" : " disabled") + '>一键下发验证</button>'
+            + (repair > 0 ? '<button type="button" class="solid-btn fix-btn" data-action="fix-vuln" data-count="' + repair + '" data-rule-id="' + escapeHtml(ruleId) + '">一键修复</button>' : '')
             + '</div>'
             + '</div>'
             + '<div class="affected-host-panel' + (expanded ? ' is-open' : '') + '" id="affectedHosts-' + escapeHtml(ruleId) + '">'
@@ -561,6 +589,7 @@ layui.use(["layer"], function () {
             + '<div class="host-actions">'
             + '<button type="button" class="ghost-btn" data-action="view-detail" data-host-id="' + escapeHtml(hostId) + '">查看漏洞</button>'
             + '<button type="button" class="solid-btn" data-action="verify-host" data-retry="' + retry + '" data-host-id="' + escapeHtml(hostId) + '"' + disabled + '>' + actionText + '</button>'
+            + (verified > 0 ? '<button type="button" class="solid-btn fix-btn" data-action="fix-host" data-count="' + verified + '" data-host-id="' + escapeHtml(hostId) + '">一键修复</button>' : '')
             + '</div>'
             + '</div>'
             + '</article>';
@@ -753,6 +782,25 @@ layui.use(["layer"], function () {
             var result = await AppRequest.request(API.verifyHost(hostId), {method: "POST"});
             showDispatchMessage(result);
             await refreshPage(false, false);
+        });
+    }
+
+    async function fixHost(hostId, button) {
+        await withButtonLoading(button, async function () {
+            var result = await AppRequest.request(API.fixHost(hostId), {method: "POST"});
+            var updated = numberValue(result.data && result.data.updated);
+            AppRequest.showMessage("已修复 " + updated + " 条漏洞", updated > 0 ? 1 : 0, 1800);
+            await refreshPage(false, false);
+        });
+    }
+
+    async function fixVuln(ruleId, button) {
+        await withButtonLoading(button, async function () {
+            var result = await AppRequest.request(API.fixVuln(ruleId), {method: "POST"});
+            var updated = numberValue(result.data && result.data.updated);
+            AppRequest.showMessage("已修复 " + updated + " 条漏洞", updated > 0 ? 1 : 0, 1800);
+            await refreshPage(false, false);
+            await reloadExpandedAffectedHosts();
         });
     }
 

@@ -89,6 +89,22 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
         return hostVulnResultMapper.selectActiveByHostIdAndTenant(hostId, currentTenantId());
     }
 
+    @Override
+    public int fixHost(Long hostId) {
+        if (hostId == null || hostId <= 0) {
+            return 0;
+        }
+        return hostVulnResultMapper.fixByHostIdAndTenant(hostId, currentTenantId());
+    }
+
+    @Override
+    public int fixByRuleId(Long ruleId) {
+        if (ruleId == null || ruleId <= 0) {
+            return 0;
+        }
+        return hostVulnResultMapper.fixByRuleIdAndTenant(ruleId, currentTenantId());
+    }
+
     private Long currentTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         return tenantId == null ? 0L : tenantId;
