@@ -44,7 +44,7 @@ License 模块基于 `license_plan`（套餐定义表）和 `license`（授权�
 
 ## 漏洞检测
 
-漏洞检测基于规则引擎实现，规则定义在 `vuln_rule` 表中，支持按资产类型（OS/APP/SERVICE/PROCESS）和版本号表达式匹配。引擎在资产数据到达后自动触发，也可手动对指定主机进行评估。`VulnRuleEngineImpl.evaluateHostInternal()` 加载主机信息及其关联资产 JSON，遍历所有缓存规则进行名称模糊匹配与版本表达式比对，匹配结果生成 `host_vuln_result`。旧结果标记为 inactive 后批量插入新结果，支持忽略误报、批量验证和**一键修复**。修复为演示需要直接置 verify_status 为 FIXED，后续可扩展为下发真实修复指令。
+漏洞检测基于规则引擎实现，规则定义在 `vuln_rule` 表中，支持按资产类型（OS/APP/SERVICE/PROCESS）和版本号表达式匹配。引擎在资产数据到达后自动触发，也可手动对指定主机进行评估。`VulnRuleEngineImpl.evaluateHostInternal()` 加载主机信息及其关联资产 JSON，遍历所有缓存规则进行名称模糊匹配与版本表达式比对，匹配结果生成 `host_vuln_result`。旧结果标记为 inactive 后批量插入新结果，支持忽略误报、批量验证和一键修复。修复流程为：已验证漏洞 → 点击一键修复后状态变为 REPAIR_PENDING（修复中），`VulnFixProgressScheduler` 定时扫描 15 秒前进入修复状态的记录，自动推进为 FIXED（已修复），形成规范的检测→验证→修复→已修复闭环。
 
 ## 日志安全
 

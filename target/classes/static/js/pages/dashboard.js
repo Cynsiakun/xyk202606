@@ -94,8 +94,9 @@ layui.use(["layer"], function () {
             {name: "High", itemStyle: {color: "#fb7185"}},
             {name: "Critical", itemStyle: {color: "#f97316"}}
         ];
-        var data = nodes.map(function (node) {
+        var data = nodes.map(function (node, index) {
             return {
+                id: "host-" + index,
                 name: node.hostName || ("Host#" + (node.hostId || "")),
                 value: Math.max(16, Math.min(82, 18 + (node.assetCount || 0) * 0.16 + (node.riskScore || 0) * 0.45)),
                 category: riskCategoryIndex(node.riskLevel),
