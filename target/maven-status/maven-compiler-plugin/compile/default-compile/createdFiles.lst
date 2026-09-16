@@ -193,6 +193,7 @@ com\cd\service\BaselineCheckDataService.class
 com\cd\service\impl\RiskLevelEvaluatorImpl$RiskLevel.class
 com\cd\mapper\SecurityLogCenterMapper.class
 com\cd\entity\HostEntity.class
+com\cd\task\VulnVerificationTimeoutScheduler.class
 com\cd\service\impl\SecurityLogCenterServiceImpl.class
 com\cd\common\ai\AiProperties$AssetAnalysis.class
 com\cd\dto\PatchRiskHostDTO.class

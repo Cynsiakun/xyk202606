@@ -8,6 +8,7 @@ import com.cd.dto.LicenseCurrentDTO;
 import com.cd.dto.LicenseDtoConverter;
 import com.cd.dto.LicenseOfflineResponseDTO;
 import com.cd.dto.LicensePlanResponseDTO;
+import com.cd.service.ActivationCodeService;
 import com.cd.service.LicenseService;
 import com.cd.service.TenantMachineService;
 import jakarta.annotation.security.PermitAll;
@@ -28,10 +29,14 @@ public class LicenseActivationController {
 
     private final LicenseService licenseService;
     private final TenantMachineService tenantMachineService;
+    private final ActivationCodeService activationCodeService;
 
     @PermitAll
     @PostMapping("/activate")
     public Result<LicenseOfflineResponseDTO> activate(@Valid @RequestBody LicenseActivateDTO dto) {
+        if (dto.getActivationCode() != null && !dto.getActivationCode().isBlank()) {
+            return Result.success(activationCodeService.activate(dto));
+        }
         return Result.success(LicenseDtoConverter.toOfflineResponse(licenseService.activate(dto)));
     }
 

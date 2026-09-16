@@ -55,4 +55,7 @@ public interface AppMapper {
 
     AppEntity selectLatestByMacAndTenant(@Param("macAddress") String macAddress,
                                          @Param("tenantId") Long tenantId);
+
+    AppEntity selectLatestNonEmptyByMacAndTenant(@Param("macAddress") String macAddress,
+                                                 @Param("tenantId") Long tenantId);
 }

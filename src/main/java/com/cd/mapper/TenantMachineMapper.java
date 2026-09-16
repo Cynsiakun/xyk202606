@@ -31,7 +31,11 @@ public interface TenantMachineMapper {
                                                  @Param("keyword") String keyword,
                                                  @Param("tenantId") Long tenantId);
 
+    List<TenantMachineEntity> selectActivatedByTenant(@Param("tenantId") Long tenantId);
+
     long countAllByTenant(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
 
     long countEnabledByTenant(@Param("tenantId") Long tenantId);
+
+    long countActivatedByTenant(@Param("tenantId") Long tenantId);
 }

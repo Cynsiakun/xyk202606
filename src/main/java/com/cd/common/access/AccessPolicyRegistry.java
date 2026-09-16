@@ -32,6 +32,7 @@ public class AccessPolicyRegistry {
         tenant("TENANT_VULN_DASHBOARD_VIEW", "VULN", AccessOperation.VIEW, "vuln-ops-dashboard:view", true);
         tenant("TENANT_LOG_VIEW", "LOG", AccessOperation.VIEW, "security-log:view", true);
         tenant("TENANT_BASELINE_VIEW", "BASELINE", AccessOperation.VIEW, "baseline:view", true);
+        tenant("TENANT_BASELINE_WORKORDER_VIEW", "BASELINE", AccessOperation.VIEW, "workorder:view", true);
         tenant("TENANT_USER_VIEW", "USER", AccessOperation.VIEW, "user:view", true);
         tenant("TENANT_USER_CREATE", "USER", AccessOperation.CREATE, "user:create", false);
         tenant("TENANT_USER_ASSIGN_ROLE", "USER", AccessOperation.ASSIGN, "user:role:assign", false);

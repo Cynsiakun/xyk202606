@@ -12,6 +12,10 @@ public interface HostVulnTaskMapper {
     HostVulnTaskEntity selectByIdAndTenant(@Param("id") Long id,
                                            @Param("tenantId") Long tenantId);
 
+    int countByHostAndStatusAndTenant(@Param("hostId") Long hostId,
+                                      @Param("status") Integer status,
+                                      @Param("tenantId") Long tenantId);
+
     int updateStatus(@Param("id") Long id,
                      @Param("status") Integer status,
                      @Param("summaryJson") String summaryJson);

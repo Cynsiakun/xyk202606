@@ -55,4 +55,7 @@ public interface ProcessMapper {
 
     ProcessEntity selectLatestByMacAndTenant(@Param("macAddress") String macAddress,
                                              @Param("tenantId") Long tenantId);
+
+    ProcessEntity selectLatestNonEmptyByMacAndTenant(@Param("macAddress") String macAddress,
+                                                     @Param("tenantId") Long tenantId);
 }

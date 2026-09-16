@@ -15,6 +15,8 @@ import com.cd.mapper.AppMapper;
 import com.cd.mapper.BaselineCheckDataMapper;
 import com.cd.mapper.BaselineTaskMapper;
 import com.cd.mapper.HostMapper;
+import com.cd.mapper.HostVulnResultMapper;
+import com.cd.mapper.HostVulnTaskMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.PortScanResultMapper;
 import com.cd.mapper.ProcessMapper;
@@ -46,6 +48,8 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_CLIENT = "CLIENT";
+    private static final String VERIFYING = "VERIFYING";
+    private static final int TASK_STATUS_RUNNING = 1;
 
     private final AgentResultOperationMapper agentResultOperationMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
@@ -57,6 +61,8 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
     private final PortScanResultMapper portScanResultMapper;
     private final BaselineCheckDataMapper baselineCheckDataMapper;
     private final BaselineTaskMapper baselineTaskMapper;
+    private final HostVulnResultMapper hostVulnResultMapper;
+    private final HostVulnTaskMapper hostVulnTaskMapper;
     private final PatchScanService patchScanService;
     private final PortFingerprintService portFingerprintService;
     private final VulnRuleEngine vulnRuleEngine;
@@ -124,7 +130,7 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
                         queueName,
                         buildPatchPayload(root, resultNode, macAddress)
                 );
-                case "asset_scan" -> handleAssetScan(operationId, tenantId, hostName, macAddress, resultNode);
+                case "asset_scan" -> handleAssetScan(operationId, tenantId, hostName, macAddress, requestNode, resultNode);
                 case "port_scan" -> handlePortScan(operationId, tenantId, hostName, macAddress, requestNode, resultNode);
                 case "baseline_scan" -> handleBaselineScan(queueName, tenantId, host, root, resultNode);
                 default -> saveError(queueName, message, "Unsupported type: " + type, tenantId);
@@ -246,11 +252,12 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
                                  Long tenantId,
                                  String hostName,
                                  String macAddress,
+                                 JsonNode requestNode,
                                  JsonNode resultNode) {
-        insertAssetRecord(operationId, tenantId, hostName, macAddress, resultNode, "accounts");
-        insertAssetRecord(operationId, tenantId, hostName, macAddress, resultNode, "services");
-        insertAssetRecord(operationId, tenantId, hostName, macAddress, resultNode, "processes");
-        insertAssetRecord(operationId, tenantId, hostName, macAddress, resultNode, "apps");
+        insertAssetRecord(operationId, tenantId, hostName, macAddress, requestNode, resultNode, "accounts");
+        insertAssetRecord(operationId, tenantId, hostName, macAddress, requestNode, resultNode, "services");
+        insertAssetRecord(operationId, tenantId, hostName, macAddress, requestNode, resultNode, "processes");
+        insertAssetRecord(operationId, tenantId, hostName, macAddress, requestNode, resultNode, "apps");
         hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
         triggerStaticVulnMatch(macAddress, tenantId);
     }
@@ -259,8 +266,12 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
                                    Long tenantId,
                                    String hostName,
                                    String macAddress,
+                                   JsonNode requestNode,
                                    JsonNode resultNode,
                                    String fieldName) {
+        if (!shouldPersistAssetRecord(requestNode, fieldName)) {
+            return;
+        }
         JsonNode arrayNode = resultNode.path(fieldName);
         if (!arrayNode.isArray()) {
             return;
@@ -316,6 +327,39 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
             default -> {
             }
         }
+    }
+
+    private boolean shouldPersistAssetRecord(JsonNode requestNode, String fieldName) {
+        if (requestNode == null || requestNode.isMissingNode() || requestNode.isNull()) {
+            return true;
+        }
+
+        String requestField = switch (fieldName) {
+            case "accounts" -> "account";
+            case "services" -> "service";
+            case "processes" -> "process";
+            case "apps" -> "app";
+            default -> null;
+        };
+        if (!StringUtils.hasText(requestField)) {
+            return true;
+        }
+
+        JsonNode flagNode = requestNode.path(requestField);
+        if (flagNode.isMissingNode() || flagNode.isNull()) {
+            return true;
+        }
+        if (flagNode.isBoolean()) {
+            return flagNode.asBoolean();
+        }
+        if (flagNode.isInt() || flagNode.isLong()) {
+            return flagNode.asInt() == 1;
+        }
+        if (flagNode.isTextual()) {
+            String value = flagNode.asText("").trim().toLowerCase(Locale.ROOT);
+            return "1".equals(value) || "true".equals(value) || "yes".equals(value) || "on".equals(value);
+        }
+        return false;
     }
 
     private void handlePortScan(String operationId,
@@ -440,10 +484,21 @@ public class AgentUnifiedResultServiceImpl implements AgentUnifiedResultService 
             if (host == null || host.getId() == null) {
                 return;
             }
+            if (hasOngoingVerification(host.getId(), resolvedTenantId)) {
+                log.info("host {} has ongoing vuln verification, skip client-result-triggered rematch", host.getId());
+                return;
+            }
             vulnRuleEngine.evaluateHostForTenant(host.getId(), resolvedTenantId);
         } catch (Exception e) {
             log.warn("Post-ingest vuln rematch failed for mac={}", macAddress, e);
         }
+    }
+
+    private boolean hasOngoingVerification(Long hostId, Long tenantId) {
+        if (hostVulnResultMapper.countActiveByHostAndVerifyStatusAndTenant(hostId, VERIFYING, tenantId) > 0) {
+            return true;
+        }
+        return hostVulnTaskMapper.countByHostAndStatusAndTenant(hostId, TASK_STATUS_RUNNING, tenantId) > 0;
     }
 
     private void saveError(String queueName, String rawMessage, String errorReason, Long tenantId) {

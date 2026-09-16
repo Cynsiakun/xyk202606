@@ -94,9 +94,13 @@ layui.use(["layer"], function () {
             {name: "High", itemStyle: {color: "#fb7185"}},
             {name: "Critical", itemStyle: {color: "#f97316"}}
         ];
-        var data = nodes.map(function (node) {
+        var data = nodes.map(function (node, index) {
+            var displayName = node.hostName || ("Host#" + (node.hostId || ""));
+            var nodeId = buildStarNodeId(node, index);
             return {
-                name: node.hostName || ("Host#" + (node.hostId || "")),
+                id: nodeId,
+                name: nodeId,
+                displayName: displayName,
                 value: Math.max(16, Math.min(82, 18 + (node.assetCount || 0) * 0.16 + (node.riskScore || 0) * 0.45)),
                 category: riskCategoryIndex(node.riskLevel),
                 host: node
@@ -143,7 +147,10 @@ layui.use(["layer"], function () {
                 label: {
                     show: true,
                     color: "#e8f2ff",
-                    fontSize: 11
+                    fontSize: 11,
+                    formatter: function (params) {
+                        return params.data && params.data.displayName ? params.data.displayName : "-";
+                    }
                 },
                 lineStyle: {
                     color: "rgba(61, 225, 255, 0.18)",
@@ -151,7 +158,7 @@ layui.use(["layer"], function () {
                     curveness: 0.18
                 },
                 edgeSymbol: ["none", "none"],
-                links: buildRingLinks(nodes),
+                links: buildRingLinks(data),
                 itemStyle: {
                     borderColor: "rgba(255,255,255,0.32)",
                     borderWidth: 1.4,
@@ -441,10 +448,23 @@ layui.use(["layer"], function () {
         }
         return nodes.map(function (node, index) {
             return {
-                source: index,
-                target: (index + 1) % nodes.length
+                source: node.id,
+                target: nodes[(index + 1) % nodes.length].id
             };
         });
+    }
+
+    function buildStarNodeId(node, index) {
+        if (node && node.hostId != null) {
+            return "host-" + node.hostId;
+        }
+        if (node && node.ipv4) {
+            return "ip-" + node.ipv4 + "-" + index;
+        }
+        if (node && node.hostName) {
+            return "name-" + node.hostName + "-" + index;
+        }
+        return "node-" + index;
     }
 
     function buildStarCenterGraphic(starRing) {

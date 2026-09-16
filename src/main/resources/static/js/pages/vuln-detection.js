@@ -679,11 +679,14 @@ layui.use(["layer"], function () {
         var retry = state.key === "verifying";
         var actionText = retry ? "重新验证" : "下发验证";
         var checked = selected[String(row.resultId)] ? " checked" : "";
+        var matchedCount = numberValue(row.matchedItemCount);
+        var matchedSummary = buildMatchedItemSummary(row);
         return '<div class="affected-host-row">'
             + '<label class="affected-check"><input type="checkbox" data-action="select-result" data-rule-id="' + escapeHtml(ruleId) + '" data-result-id="' + escapeHtml(row.resultId || "") + '"' + checked + '></label>'
             + '<div class="affected-host-main">'
             + '<strong>' + escapeHtml(row.hostname || ("Host #" + (row.hostId || "-"))) + '</strong>'
             + '<span>' + escapeHtml(row.ipv4 || "-") + ' · ' + escapeHtml(row.macAddress || "-") + '</span>'
+            + (matchedCount > 1 || matchedSummary ? '<div class="affected-host-hit">命中 ' + matchedCount + ' 项' + (matchedSummary ? ' · ' + escapeHtml(matchedSummary) : '') + '</div>' : '')
             + '</div>'
             + renderStatusTag(state)
             + '<button type="button" class="solid-btn small" data-action="verify-vuln-host" data-retry="' + retry + '" data-result-id="' + escapeHtml(row.resultId || "") + '">' + actionText + '</button>'
@@ -789,7 +792,7 @@ layui.use(["layer"], function () {
         await withButtonLoading(button, async function () {
             var result = await AppRequest.request(API.fixHost(hostId), {method: "POST"});
             var updated = numberValue(result.data && result.data.updated);
-            AppRequest.showMessage("已修复 " + updated + " 条漏洞", updated > 0 ? 1 : 0, 1800);
+            AppRequest.showMessage("已下发修复任务，" + updated + " 条", 1, 2000);
             await refreshPage(false, false);
         });
     }
@@ -798,7 +801,7 @@ layui.use(["layer"], function () {
         await withButtonLoading(button, async function () {
             var result = await AppRequest.request(API.fixVuln(ruleId), {method: "POST"});
             var updated = numberValue(result.data && result.data.updated);
-            AppRequest.showMessage("已修复 " + updated + " 条漏洞", updated > 0 ? 1 : 0, 1800);
+            AppRequest.showMessage("已下发修复任务，" + updated + " 条", 1, 2000);
             await refreshPage(false, false);
             await reloadExpandedAffectedHosts();
         });
@@ -991,7 +994,7 @@ layui.use(["layer"], function () {
         var normalized = String(verifyStatus || "").toUpperCase();
         if (normalized === "VERIFYING") return {key: "verifying", label: "验证中"};
         if (normalized === "VERIFIED" || normalized === "NOT_AFFECTED") return {key: "verified", label: "已验证"};
-        if (normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "待修复"};
+        if (normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "修复中"};
         if (normalized === "FIXED") return {key: "fixed", label: "已修复"};
         return {key: "pending", label: "待验证"};
     }
@@ -1000,7 +1003,7 @@ layui.use(["layer"], function () {
         if (Number(status) === 0) return {key: "fixed", label: "已修复"};
         var normalized = String(verifyStatus || "").toUpperCase();
         if (normalized === "VERIFYING") return {key: "verifying", label: "验证中"};
-        if (normalized === "VERIFIED" || normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "待修复"};
+        if (normalized === "VERIFIED" || normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "修复中"};
         if (normalized === "FIXED" || normalized === "NOT_AFFECTED") return {key: "fixed", label: "已修复"};
         return {key: "pending", label: "待验证"};
     }
@@ -1060,6 +1063,18 @@ layui.use(["layer"], function () {
         } catch (error) {
             return String(value);
         }
+    }
+
+    function buildMatchedItemSummary(row) {
+        var summary = String(row && row.matchedItemSummary ? row.matchedItemSummary : "").trim();
+        if (!summary) return "";
+        return truncateText(summary, 72);
+    }
+
+    function truncateText(text, maxLength) {
+        var value = String(text == null ? "" : text);
+        if (!maxLength || value.length <= maxLength) return value;
+        return value.slice(0, Math.max(0, maxLength - 1)) + "…";
     }
 
     function sum() {

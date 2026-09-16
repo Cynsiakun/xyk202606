@@ -19,6 +19,10 @@ public interface HostVulnResultMapper {
     int markInactiveByHostIdAndTenant(@Param("hostId") Long hostId,
                                       @Param("tenantId") Long tenantId);
 
+    int countActiveByHostAndVerifyStatusAndTenant(@Param("hostId") Long hostId,
+                                                  @Param("verifyStatus") String verifyStatus,
+                                                  @Param("tenantId") Long tenantId);
+
     List<HostVulnResultEntity> selectActiveByHostId(@Param("hostId") Long hostId);
 
     List<HostVulnResultEntity> selectActiveByHostIdAndTenant(@Param("hostId") Long hostId,
@@ -81,6 +85,9 @@ public interface HostVulnResultMapper {
     List<VulnAffectedHostDTO> selectAffectedHostsByRuleIdAndTenant(@Param("ruleId") Long ruleId,
                                                                    @Param("tenantId") Long tenantId);
 
+    List<Long> selectGroupedResultIdsByResultIdsAndTenant(@Param("ids") List<Long> ids,
+                                                          @Param("tenantId") Long tenantId);
+
     int ignoreByResultIds(@Param("ids") List<Long> ids);
 
     int ignoreByResultIdsAndTenant(@Param("ids") List<Long> ids,
@@ -91,4 +98,12 @@ public interface HostVulnResultMapper {
 
     int fixByRuleIdAndTenant(@Param("ruleId") Long ruleId,
                              @Param("tenantId") Long tenantId);
+
+    int completeRepairingByTenant(@Param("tenantId") Long tenantId,
+                                  @Param("thresholdSeconds") int thresholdSeconds);
+
+    int resetVerifyingTimeoutByTenant(@Param("tenantId") Long tenantId,
+                                      @Param("thresholdSeconds") int thresholdSeconds,
+                                      @Param("fromStatus") String fromStatus,
+                                      @Param("toStatus") String toStatus);
 }

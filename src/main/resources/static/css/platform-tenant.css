@@ -49,6 +49,22 @@
     padding-right: 0;
 }
 
+.activation-panel {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color, #edf1f7);
+}
+
+.activation-panel-head {
+    margin-bottom: 12px;
+}
+
+.activation-code-value {
+    font-family: Consolas, "Courier New", monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
 @media (max-width: 640px) {
     .license-panel-head {
         align-items: flex-start;

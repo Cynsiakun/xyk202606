@@ -83,6 +83,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\controller\PortScanController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\RbacController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\SecurityEventController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\SecurityLogCenterController.java
+C:\DATA\2026实训\java\src\main\java\com\cd\controller\TenantLicenseCenterController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TenantMachineController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TenantPublicController.java
 C:\DATA\2026实训\java\src\main\java\com\cd\controller\TestController.java
@@ -98,6 +99,8 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountChangeLogQueryDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountChangeLogStatDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountRiskAnalysisDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AccountRiskSnapshotDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\ActivationCodeCreateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\ActivationCodeResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiChatResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AiTestRequestDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\AlertIdsDTO.java
@@ -189,6 +192,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\SysRoleUpdateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantCreateDTO.java
+C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantLicenseOverviewDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantMachineCreateDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantMachineResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\TenantMachineUpdateDTO.java
@@ -224,6 +228,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationRuleDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\dto\VulnVerificationTaskResponseDTO.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountChangeLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AccountEntity.java
+C:\DATA\2026实训\java\src\main\java\com\cd\entity\ActivationCodeEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AgentResultOperationEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AppEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\entity\AssetExportLogEntity.java
@@ -271,6 +276,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\entity\WindowsEventLogEntity.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountChangeLogMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountChangeLogViewMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AccountMapper.java
+C:\DATA\2026实训\java\src\main\java\com\cd\mapper\ActivationCodeMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AgentResultOperationMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AppMapper.java
 C:\DATA\2026实训\java\src\main\java\com\cd\mapper\AssetExportLogMapper.java
@@ -342,6 +348,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\rule\impl\PendingRebootRule.java
 C:\DATA\2026实训\java\src\main\java\com\cd\rule\PatchRiskRule.java
 C:\DATA\2026实训\java\src\main\java\com\cd\security\SecurityEventContext.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AccountChangeLogViewService.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\ActivationCodeService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AgentUnifiedResultService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AiService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\AssetAiAnalysisService.java
@@ -361,6 +368,7 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\BaselineWorkorderService.ja
 C:\DATA\2026实训\java\src\main\java\com\cd\service\DashboardService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\HostService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AccountChangeLogViewServiceImpl.java
+C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\ActivationCodeServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AgentCommandCleanupService.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AgentUnifiedResultServiceImpl.java
 C:\DATA\2026实训\java\src\main\java\com\cd\service\impl\AssetAiAnalysisServiceImpl.java
@@ -441,6 +449,8 @@ C:\DATA\2026实训\java\src\main\java\com\cd\service\VulnVerificationService.jav
 C:\DATA\2026实训\java\src\main\java\com\cd\task\AlertBroadcastTask.java
 C:\DATA\2026实训\java\src\main\java\com\cd\task\AssetProbeScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\task\HostStatusScheduler.java
+C:\DATA\2026实训\java\src\main\java\com\cd\task\VulnFixProgressScheduler.java
+C:\DATA\2026实训\java\src\main\java\com\cd\task\VulnVerificationTimeoutScheduler.java
 C:\DATA\2026实训\java\src\main\java\com\cd\ThreatPlatformApplication.java
 C:\DATA\2026实训\java\src\main\java\com\cd\util\BaselineWindowsPathNormalizer.java
 C:\DATA\2026实训\java\src\main\java\com\cd\util\CsvImportUtil.java

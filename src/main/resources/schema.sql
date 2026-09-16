@@ -981,6 +981,25 @@ CREATE TABLE IF NOT EXISTS tenant_machine (
     KEY idx_tenant_machine_status (status)
 );
 
+CREATE TABLE IF NOT EXISTS activation_code (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id BIGINT NOT NULL,
+    license_id BIGINT NULL,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    status VARCHAR(16) NOT NULL DEFAULT 'NEW',
+    expire_time DATETIME NOT NULL,
+    bound_machine_id VARCHAR(128) NULL,
+    bound_mac_address VARCHAR(64) NULL,
+    bound_host_name VARCHAR(255) NULL,
+    used_at DATETIME NULL,
+    created_by BIGINT NULL,
+    remark VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_activation_code_tenant (tenant_id),
+    KEY idx_activation_code_status (status)
+);
+
 INSERT INTO sys_permission (permission_code, permission_name, permission_type, path, status)
 SELECT 'tenant-machine:view', '查看授权主机', 'API', '/api/tenant-machines/list', 1
 WHERE NOT EXISTS (SELECT 1 FROM sys_permission WHERE permission_code = 'tenant-machine:view');

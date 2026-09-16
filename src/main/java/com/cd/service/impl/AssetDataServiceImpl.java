@@ -9,6 +9,8 @@ import com.cd.entity.ServiceEntity;
 import com.cd.mapper.AccountMapper;
 import com.cd.mapper.AppMapper;
 import com.cd.mapper.HostMapper;
+import com.cd.mapper.HostVulnResultMapper;
+import com.cd.mapper.HostVulnTaskMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.ProcessMapper;
 import com.cd.mapper.ServiceMapper;
@@ -35,6 +37,8 @@ public class AssetDataServiceImpl implements AssetDataService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_PLATFORM = "PLATFORM";
+    private static final String VERIFYING = "VERIFYING";
+    private static final int TASK_STATUS_RUNNING = 1;
 
     private final AccountMapper accountMapper;
     private final ServiceMapper serviceMapper;
@@ -42,6 +46,8 @@ public class AssetDataServiceImpl implements AssetDataService {
     private final AppMapper appMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final HostMapper hostMapper;
+    private final HostVulnResultMapper hostVulnResultMapper;
+    private final HostVulnTaskMapper hostVulnTaskMapper;
     private final VulnRuleEngine vulnRuleEngine;
 
     @Override
@@ -195,6 +201,10 @@ public class AssetDataServiceImpl implements AssetDataService {
                 log.warn("资产入库后未找到主机，跳过静态漏洞匹配: mac={}", macAddress);
                 return;
             }
+            if (hasOngoingVerification(host.getId(), resolvedTenantId)) {
+                log.info("host {} has ongoing vuln verification, skip asset-triggered rematch", host.getId());
+                return;
+            }
             vulnRuleEngine.evaluateHostForTenant(host.getId(), resolvedTenantId);
         } catch (Exception e) {
             log.warn("资产入库后静态漏洞匹配失败: mac={}", macAddress, e);
@@ -202,6 +212,13 @@ public class AssetDataServiceImpl implements AssetDataService {
     }
 
     /** 队列名 → type 值映射。 */
+    private boolean hasOngoingVerification(Long hostId, Long tenantId) {
+        if (hostVulnResultMapper.countActiveByHostAndVerifyStatusAndTenant(hostId, VERIFYING, tenantId) > 0) {
+            return true;
+        }
+        return hostVulnTaskMapper.countByHostAndStatusAndTenant(hostId, TASK_STATUS_RUNNING, tenantId) > 0;
+    }
+
     private String queueToType(String queueName) {
         return switch (queueName) {
             case "account_queue" -> "account";

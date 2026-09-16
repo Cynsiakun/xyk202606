@@ -157,4 +157,15 @@
         ORDER BY id DESC
         LIMIT 1
     </select>
+
+    <select id="selectLatestNonEmptyByMacAndTenant" resultMap="AppResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM apps
+        WHERE deleted = 0
+          AND mac_address = #{macAddress}
+          AND tenant_id = #{tenantId}
+          AND COALESCE(asset_count, 0) > 0
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
 </mapper>

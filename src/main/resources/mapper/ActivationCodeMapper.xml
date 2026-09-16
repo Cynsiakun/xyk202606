@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.ActivationCodeMapper">
+
+    <resultMap id="ActivationCodeEntityResultMap" type="com.cd.entity.ActivationCodeEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="license_id" property="licenseId"/>
+        <result column="code" property="code"/>
+        <result column="status" property="status"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="bound_machine_id" property="boundMachineId"/>
+        <result column="bound_mac_address" property="boundMacAddress"/>
+        <result column="bound_host_name" property="boundHostName"/>
+        <result column="used_at" property="usedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="remark" property="remark"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, tenant_id, license_id, code, status, expire_time, bound_machine_id, bound_mac_address,
+        bound_host_name, used_at, created_by, remark, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.cd.entity.ActivationCodeEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO activation_code (
+            tenant_id, license_id, code, status, expire_time, bound_machine_id, bound_mac_address,
+            bound_host_name, used_at, created_by, remark
+        ) VALUES (
+            #{tenantId}, #{licenseId}, #{code}, #{status}, #{expireTime}, #{boundMachineId}, #{boundMacAddress},
+            #{boundHostName}, #{usedAt}, #{createdBy}, #{remark}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ActivationCodeEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM activation_code
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="ActivationCodeEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM activation_code
+        WHERE code = #{code}
+        LIMIT 1
+    </select>
+
+    <select id="selectByTenantId" resultMap="ActivationCodeEntityResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM activation_code
+        WHERE tenant_id = #{tenantId}
+        ORDER BY id DESC
+    </select>
+
+    <update id="markUsed">
+        UPDATE activation_code
+        SET status = 'USED',
+            bound_machine_id = #{boundMachineId},
+            bound_mac_address = #{boundMacAddress},
+            bound_host_name = #{boundHostName},
+            used_at = #{usedAt}
+        WHERE id = #{id}
+    </update>
+</mapper>

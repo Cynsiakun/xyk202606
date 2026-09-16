@@ -53,10 +53,14 @@ public class VulnDetectionServiceImpl implements VulnDetectionService {
         if (resultIds == null || resultIds.isEmpty()) {
             return 0;
         }
-        List<Long> ids = resultIds.stream()
+        List<Long> seedIds = resultIds.stream()
                 .filter(id -> id != null && id > 0)
                 .distinct()
                 .toList();
+        if (seedIds.isEmpty()) {
+            return 0;
+        }
+        List<Long> ids = hostVulnResultMapper.selectGroupedResultIdsByResultIdsAndTenant(seedIds, currentTenantId());
         return ids.isEmpty() ? 0 : hostVulnResultMapper.ignoreByResultIdsAndTenant(ids, currentTenantId());
     }
 

@@ -16,9 +16,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.MessageDeliveryMode;
-import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Properties;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,11 +69,18 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
     public VulnVerificationTaskResponseDTO verifyResult(Long hostId, Long resultId) {
         HostEntity host = requireHost(hostId);
         Long tenantId = currentTenantId();
-        VulnVerificationRuleDTO rule = hostVulnResultMapper.selectVerificationRuleByResultIdAndTenant(hostId, resultId, tenantId);
-        if (rule == null) {
+        List<Long> groupedIds = hostVulnResultMapper.selectGroupedResultIdsByResultIdsAndTenant(List.of(resultId), tenantId);
+        if (groupedIds.isEmpty()) {
             throw new IllegalArgumentException("该漏洞结果不存在或不可下发验证");
         }
-        return createAndSendTask(host, List.of(rule));
+        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectVerificationRulesByResultIdsAndTenant(groupedIds, tenantId)
+                .stream()
+                .filter(rule -> hostId.equals(rule.getHostId()))
+                .toList();
+        if (rules.isEmpty()) {
+            throw new IllegalArgumentException("该漏洞结果不存在或不可下发验证");
+        }
+        return createAndSendTask(host, rules);
     }
 
     @Override
@@ -90,7 +98,10 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         }
 
         Long tenantId = currentTenantId();
-        List<VulnVerificationRuleDTO> rules = hostVulnResultMapper.selectVerificationRulesByResultIdsAndTenant(distinctIds, tenantId);
+        List<Long> expandedIds = hostVulnResultMapper.selectGroupedResultIdsByResultIdsAndTenant(distinctIds, tenantId);
+        List<VulnVerificationRuleDTO> rules = expandedIds.isEmpty()
+                ? List.of()
+                : hostVulnResultMapper.selectVerificationRulesByResultIdsAndTenant(expandedIds, tenantId);
         Map<Long, List<VulnVerificationRuleDTO>> rulesByHost = rules.stream()
                 .filter(rule -> rule.getHostId() != null)
                 .collect(Collectors.groupingBy(VulnVerificationRuleDTO::getHostId, LinkedHashMap::new, Collectors.toList()));
@@ -111,24 +122,6 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
             }
         }
         return result;
-    }
-
-    private VulnVerificationTaskResponseDTO createAndSendTask(HostEntity host, List<VulnVerificationRuleDTO> rules) {
-        HostVulnTaskEntity task = createTask(host, rules.size());
-        Map<String, Object> agentMessage = buildAgentMessage(task.getId(), host.getMacAddress(), rules);
-        List<Long> resultIds = rules.stream().map(VulnVerificationRuleDTO::getResultId).toList();
-        String summaryJson = buildSummaryJson(agentMessage, resultIds, null);
-        Long tenantId = currentTenantId();
-        hostVulnResultMapper.updateTaskIdByIdsAndTenant(resultIds, task.getId(), tenantId);
-        hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_PENDING, summaryJson, tenantId);
-
-        boolean sent = sendToAgent(host.getMacAddress(), agentMessage);
-        if (sent) {
-            hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_RUNNING, summaryJson, tenantId);
-            hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(resultIds, VERIFYING, tenantId);
-        }
-        return response(task.getId(), rules.size(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
-                sent ? "验证任务已下发" : "验证任务已创建，但消息下发失败，可稍后重试");
     }
 
     @Override
@@ -169,13 +162,31 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
         boolean sent = sendToAgent(task.getMacAddress(), agentMessage);
         if (sent) {
             hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_RUNNING, task.getSummaryJson(), tenantId);
-            List<Long> resultIds = readResultIds(summary.path("resultIds"));
-            if (!resultIds.isEmpty()) {
-                hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(resultIds, VERIFYING, tenantId);
+            List<Long> summaryResultIds = readResultIds(summary.path("resultIds"));
+            if (!summaryResultIds.isEmpty()) {
+                hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(summaryResultIds, VERIFYING, tenantId);
             }
         }
         return response(task.getId(), task.getRuleCount(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
                 sent ? "验证任务已重新下发" : "重试下发失败，任务仍为待执行");
+    }
+
+    private VulnVerificationTaskResponseDTO createAndSendTask(HostEntity host, List<VulnVerificationRuleDTO> rules) {
+        HostVulnTaskEntity task = createTask(host, rules.size());
+        Map<String, Object> agentMessage = buildAgentMessage(task.getId(), host.getMacAddress(), rules);
+        List<Long> resultIds = rules.stream().map(VulnVerificationRuleDTO::getResultId).toList();
+        String summaryJson = buildSummaryJson(agentMessage, resultIds, null);
+        Long tenantId = currentTenantId();
+        hostVulnResultMapper.updateTaskIdByIdsAndTenant(resultIds, task.getId(), tenantId);
+        hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_PENDING, summaryJson, tenantId);
+
+        boolean sent = sendToAgent(host.getMacAddress(), agentMessage);
+        if (sent) {
+            hostVulnTaskMapper.updateStatusByTenant(task.getId(), STATUS_RUNNING, summaryJson, tenantId);
+            hostVulnResultMapper.updateVerifyStatusByIdsAndTenant(resultIds, VERIFYING, tenantId);
+        }
+        return response(task.getId(), rules.size(), sent, sent ? STATUS_RUNNING : STATUS_PENDING,
+                sent ? "验证任务已下发" : "验证任务已创建，但消息下发失败，可稍后重试");
     }
 
     private HostEntity requireHost(Long hostId) {
@@ -229,6 +240,14 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
 
     private boolean sendToAgent(String macAddress, Map<String, Object> agentMessage) {
         try {
+            String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX
+                    + normalizeMac(macAddress)
+                    + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
+            Properties queueProperties = amqpAdmin.getQueueProperties(queueName);
+            if (queueProperties == null) {
+                log.warn("漏洞验证任务跳过：客户端队列不存在 queueName={}, routingKey={}", queueName, macAddress);
+                return false;
+            }
             amqpAdmin.declareExchange(new DirectExchange(RabbitMQConfig.AGENT_EXCHANGE, true, false));
             String payload = objectMapper.writeValueAsString(agentMessage);
             rabbitTemplate.convertAndSend(
@@ -246,6 +265,13 @@ public class VulnVerificationServiceImpl implements VulnVerificationService {
             log.error("漏洞验证任务下发失败: routingKey={}", macAddress, e);
             return false;
         }
+    }
+
+    private String normalizeMac(String mac) {
+        if (mac == null) {
+            return "";
+        }
+        return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
     private String buildSummaryJson(Map<String, Object> agentMessage, List<Long> resultIds, String errorMessage) {

@@ -15,6 +15,7 @@ import com.cd.entity.TenantEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.LicenseMapper;
 import com.cd.mapper.LicensePlanMapper;
+import com.cd.mapper.TenantMachineMapper;
 import com.cd.mapper.TenantMapper;
 import com.cd.mapper.UserMapper;
 import com.cd.service.LicenseService;
@@ -36,6 +37,7 @@ public class LicenseServiceImpl implements LicenseService {
     private final LicensePlanMapper licensePlanMapper;
     private final TenantMapper tenantMapper;
     private final HostMapper hostMapper;
+    private final TenantMachineMapper tenantMachineMapper;
     private final UserMapper userMapper;
     private final LicenseSigner licenseSigner;
     private final LicenseGuard licenseGuard;
@@ -129,7 +131,7 @@ public class LicenseServiceImpl implements LicenseService {
         dto.setTenantId(tenantId);
         TenantEntity tenant = tenantMapper.selectById(tenantId);
         dto.setTenantName(tenant == null ? null : tenant.getName());
-        dto.setHostUsed(hostMapper.countByTenantId(tenantId));
+        dto.setHostUsed(activatedHostCount(tenantId));
         dto.setUserUsed(userMapper.countAllByTenant(null, tenantId));
 
         if (permissionChecker.isSuperAdmin()) {
@@ -258,7 +260,7 @@ public class LicenseServiceImpl implements LicenseService {
         if (hostLimit == null || hostLimit == 0) {
             return;
         }
-        long hostCount = hostMapper.countByTenantId(entity.getTenantId());
+        long hostCount = activatedHostCount(entity.getTenantId());
         if (hostCount > hostLimit) {
             throw new IllegalArgumentException("Host limit exceeded");
         }
@@ -288,6 +290,10 @@ public class LicenseServiceImpl implements LicenseService {
     private Long currentTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         return tenantId == null ? 0L : tenantId;
+    }
+
+    private long activatedHostCount(Long tenantId) {
+        return tenantId == null ? 0L : tenantMachineMapper.countActivatedByTenant(tenantId);
     }
 
     private LicensePlanEntity requirePlan(String planCode) {

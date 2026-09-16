@@ -55,4 +55,7 @@ public interface ServiceMapper {
 
     ServiceEntity selectLatestByMacAndTenant(@Param("macAddress") String macAddress,
                                              @Param("tenantId") Long tenantId);
+
+    ServiceEntity selectLatestNonEmptyByMacAndTenant(@Param("macAddress") String macAddress,
+                                                     @Param("tenantId") Long tenantId);
 }

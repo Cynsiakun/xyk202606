@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -121,18 +122,59 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         }
 
         Long tenantId = host.getTenantId() == null ? currentTenantId() : host.getTenantId();
-        AppEntity appRecord = appMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
-        ServiceEntity serviceRecord = serviceMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
-        ProcessEntity processRecord = processMapper.selectLatestByMacAndTenant(host.getMacAddress(), tenantId);
-
-        assets.addAll(parseAssetJson(TYPE_APP, appRecord == null ? null : appRecord.getAssetJson()));
-        assets.addAll(parseAssetJson(TYPE_SERVICE, serviceRecord == null ? null : serviceRecord.getAssetJson()));
-        assets.addAll(parseAssetJson(TYPE_PROCESS, processRecord == null ? null : processRecord.getAssetJson()));
+        assets.addAll(loadLatestAppAssets(host.getMacAddress(), tenantId));
+        assets.addAll(loadLatestServiceAssets(host.getMacAddress(), tenantId));
+        assets.addAll(loadLatestProcessAssets(host.getMacAddress(), tenantId));
 
         for (AssetInfoDTO asset : assets) {
             asset.setHostId(host.getId());
         }
         return assets;
+    }
+
+    private List<AssetInfoDTO> loadLatestAppAssets(String macAddress, Long tenantId) {
+        AppEntity latestRecord = appMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_APP, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        AppEntity latestNonEmptyRecord = appMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_APP, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_APP);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<AssetInfoDTO> loadLatestServiceAssets(String macAddress, Long tenantId) {
+        ServiceEntity latestRecord = serviceMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_SERVICE, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        ServiceEntity latestNonEmptyRecord = serviceMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_SERVICE, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_SERVICE);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<AssetInfoDTO> loadLatestProcessAssets(String macAddress, Long tenantId) {
+        ProcessEntity latestRecord = processMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_PROCESS, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        ProcessEntity latestNonEmptyRecord = processMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_PROCESS, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_PROCESS);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
     }
 
     private List<AssetInfoDTO> parseAssetJson(String type, String assetJson) {

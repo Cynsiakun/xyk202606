@@ -44,6 +44,8 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
     private static final String STATUS_DONE = "DONE";
     private static final String REMEDIATION_TICKETED = "TICKETED";
     private static final String SECURITY_OPERATOR = "SECURITY_OPERATOR";
+    private static final String SECURITY_ADMIN = "SECURITY_ADMIN";
+    private static final String TENANT_ADMIN = "TENANT_ADMIN";
 
     private final BaselineResultMapper baselineResultMapper;
     private final BaselineQueryMapper baselineQueryMapper;
@@ -211,10 +213,13 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
     }
 
     private Long currentAssigneeScope() {
-        if (permissionChecker.isSuperAdmin() || hasRole("SECURITY_ADMIN")) {
+        if (permissionChecker.isSuperAdmin() || hasRole(SECURITY_ADMIN) || hasRole(TENANT_ADMIN)) {
             return null;
         }
-        return SecurityUtils.getCurrentUserId();
+        if (hasRole(SECURITY_OPERATOR)) {
+            return SecurityUtils.getCurrentUserId();
+        }
+        return null;
     }
 
     private boolean hasRole(String roleCode) {

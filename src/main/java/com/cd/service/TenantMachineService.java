@@ -9,6 +9,8 @@ import com.cd.dto.TenantMachineResponseDTO;
 import com.cd.dto.TenantMachineUpdateDTO;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface TenantMachineService {
 
     PageResult<TenantMachineResponseDTO> list(int page, int size, String keyword);
@@ -21,5 +23,13 @@ public interface TenantMachineService {
 
     CsvImportResultDTO importCsv(MultipartFile file);
 
+    List<TenantMachineResponseDTO> activatedHosts();
+
+    long countActivatedByTenant();
+
     ClientMachineValidateResponseDTO validate(ClientMachineValidateDTO dto);
+
+    void requireMachineQuotaForActivation(Long tenantId);
+
+    void syncAuthorizedHostTenantForActivation(Long tenantId, String macAddress, String hostName);
 }

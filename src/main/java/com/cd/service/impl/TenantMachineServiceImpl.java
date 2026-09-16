@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -63,9 +64,6 @@ public class TenantMachineServiceImpl implements TenantMachineService {
         Long tenantId = currentTenantId();
         requireMac(dto.getMacAddress());
         ensureUnique(null, null, dto.getMacAddress());
-        if (dto.getStatus() == null || dto.getStatus() == 1) {
-            requireMachineQuota(tenantId, 1);
-        }
 
         TenantMachineEntity entity = new TenantMachineEntity();
         entity.setTenantId(tenantId);
@@ -88,9 +86,6 @@ public class TenantMachineServiceImpl implements TenantMachineService {
         requireMac(dto.getMacAddress());
         ensureUnique(id, existing.getMachineId(), dto.getMacAddress());
         int nextStatus = dto.getStatus() == null ? existing.getStatus() : dto.getStatus();
-        if ((existing.getStatus() == null || existing.getStatus() != 1) && nextStatus == 1) {
-            requireMachineQuota(tenantId, 1);
-        }
 
         existing.setMacAddress(normalizeMac(dto.getMacAddress()));
         existing.setHostName(trim(dto.getHostName()));
@@ -118,6 +113,19 @@ public class TenantMachineServiceImpl implements TenantMachineService {
     }
 
     @Override
+    public List<TenantMachineResponseDTO> activatedHosts() {
+        Long tenantId = currentTenantId();
+        return tenantMachineMapper.selectActivatedByTenant(tenantId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    public long countActivatedByTenant() {
+        return tenantMachineMapper.countActivatedByTenant(currentTenantId());
+    }
+
+    @Override
     @Transactional
     public ClientMachineValidateResponseDTO validate(ClientMachineValidateDTO dto) {
         String machineId = trim(dto.getMachineId());
@@ -134,6 +142,7 @@ public class TenantMachineServiceImpl implements TenantMachineService {
                 return deny("MACHINE_ID_MISMATCH");
             }
         } else if (StringUtils.hasText(machineId)) {
+            requireMachineQuota(machine.getTenantId(), 1);
             tenantMachineMapper.bindMachineIdIfEmpty(machine.getId(), machineId);
             machine = tenantMachineMapper.selectByIdAndTenant(machine.getId(), machine.getTenantId());
         }
@@ -170,6 +179,16 @@ public class TenantMachineServiceImpl implements TenantMachineService {
         return response;
     }
 
+    @Override
+    public void requireMachineQuotaForActivation(Long tenantId) {
+        requireMachineQuota(tenantId, 1);
+    }
+
+    @Override
+    public void syncAuthorizedHostTenantForActivation(Long tenantId, String macAddress, String hostName) {
+        syncAuthorizedHostTenant(tenantId, macAddress, hostName);
+    }
+
     private TenantMachineEntity ensureExists(Long id, Long tenantId) {
         TenantMachineEntity entity = tenantMachineMapper.selectByIdAndTenant(id, tenantId);
         if (entity == null) {
@@ -190,7 +209,7 @@ public class TenantMachineServiceImpl implements TenantMachineService {
         if (limit == 0) {
             return;
         }
-        long current = tenantMachineMapper.countEnabledByTenant(tenantId);
+        long current = tenantMachineMapper.countActivatedByTenant(tenantId);
         if (current + Math.max(1, increment) > limit) {
             throw new LicenseAccessDeniedException("Host quota exceeded");
         }
@@ -260,7 +279,6 @@ public class TenantMachineServiceImpl implements TenantMachineService {
 
         TenantMachineEntity existing = tenantMachineMapper.selectByMacAddress(normalizedMac);
         if (existing == null) {
-            requireMachineQuota(tenantId, 1);
             imported.setTenantId(tenantId);
             imported.setMachineId(null);
             imported.setRemark(null);
@@ -273,10 +291,6 @@ public class TenantMachineServiceImpl implements TenantMachineService {
 
         if (!tenantId.equals(existing.getTenantId())) {
             throw new IllegalArgumentException("macAddress already exists");
-        }
-
-        if ((existing.getStatus() == null || existing.getStatus() != 1) && imported.getStatus() == 1) {
-            requireMachineQuota(tenantId, 1);
         }
         existing.setMacAddress(normalizedMac);
         existing.setHostName(imported.getHostName());
@@ -312,10 +326,23 @@ public class TenantMachineServiceImpl implements TenantMachineService {
         dto.setHostName(entity.getHostName());
         dto.setRemark(entity.getRemark());
         dto.setStatus(entity.getStatus());
-        dto.setMachineBoundAt(entity.getMachineBoundAt());
+        dto.setMachineBoundAt(resolveMachineBoundAt(entity));
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
+    }
+
+    private LocalDateTime resolveMachineBoundAt(TenantMachineEntity entity) {
+        if (entity.getMachineBoundAt() != null) {
+            return entity.getMachineBoundAt();
+        }
+        if (!StringUtils.hasText(entity.getMachineId())) {
+            return null;
+        }
+        if (entity.getUpdatedAt() != null) {
+            return entity.getUpdatedAt();
+        }
+        return entity.getCreatedAt();
     }
 
     private Long currentTenantId() {

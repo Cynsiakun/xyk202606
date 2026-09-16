@@ -54,7 +54,7 @@ layui.use(["element", "layer"], function () {
         {title: "基线合规", icon: "layui-icon-survey", children: [
             {title: "主机合规总览", page: "./pages/baseline-host.html", icon: "layui-icon-survey", policyKey: "TENANT_BASELINE_VIEW"},
             {title: "基线任务", page: "./pages/baseline-task.html", icon: "layui-icon-template", policyKey: "TENANT_BASELINE_VIEW"},
-            {title: "整改工单", page: "./pages/baseline-workorder.html", icon: "layui-icon-form", policyKey: "TENANT_BASELINE_VIEW"}
+            {title: "整改工单", page: "./pages/baseline-workorder.html", icon: "layui-icon-form", policyKey: "TENANT_BASELINE_WORKORDER_VIEW"}
         ]},
         {title: "用户管理", page: "./pages/user.html", icon: "layui-icon-username", policyKey: "TENANT_USER_VIEW"},
         {title: "套餐中心", page: "./pages/license-center.html", icon: "layui-icon-diamond", policyKey: "COMMON_PROFILE_VIEW"},

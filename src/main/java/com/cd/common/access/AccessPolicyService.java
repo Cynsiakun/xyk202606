@@ -7,6 +7,7 @@ import com.cd.entity.LicenseEntity;
 import com.cd.entity.TenantEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.mapper.LicenseMapper;
+import com.cd.mapper.TenantMachineMapper;
 import com.cd.mapper.TenantMapper;
 import com.cd.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class AccessPolicyService {
     private final LicenseMapper licenseMapper;
     private final TenantMapper tenantMapper;
     private final HostMapper hostMapper;
+    private final TenantMachineMapper tenantMachineMapper;
     private final UserMapper userMapper;
     private final LicenseGuard licenseGuard;
 
@@ -71,7 +73,7 @@ public class AccessPolicyService {
         AccessEffectiveDTO dto = new AccessEffectiveDTO();
         dto.setTenantId(tenantId);
         dto.setTenantName(tenant == null ? null : tenant.getName());
-        dto.setHostUsed(hostMapper.countByTenantId(tenantId));
+        dto.setHostUsed(tenantMachineMapper.countActivatedByTenant(tenantId));
         dto.setUserUsed(userMapper.countAllByTenant(null, tenantId));
 
         LicenseEntity license = licenseMapper.selectEffectiveByTenantId(tenantId);

@@ -680,6 +680,15 @@ button:disabled {
     word-break: break-all;
 }
 
+.affected-host-hit {
+    margin-top: 4px;
+    color: #0f766e;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
 .affected-bulk-bar {
     margin-top: 10px;
     padding-top: 10px;

@@ -85,6 +85,7 @@
 
     <resultMap id="VulnAffectedHostMap" type="com.cd.dto.VulnAffectedHostDTO">
         <id column="result_id" property="resultId"/>
+        <result column="result_ids_csv" property="resultIdsCsv"/>
         <result column="host_id" property="hostId"/>
         <result column="hostname" property="hostname"/>
         <result column="ipv4" property="ipv4"/>
@@ -95,6 +96,8 @@
         <result column="status" property="status"/>
         <result column="product_name" property="productName"/>
         <result column="product_version" property="productVersion"/>
+        <result column="matched_item_count" property="matchedItemCount"/>
+        <result column="matched_item_summary" property="matchedItemSummary"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.cd.entity.HostVulnResultEntity" useGeneratedKeys="true" keyProperty="id">
@@ -123,6 +126,15 @@
           AND tenant_id = #{tenantId}
           AND status = 1
     </update>
+
+    <select id="countActiveByHostAndVerifyStatusAndTenant" resultType="int">
+        SELECT COUNT(1)
+        FROM host_vuln_result
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+          AND status = 1
+          AND UPPER(verify_status) = UPPER(#{verifyStatus})
+    </select>
 
     <select id="selectActiveByHostId" resultMap="HostVulnResultMap">
         SELECT id, tenant_id, host_id, rule_id, severity, vuln_name, product_name, product_version,
@@ -386,8 +398,8 @@
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'low' THEN 1 END) AS low_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'PENDING' THEN 1 END) AS pending_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
-            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED') THEN 1 END) AS verified_count,
-            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING') THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'FIXED' THEN 1 END) AS fixed_count,
             COUNT(CASE WHEN rule_id > 0 AND UPPER(verify_status) = 'FAILED' THEN 1 END) AS ignored_count
         FROM host_vuln_result
@@ -401,8 +413,8 @@
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND LOWER(severity) = 'low' THEN 1 END) AS low_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'PENDING' THEN 1 END) AS pending_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
-            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED') THEN 1 END) AS verified_count,
-            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING') THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
             COUNT(CASE WHEN status = 1 AND rule_id > 0 AND UPPER(verify_status) = 'FIXED' THEN 1 END) AS fixed_count,
             COUNT(CASE WHEN rule_id > 0 AND UPPER(verify_status) = 'FAILED' THEN 1 END) AS ignored_count
         FROM host_vuln_result
@@ -435,8 +447,8 @@
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'PENDING' THEN 1 END) AS pending_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('PENDING', 'VERIFYING', 'VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') AND hvr.rule_id > 0 THEN 1 END) AS pending_rule_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
-            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED') THEN 1 END) AS verified_count,
-            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING') THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'FIXED' THEN 1 END) AS fixed_count,
             COUNT(CASE WHEN UPPER(hvr.verify_status) = 'FAILED' THEN 1 END) AS ignored_count,
             MAX(COALESCE(hvr.updated_at, hvr.created_at)) AS latest_scan_time
@@ -481,8 +493,8 @@
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'PENDING' THEN 1 END) AS pending_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('PENDING', 'VERIFYING', 'VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') AND hvr.rule_id > 0 THEN 1 END) AS pending_rule_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'VERIFYING' THEN 1 END) AS verifying_count,
-            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED') THEN 1 END) AS verified_count,
-            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING') THEN 1 END) AS verified_count,
+            COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX') THEN 1 END) AS repair_count,
             COUNT(CASE WHEN hvr.status = 1 AND UPPER(hvr.verify_status) = 'FIXED' THEN 1 END) AS fixed_count,
             COUNT(CASE WHEN UPPER(hvr.verify_status) = 'FAILED' THEN 1 END) AS ignored_count,
             MAX(COALESCE(hvr.updated_at, hvr.created_at)) AS latest_scan_time
@@ -600,7 +612,7 @@
 
     <update id="fixByHostIdAndTenant">
         UPDATE host_vuln_result
-        SET verify_status = 'FIXED',
+        SET verify_status = 'REPAIR_PENDING',
             updated_at = CURRENT_TIMESTAMP
         WHERE host_id = #{hostId}
           AND tenant_id = #{tenantId}
@@ -610,7 +622,7 @@
 
     <update id="fixByRuleIdAndTenant">
         UPDATE host_vuln_result
-        SET verify_status = 'FIXED',
+        SET verify_status = 'REPAIR_PENDING',
             updated_at = CURRENT_TIMESTAMP
         WHERE rule_id = #{ruleId}
           AND tenant_id = #{tenantId}
@@ -618,35 +630,118 @@
           AND UPPER(verify_status) IN ('VERIFIED', 'NOT_AFFECTED', 'REPAIR_PENDING', 'TO_FIX')
     </update>
 
+    <update id="completeRepairingByTenant">
+        UPDATE host_vuln_result
+        SET verify_status = 'FIXED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE UPPER(verify_status) = 'REPAIR_PENDING'
+          AND status = 1
+          AND updated_at &lt;= DATE_SUB(NOW(), INTERVAL #{thresholdSeconds} SECOND)
+        <if test="tenantId != null and tenantId >= 0">
+          AND tenant_id = #{tenantId}
+        </if>
+    </update>
+
+    <update id="resetVerifyingTimeoutByTenant">
+        UPDATE host_vuln_result
+        SET verify_status = #{toStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE UPPER(verify_status) = UPPER(#{fromStatus})
+          AND status = 1
+          AND updated_at &lt;= DATE_SUB(NOW(), INTERVAL #{thresholdSeconds} SECOND)
+        <if test="tenantId != null and tenantId >= 0">
+          AND tenant_id = #{tenantId}
+        </if>
+    </update>
+
     <select id="selectAffectedHostsByRuleIdAndTenant" resultMap="VulnAffectedHostMap">
         SELECT
-            hvr.id AS result_id,
-            h.id AS host_id,
-            h.hostname,
-            h.ipv4,
-            h.mac_address,
-            h.os_name,
-            h.os_version,
-            hvr.verify_status,
-            hvr.status,
-            hvr.product_name,
-            hvr.product_version
-        FROM host_vuln_result hvr
-        INNER JOIN hosts h ON h.id = hvr.host_id AND h.tenant_id = #{tenantId}
-        WHERE hvr.rule_id = #{ruleId}
-          AND hvr.tenant_id = #{tenantId}
-          AND hvr.status = 1
-          AND hvr.rule_id IS NOT NULL
-          AND hvr.rule_id &gt; 0
-        ORDER BY CASE UPPER(hvr.verify_status)
+            MAX(grouped.result_id) AS result_id,
+            grouped.result_ids_csv,
+            grouped.host_id,
+            grouped.hostname,
+            grouped.ipv4,
+            grouped.mac_address,
+            grouped.os_name,
+            grouped.os_version,
+            grouped.verify_status,
+            grouped.status,
+            grouped.product_name,
+            grouped.product_version,
+            grouped.matched_item_count,
+            grouped.matched_item_summary
+        FROM (
+            SELECT
+                MAX(hvr.id) AS result_id,
+                GROUP_CONCAT(hvr.id ORDER BY hvr.id DESC) AS result_ids_csv,
+                h.id AS host_id,
+                h.hostname,
+                h.ipv4,
+                h.mac_address,
+                h.os_name,
+                h.os_version,
+                CASE
+                    WHEN SUM(CASE WHEN UPPER(hvr.verify_status) = 'PENDING' THEN 1 ELSE 0 END) &gt; 0 THEN 'PENDING'
+                    WHEN SUM(CASE WHEN UPPER(hvr.verify_status) = 'VERIFYING' THEN 1 ELSE 0 END) &gt; 0 THEN 'VERIFYING'
+                    WHEN SUM(CASE WHEN UPPER(hvr.verify_status) IN ('VERIFIED', 'REPAIR_PENDING', 'TO_FIX') THEN 1 ELSE 0 END) &gt; 0 THEN 'REPAIR_PENDING'
+                    WHEN SUM(CASE WHEN UPPER(hvr.verify_status) IN ('FIXED', 'NOT_AFFECTED') THEN 1 ELSE 0 END) &gt; 0 THEN 'FIXED'
+                    ELSE 'PENDING'
+                END AS verify_status,
+                MAX(hvr.status) AS status,
+                MAX(hvr.product_name) AS product_name,
+                MAX(hvr.product_version) AS product_version,
+                COUNT(*) AS matched_item_count,
+                GROUP_CONCAT(
+                    DISTINCT CASE
+                        WHEN COALESCE(NULLIF(hvr.product_version, ''), '') = '' THEN hvr.product_name
+                        ELSE CONCAT(hvr.product_name, ' ', hvr.product_version)
+                    END
+                    ORDER BY hvr.product_name, hvr.product_version
+                    SEPARATOR ' | '
+                ) AS matched_item_summary
+            FROM host_vuln_result hvr
+            INNER JOIN hosts h ON h.id = hvr.host_id AND h.tenant_id = #{tenantId}
+            WHERE hvr.rule_id = #{ruleId}
+              AND hvr.tenant_id = #{tenantId}
+              AND hvr.status = 1
+              AND hvr.rule_id IS NOT NULL
+              AND hvr.rule_id &gt; 0
+            GROUP BY h.id, h.hostname, h.ipv4, h.mac_address, h.os_name, h.os_version
+        ) grouped
+        GROUP BY grouped.host_id, grouped.hostname, grouped.ipv4, grouped.mac_address,
+                 grouped.os_name, grouped.os_version, grouped.result_ids_csv, grouped.verify_status,
+                 grouped.status, grouped.product_name, grouped.product_version,
+                 grouped.matched_item_count, grouped.matched_item_summary
+        ORDER BY CASE UPPER(grouped.verify_status)
             WHEN 'PENDING' THEN 1
             WHEN 'VERIFYING' THEN 2
-            WHEN 'VERIFIED' THEN 3
-            WHEN 'REPAIR_PENDING' THEN 4
-            WHEN 'TO_FIX' THEN 4
+            WHEN 'REPAIR_PENDING' THEN 3
+            WHEN 'TO_FIX' THEN 3
+            WHEN 'VERIFIED' THEN 4
             WHEN 'NOT_AFFECTED' THEN 5
             WHEN 'FIXED' THEN 6
             ELSE 7
-        END ASC, hvr.id DESC
+        END ASC, grouped.matched_item_count DESC, grouped.result_id DESC
+    </select>
+
+    <select id="selectGroupedResultIdsByResultIdsAndTenant" resultType="long">
+        SELECT DISTINCT expanded.id
+        FROM host_vuln_result expanded
+        INNER JOIN (
+            SELECT DISTINCT seed.host_id, seed.rule_id
+            FROM host_vuln_result seed
+            WHERE seed.tenant_id = #{tenantId}
+              AND seed.id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        ) grouped
+            ON grouped.host_id = expanded.host_id
+           AND grouped.rule_id = expanded.rule_id
+        WHERE expanded.tenant_id = #{tenantId}
+          AND expanded.status = 1
+          AND expanded.rule_id IS NOT NULL
+          AND expanded.rule_id &gt; 0
+        ORDER BY expanded.id DESC
     </select>
 </mapper>

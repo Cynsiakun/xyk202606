@@ -6,6 +6,7 @@
 
 .license-overview,
 .quota-panel,
+.license-section,
 .plan-section {
     border: 1px solid var(--surface-border);
     border-radius: 8px;
@@ -80,6 +81,13 @@
     transition: width 0.2s ease;
 }
 
+.quota-extra {
+    margin-top: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.license-section,
 .plan-section {
     padding: 20px;
 }
@@ -97,6 +105,10 @@
     font-size: 13px;
 }
 
+.table-shell {
+    overflow: hidden;
+}
+
 .plan-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -107,7 +119,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
-    min-height: 260px;
+    min-height: 250px;
     padding: 16px;
     border: 1px solid var(--surface-border);
     border-radius: 8px;
@@ -192,13 +204,33 @@
     color: #991b1b;
 }
 
+.activation-code-value {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+}
+
+.generated-code-dialog {
+    padding: 18px;
+}
+
+.generated-code-tip {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.generated-code-textarea {
+    min-height: 260px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+}
+
 .empty-plan {
     padding: 26px;
     color: var(--text-secondary);
     text-align: center;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 860px) {
     .license-overview,
     .section-head {
         align-items: flex-start;

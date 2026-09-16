@@ -4,6 +4,8 @@ import com.cd.entity.HostEntity;
 import com.cd.entity.MqErrorLogEntity;
 import com.cd.entity.PortScanResultEntity;
 import com.cd.mapper.HostMapper;
+import com.cd.mapper.HostVulnResultMapper;
+import com.cd.mapper.HostVulnTaskMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.PortScanResultMapper;
 import com.cd.service.PortFingerprintService;
@@ -25,10 +27,14 @@ public class PortScanResultServiceImpl implements PortScanResultService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_PLATFORM = "PLATFORM";
+    private static final String VERIFYING = "VERIFYING";
+    private static final int TASK_STATUS_RUNNING = 1;
 
     private final HostMapper hostMapper;
     private final PortScanResultMapper portScanResultMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
+    private final HostVulnResultMapper hostVulnResultMapper;
+    private final HostVulnTaskMapper hostVulnTaskMapper;
     private final PortFingerprintService portFingerprintService;
     private final VulnRuleEngine vulnRuleEngine;
 
@@ -127,10 +133,21 @@ public class PortScanResultServiceImpl implements PortScanResultService {
                 log.warn("端口采集入库后未找到主机，跳过静态漏洞匹配: mac={}", macAddress);
                 return;
             }
+            if (hasOngoingVerification(host.getId(), resolvedTenantId)) {
+                log.info("host {} has ongoing vuln verification, skip port-triggered rematch", host.getId());
+                return;
+            }
             vulnRuleEngine.evaluateHostForTenant(host.getId(), resolvedTenantId);
         } catch (Exception e) {
             log.warn("端口采集入库后静态漏洞匹配失败: mac={}", macAddress, e);
         }
+    }
+
+    private boolean hasOngoingVerification(Long hostId, Long tenantId) {
+        if (hostVulnResultMapper.countActiveByHostAndVerifyStatusAndTenant(hostId, VERIFYING, tenantId) > 0) {
+            return true;
+        }
+        return hostVulnTaskMapper.countByHostAndStatusAndTenant(hostId, TASK_STATUS_RUNNING, tenantId) > 0;
     }
 
     private Integer integerValue(JsonNode root, String key) {

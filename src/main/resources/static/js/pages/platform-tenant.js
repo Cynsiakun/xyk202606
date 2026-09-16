@@ -32,19 +32,17 @@ layui.use(["table", "form", "layer", "laydate"], function () {
             url: API.tenantList,
             cols: [[
                 {field: "id", title: "ID", width: 80, sort: true},
-                {field: "name", title: "\u79df\u6237\u540d", minWidth: 160},
-                {field: "licenseEdition", title: "\u5957\u9910", width: 130, templet: function (d) { return editionTpl(d.licenseEdition); }},
-                {field: "contact", title: "\u8054\u7cfb\u4eba", minWidth: 150, templet: function (d) { return d.contact || "-"; }},
-                {field: "status", title: "\u72b6\u6001", width: 90, templet: statusTpl},
-                {field: "createdAt", title: "\u521b\u5efa\u65f6\u95f4", minWidth: 170, templet: function (d) {
-                    return AppUtils.formatDateTime(d.createdAt);
-                }},
-                {title: "\u64cd\u4f5c", width: 280, fixed: "right", templet: function (d) {
-                    var toggleText = d.status === 1 ? "\u7981\u7528" : "\u542f\u7528";
+                {field: "name", title: "租户名", minWidth: 160},
+                {field: "licenseEdition", title: "套餐", width: 130, templet: function (d) { return editionTpl(d.licenseEdition); }},
+                {field: "contact", title: "联系人", minWidth: 150, templet: function (d) { return d.contact || "-"; }},
+                {field: "status", title: "状态", width: 90, templet: statusTpl},
+                {field: "createdAt", title: "创建时间", minWidth: 170, templet: function (d) { return AppUtils.formatDateTime(d.createdAt); }},
+                {title: "操作", width: 280, fixed: "right", templet: function (d) {
+                    var toggleText = d.status === 1 ? "禁用" : "启用";
                     var toggleClass = d.status === 1 ? "layui-btn-danger" : "layui-btn-normal";
                     return '<div class="tenant-action-group">'
-                        + '<button type="button" class="layui-btn layui-btn-xs" lay-event="license">\u6388\u6743</button>'
-                        + '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">\u8be6\u60c5</button>'
+                        + '<button type="button" class="layui-btn layui-btn-xs" lay-event="license">授权</button>'
+                        + '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">详情</button>'
                         + '<button type="button" class="layui-btn ' + toggleClass + ' layui-btn-xs" lay-event="toggle">' + toggleText + "</button>"
                         + "</div>";
                 }}
@@ -78,7 +76,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
                             adminEmail: data.field.adminEmail || ""
                         }
                     }, {
-                        successMessage: "\u79df\u6237\u5f00\u901a\u6210\u529f",
+                        successMessage: "租户开通成功",
                         showErrorMessage: false
                     });
                     layer.closeAll("page");
@@ -99,7 +97,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
                         method: "POST",
                         body: normalizeLicensePayload(data.field)
                     }, {
-                        successMessage: "License \u751f\u6210\u6210\u529f",
+                        successMessage: "套餐授权已生成",
                         showErrorMessage: false
                     });
                     layer.closeAll("page");
@@ -124,7 +122,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
                             machineId: data.field.machineId
                         }
                     }, {
-                        successMessage: "\u79bb\u7ebf License \u5df2\u751f\u6210",
+                        successMessage: "离线 License 已生成",
                         showErrorMessage: false
                     });
                     renderOfflineResult(result.data);
@@ -173,7 +171,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
     function openTenantDialog() {
         var index = layer.open({
             type: 1,
-            title: "\u5f00\u901a\u79df\u6237",
+            title: "开通租户",
             area: ["560px", "620px"],
             content: AppUtils.getTemplateHtml("tenantFormTemplate"),
             success: function (layero) {
@@ -197,15 +195,15 @@ layui.use(["table", "form", "layer", "laydate"], function () {
     function openTenantDetail(tenant) {
         var html = '<div class="tenant-detail profile-grid">'
             + detailRow("ID", tenant.id)
-            + detailRow("\u79df\u6237\u540d", escapeHtml(tenant.name))
-            + detailRow("\u5957\u9910", editionTpl(tenant.licenseEdition))
-            + detailRow("\u8054\u7cfb\u4eba", escapeHtml(tenant.contact || "-"))
-            + detailRow("\u72b6\u6001", tenant.status === 1 ? "\u542f\u7528" : "\u7981\u7528")
-            + detailRow("\u521b\u5efa\u65f6\u95f4", AppUtils.formatDateTime(tenant.createdAt))
+            + detailRow("租户名", escapeHtml(tenant.name))
+            + detailRow("套餐", editionTpl(tenant.licenseEdition))
+            + detailRow("联系人", escapeHtml(tenant.contact || "-"))
+            + detailRow("状态", tenant.status === 1 ? "启用" : "禁用")
+            + detailRow("创建时间", AppUtils.formatDateTime(tenant.createdAt))
             + "</div>";
         layer.open({
             type: 1,
-            title: "\u79df\u6237\u8be6\u60c5",
+            title: "租户详情",
             area: ["560px", "420px"],
             content: html
         });
@@ -213,9 +211,9 @@ layui.use(["table", "form", "layer", "laydate"], function () {
 
     function openLicensePanel(tenant) {
         currentTenant = tenant;
-        var index = layer.open({
+        layer.open({
             type: 1,
-            title: "License",
+            title: "租户授权",
             area: ["980px", "620px"],
             content: AppUtils.getTemplateHtml("licensePanelTemplate"),
             success: function (layero) {
@@ -235,7 +233,6 @@ layui.use(["table", "form", "layer", "laydate"], function () {
                 }
             }
         });
-        return index;
     }
 
     async function loadLicenses(tenant) {
@@ -247,16 +244,17 @@ layui.use(["table", "form", "layer", "laydate"], function () {
                 page: false,
                 cols: [[
                     {field: "licenseKey", title: "LicenseKey", minWidth: 230},
-                    {field: "edition", title: "\u5957\u9910", width: 130},
-                    {field: "hostLimit", title: "\u4e3b\u673a", width: 90, templet: function (d) { return formatLimit(d.hostLimit); }},
-                    {field: "userLimit", title: "\u7528\u6237", width: 90, templet: function (d) { return formatLimit(d.userLimit); }},
-                    {field: "expireTime", title: "\u5230\u671f\u65f6\u95f4", minWidth: 170, templet: function (d) { return AppUtils.formatDateTime(d.expireTime); }},
+                    {field: "edition", title: "套餐", width: 130},
+                    {field: "hostLimit", title: "主机上限", width: 100, templet: function (d) { return formatLimit(d.hostLimit); }},
+                    {field: "userLimit", title: "用户上限", width: 100, templet: function (d) { return formatLimit(d.userLimit); }},
+                    {field: "expireTime", title: "到期时间", minWidth: 170, templet: function (d) { return AppUtils.formatDateTime(d.expireTime); }},
                     {field: "machineId", title: "MachineId", minWidth: 150, templet: function (d) { return d.machineId || "-"; }},
-                    {field: "status", title: "\u72b6\u6001", width: 90, templet: statusTpl},
-                    {title: "\u64cd\u4f5c", width: 120, templet: function () {
-                        return '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="offline">\u79bb\u7ebf</button>';
+                    {field: "status", title: "状态", width: 90, templet: statusTpl},
+                    {title: "操作", width: 120, templet: function () {
+                        return '<button type="button" class="layui-btn layui-btn-primary layui-btn-xs" lay-event="offline">离线文件</button>';
                     }}
-                ]]
+                ]],
+                text: {none: "当前租户尚未开通套餐授权"}
             });
         } catch (error) {
             return null;
@@ -268,7 +266,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
         currentTenant = tenant;
         var index = layer.open({
             type: 1,
-            title: "\u751f\u6210 License",
+            title: "开通 / 调整套餐",
             area: ["560px", "500px"],
             content: AppUtils.getTemplateHtml("licenseFormTemplate"),
             success: function (layero) {
@@ -295,7 +293,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
 
     function renderPlanOptions(container) {
         var select = container.querySelector("#licensePlanSelect");
-        var html = ['<option value="">\u8bf7\u9009\u62e9\u5957\u9910</option>'];
+        var html = ['<option value="">请选择套餐</option>'];
         licensePlans.forEach(function (plan) {
             html.push('<option value="' + escapeAttr(plan.code) + '">' + escapeHtml(plan.name || plan.code)
                 + " (" + plan.userLimit + "U/" + plan.hostLimit + "H)</option>");
@@ -307,7 +305,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
         offlinePayloadText = "";
         var index = layer.open({
             type: 1,
-            title: "\u751f\u6210\u79bb\u7ebf\u6388\u6743\u6587\u4ef6",
+            title: "生成离线授权文件",
             area: ["620px", "600px"],
             content: AppUtils.getTemplateHtml("offlineFormTemplate"),
             success: function (layero) {
@@ -327,18 +325,18 @@ layui.use(["table", "form", "layer", "laydate"], function () {
 
     async function toggleTenantStatus(tenant) {
         if (tenant.id === 0 && tenant.status === 1) {
-            AppRequest.showMessage("\u5e73\u53f0\u79df\u6237\u4e0d\u80fd\u7981\u7528", 2);
+            AppRequest.showMessage("平台租户不能禁用", 2);
             return;
         }
         var nextStatus = tenant.status === 1 ? 0 : 1;
-        var text = nextStatus === 1 ? "\u542f\u7528" : "\u7981\u7528";
-        AppDialog.confirm(layer, "\u786e\u5b9a" + text + "\u79df\u6237 " + tenant.name + " \u5417\uff1f", async function (index) {
+        var text = nextStatus === 1 ? "启用" : "禁用";
+        AppDialog.confirm(layer, "确定" + text + "租户 " + tenant.name + " 吗？", async function (index) {
             try {
                 await AppRequest.request(apiFor(API.tenantStatus, tenant.id), {
                     method: "PUT",
                     body: {status: nextStatus}
                 }, {
-                    successMessage: text + "\u6210\u529f"
+                    successMessage: text + "成功"
                 });
                 layer.close(index);
                 table.reload(tenantTableId);
@@ -375,9 +373,9 @@ layui.use(["table", "form", "layer", "laydate"], function () {
         }
         try {
             await navigator.clipboard.writeText(offlinePayloadText);
-            AppRequest.showMessage("\u5df2\u590d\u5236", 1);
+            AppRequest.showMessage("已复制", 1);
         } catch (error) {
-            AppRequest.showMessage("\u590d\u5236\u5931\u8d25", 2);
+            AppRequest.showMessage("复制失败", 2);
         }
     }
 
@@ -398,8 +396,8 @@ layui.use(["table", "form", "layer", "laydate"], function () {
 
     function statusTpl(d) {
         return d.status === 1
-            ? '<span class="status-tag success">\u542f\u7528</span>'
-            : '<span class="status-tag fail">\u7981\u7528</span>';
+            ? '<span class="status-tag success">启用</span>'
+            : '<span class="status-tag fail">禁用</span>';
     }
 
     function editionTpl(edition) {
@@ -407,7 +405,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
             TRIAL: "Trial",
             STANDARD: "Standard",
             PROFESSIONAL: "Professional",
-            NONE: "\u672a\u6388\u6743"
+            NONE: "未授权"
         };
         return labels[edition] || edition || "-";
     }
@@ -417,7 +415,7 @@ layui.use(["table", "form", "layer", "laydate"], function () {
     }
 
     function formatLimit(value) {
-        return Number(value || 0) === 0 ? "\u4e0d\u9650" : value;
+        return Number(value || 0) === 0 ? "不限" : value;
     }
 
     function detailRow(label, value) {

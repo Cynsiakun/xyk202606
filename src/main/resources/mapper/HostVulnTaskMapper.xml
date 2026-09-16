@@ -46,6 +46,14 @@
           AND tenant_id = #{tenantId}
     </select>
 
+    <select id="countByHostAndStatusAndTenant" resultType="int">
+        SELECT COUNT(1)
+        FROM host_vuln_task
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+          AND status = #{status}
+    </select>
+
     <update id="updateStatus">
         UPDATE host_vuln_task
         SET status = #{status},

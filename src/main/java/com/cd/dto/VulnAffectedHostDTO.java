@@ -6,6 +6,7 @@ import lombok.Data;
 public class VulnAffectedHostDTO {
 
     private Long resultId;
+    private String resultIdsCsv;
     private Long hostId;
     private String hostname;
     private String ipv4;
@@ -16,4 +17,6 @@ public class VulnAffectedHostDTO {
     private Integer status;
     private String productName;
     private String productVersion;
+    private Integer matchedItemCount;
+    private String matchedItemSummary;
 }
