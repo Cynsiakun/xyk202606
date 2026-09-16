@@ -15,6 +15,8 @@ public class BaselineTaskExportRowDTO {
     private String ruleName;
     private String category;
     private String severity;
+    private String assetType;
+    private String protectionLevel;
     private String checkKey;
     private String status;
     private String remediationStatus;

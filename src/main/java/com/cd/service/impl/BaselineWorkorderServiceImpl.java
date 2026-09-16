@@ -5,6 +5,7 @@ import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
 import com.cd.common.security.PermissionChecker;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.BaselineActionResponseDTO;
 import com.cd.dto.BaselineOperatorOptionDTO;
 import com.cd.dto.BaselineTaskCreateRequestDTO;
@@ -43,6 +44,8 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
     private static final String STATUS_DONE = "DONE";
     private static final String REMEDIATION_TICKETED = "TICKETED";
     private static final String SECURITY_OPERATOR = "SECURITY_OPERATOR";
+    private static final String SECURITY_ADMIN = "SECURITY_ADMIN";
+    private static final String TENANT_ADMIN = "TENANT_ADMIN";
 
     private final BaselineResultMapper baselineResultMapper;
     private final BaselineQueryMapper baselineQueryMapper;
@@ -61,10 +64,11 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         if (assigneeId == null || assigneeId <= 0) {
             throw new IllegalArgumentException("请选择安全运维工程师");
         }
-        if (!baselineWorkorderMapper.userHasRole(assigneeId, SECURITY_OPERATOR)) {
+        Long tenantId = currentTenantId();
+        if (!baselineWorkorderMapper.userHasRole(assigneeId, SECURITY_OPERATOR, tenantId)) {
             throw new IllegalArgumentException("处理人必须是安全运维工程师");
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(distinctIds);
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(distinctIds, tenantId);
         List<Long> ruleIds = results.stream()
                 .map(BaselineResultEntity::getRuleId)
                 .filter(id -> id != null && id > 0)
@@ -81,7 +85,7 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         for (BaselineResultEntity result : results) {
             BaselineHostResultItemDTO latest = null;
             try {
-                latest = baselineQueryMapper.selectTaskHostResults(result.getTaskId(), result.getHostId()).stream()
+                latest = baselineQueryMapper.selectTaskHostResults(result.getTaskId(), result.getHostId(), tenantId).stream()
                         .filter(item -> result.getId().equals(item.getResultId()))
                         .findFirst()
                         .orElse(null);
@@ -90,6 +94,7 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
             }
             BaselineRuleEntity rule = rulesById.get(result.getRuleId());
             BaselineWorkorderEntity workorder = new BaselineWorkorderEntity();
+            workorder.setTenantId(tenantId);
             workorder.setHostId(result.getHostId());
             workorder.setRuleId(result.getRuleId());
             workorder.setResultId(result.getId());
@@ -104,7 +109,7 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
             ticketedIds.add(result.getId());
         }
         if (!ticketedIds.isEmpty()) {
-            baselineResultMapper.updateRemediationStatusByIds(ticketedIds, REMEDIATION_TICKETED);
+            baselineResultMapper.updateRemediationStatusByIdsAndTenant(ticketedIds, REMEDIATION_TICKETED, tenantId);
         }
 
         int success = ticketedIds.size();
@@ -127,15 +132,16 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         String safeStatus = normalizeEnum(status, List.of(STATUS_OPEN, STATUS_PROCESSING, STATUS_DONE));
         String safePriority = normalizeEnum(priority, List.of("LOW", "MEDIUM", "HIGH", "CRITICAL"));
         Long assigneeScope = currentAssigneeScope();
-        long total = baselineWorkorderMapper.countPage(safeKeyword, safeStatus, safePriority, assigneeScope);
+        Long tenantId = currentTenantId();
+        long total = baselineWorkorderMapper.countPage(safeKeyword, safeStatus, safePriority, assigneeScope, tenantId);
         List<BaselineWorkorderListItemDTO> list = baselineWorkorderMapper.selectPage(
-                safeKeyword, safeStatus, safePriority, assigneeScope, (safePage - 1) * safeSize, safeSize);
+                safeKeyword, safeStatus, safePriority, assigneeScope, tenantId, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
     @Override
     public BaselineWorkorderDetailDTO detail(Long id) {
-        BaselineWorkorderDetailDTO detail = baselineWorkorderMapper.selectDetail(id);
+        BaselineWorkorderDetailDTO detail = baselineWorkorderMapper.selectDetail(id, currentTenantId());
         if (detail == null) {
             throw new ResourceNotFoundException("工单不存在");
         }
@@ -150,7 +156,7 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         if (!STATUS_OPEN.equals(entity.getStatus())) {
             throw new IllegalArgumentException("只有待处理工单可以开始处理");
         }
-        int updated = baselineWorkorderMapper.markProcessing(id);
+        int updated = baselineWorkorderMapper.markProcessing(id, currentTenantId());
         return actionResponse(1, updated, updated == 1 ? "工单已进入处理中" : "工单状态已变化，请刷新后重试");
     }
 
@@ -165,7 +171,7 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         if (!StringUtils.hasText(safeRemark)) {
             throw new IllegalArgumentException("处理说明不能为空");
         }
-        int updated = baselineWorkorderMapper.markDone(id, safeRemark);
+        int updated = baselineWorkorderMapper.markDone(id, safeRemark, currentTenantId());
         return actionResponse(1, updated, updated == 1 ? "工单已完成" : "工单状态已变化，请刷新后重试");
     }
 
@@ -187,11 +193,11 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
 
     @Override
     public List<BaselineOperatorOptionDTO> operatorOptions() {
-        return baselineWorkorderMapper.selectOperatorOptions();
+        return baselineWorkorderMapper.selectOperatorOptions(currentTenantId());
     }
 
     private BaselineWorkorderEntity requireAccessibleEntity(Long id) {
-        BaselineWorkorderEntity entity = baselineWorkorderMapper.selectEntityById(id);
+        BaselineWorkorderEntity entity = baselineWorkorderMapper.selectEntityById(id, currentTenantId());
         if (entity == null) {
             throw new ResourceNotFoundException("工单不存在");
         }
@@ -207,10 +213,13 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
     }
 
     private Long currentAssigneeScope() {
-        if (permissionChecker.isSuperAdmin() || hasRole("SECURITY_ADMIN")) {
+        if (permissionChecker.isSuperAdmin() || hasRole(SECURITY_ADMIN) || hasRole(TENANT_ADMIN)) {
             return null;
         }
-        return SecurityUtils.getCurrentUserId();
+        if (hasRole(SECURITY_OPERATOR)) {
+            return SecurityUtils.getCurrentUserId();
+        }
+        return null;
     }
 
     private boolean hasRole(String roleCode) {
@@ -305,5 +314,10 @@ public class BaselineWorkorderServiceImpl implements BaselineWorkorderService {
         }
         String normalized = value.trim().toUpperCase();
         return allowed.contains(normalized) ? normalized : null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

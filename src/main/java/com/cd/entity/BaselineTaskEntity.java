@@ -8,12 +8,15 @@ import java.time.LocalDateTime;
 public class BaselineTaskEntity {
 
     private Long id;
+    private Long tenantId;
     private String taskName;
     private String executeType;
     private String cronExpr;
     private String ruleScope;
     private String ruleSnapshotJson;
     private String status;
+    private Integer targetLevel;
+    private String assetTypeFilter;
     private Integer totalHostCount;
     private Integer successCount;
     private Integer failCount;
@@ -21,4 +24,5 @@ public class BaselineTaskEntity {
     private LocalDateTime createTime;
     private LocalDateTime startTime;
     private LocalDateTime finishTime;
+    private Long protectionLevelId;
 }

@@ -1,6 +1,7 @@
 package com.cd.mq;
 
 import com.cd.common.config.RabbitMQConfig;
+import com.cd.entity.HostVulnTaskEntity;
 import com.cd.mapper.HostVulnResultMapper;
 import com.cd.mapper.HostVulnTaskMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,6 +54,13 @@ public class VulnVerifyResultListener {
             return;
         }
 
+        HostVulnTaskEntity task = hostVulnTaskMapper.selectById(taskId);
+        if (task == null) {
+            log.warn("Vuln verify result ignored because task does not exist: taskId={}", taskId);
+            return;
+        }
+        Long tenantId = task.getTenantId() == null ? 0L : task.getTenantId();
+
         JsonNode results = root.path("results");
         if (!results.isArray()) {
             log.warn("漏洞验证回传results不是数组，taskId={}, message={}", taskId, message);
@@ -71,7 +79,8 @@ public class VulnVerifyResultListener {
 
             boolean isMatched = item.path("matched").asBoolean(false);
             String verifyStatus = isMatched ? STATUS_VERIFIED : STATUS_NOT_AFFECTED;
-            int updated = hostVulnResultMapper.updateVerifyStatusByTaskAndRule(taskId, ruleId, verifyStatus);
+            int updated = hostVulnResultMapper.updateVerifyStatusByTaskAndRuleAndTenant(
+                    taskId, ruleId, verifyStatus, tenantId);
             if (updated == 0) {
                 log.warn("未找到待更新的漏洞验证结果: taskId={}, ruleId={}, status={}", taskId, ruleId, verifyStatus);
             }
@@ -85,7 +94,8 @@ public class VulnVerifyResultListener {
         }
 
         String summaryJson = summaryJson(total, matched, notAffected);
-        int taskUpdated = hostVulnTaskMapper.markFinished(taskId, TASK_STATUS_FINISHED, summaryJson);
+        int taskUpdated = hostVulnTaskMapper.markFinishedByTenant(
+                taskId, TASK_STATUS_FINISHED, summaryJson, tenantId);
         if (taskUpdated == 0) {
             log.warn("未找到待更新的漏洞验证任务: taskId={}, summary={}", taskId, summaryJson);
         }

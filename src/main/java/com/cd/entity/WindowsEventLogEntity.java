@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class WindowsEventLogEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private String logType;
     private Integer eventId;

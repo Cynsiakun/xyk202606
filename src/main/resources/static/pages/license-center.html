@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授权中心</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/license-center.css">
+</head>
+<body class="page-body">
+<div class="page-shell license-center-page">
+    <section class="license-overview">
+        <div>
+            <div class="section-kicker">License Center</div>
+            <h2 id="currentEdition">当前套餐</h2>
+            <p id="licenseMeta">正在加载授权状态</p>
+        </div>
+        <div class="license-actions" id="licenseActions"></div>
+    </section>
+
+    <section class="quota-grid">
+        <div class="quota-panel">
+            <div class="quota-head">
+                <span>主机额度</span>
+                <strong id="hostQuotaText">-</strong>
+            </div>
+            <div class="quota-track"><span id="hostQuotaBar"></span></div>
+            <div class="quota-extra" id="hostQuotaExtra">已激活 - / 剩余可激活 -</div>
+        </div>
+        <div class="quota-panel">
+            <div class="quota-head">
+                <span>用户额度</span>
+                <strong id="userQuotaText">-</strong>
+            </div>
+            <div class="quota-track"><span id="userQuotaBar"></span></div>
+            <div class="quota-extra" id="featureSummary">功能范围 -</div>
+        </div>
+    </section>
+
+    <section class="license-section">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Activated Hosts</div>
+                <h3>已激活主机</h3>
+            </div>
+            <span id="activatedHostCount">0 台</span>
+        </div>
+        <div class="table-shell">
+            <table id="activatedHostTable" lay-filter="activatedHostTable"></table>
+        </div>
+    </section>
+
+    <section class="license-section">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Activation Codes</div>
+                <h3>激活码列表</h3>
+            </div>
+            <div class="license-actions">
+                <button type="button" class="layui-btn layui-btn-normal" id="generateSingleCodeButton">生成 1 个</button>
+                <button type="button" class="layui-btn" id="generateBatchCodeButton">批量生成 N 个</button>
+            </div>
+        </div>
+        <div class="table-shell">
+            <table id="activationCodeTable" lay-filter="activationCodeTable"></table>
+        </div>
+    </section>
+
+    <section class="plan-section">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Plans</div>
+                <h3>套餐说明</h3>
+            </div>
+            <span id="planSourceTip">平台侧开通套餐后，租户管理员可自助生成激活码</span>
+        </div>
+        <div class="plan-grid" id="planGrid"></div>
+    </section>
+</div>
+
+<template id="activationCodeFormTemplate">
+    <form class="layui-form popup-form" lay-filter="activationCodeForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">生成数量</label>
+            <div class="layui-input-block">
+                <input type="number" name="quantity" min="1" max="100" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">到期时间</label>
+            <div class="layui-input-block">
+                <input type="text" name="expireTime" id="activationCodeExpireTime" required lay-verify="required" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">备注</label>
+            <div class="layui-input-block">
+                <input type="text" name="remark" autocomplete="off" class="layui-input" placeholder="例如：第一批演示机器">
+            </div>
+        </div>
+        <div class="popup-actions">
+            <button type="button" class="layui-btn layui-btn-primary" data-action="close">取消</button>
+            <button type="submit" class="layui-btn" lay-submit lay-filter="saveActivationCode">生成</button>
+        </div>
+    </form>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/license-center.js"></script>
+</body>
+</html>

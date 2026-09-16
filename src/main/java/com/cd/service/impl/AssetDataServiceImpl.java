@@ -2,12 +2,15 @@ package com.cd.service.impl;
 
 import com.cd.entity.AccountEntity;
 import com.cd.entity.AppEntity;
+import com.cd.entity.HostEntity;
 import com.cd.entity.MqErrorLogEntity;
 import com.cd.entity.ProcessEntity;
 import com.cd.entity.ServiceEntity;
 import com.cd.mapper.AccountMapper;
 import com.cd.mapper.AppMapper;
 import com.cd.mapper.HostMapper;
+import com.cd.mapper.HostVulnResultMapper;
+import com.cd.mapper.HostVulnTaskMapper;
 import com.cd.mapper.MqErrorLogMapper;
 import com.cd.mapper.ProcessMapper;
 import com.cd.mapper.ServiceMapper;
@@ -33,6 +36,9 @@ import java.time.LocalDateTime;
 public class AssetDataServiceImpl implements AssetDataService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String SOURCE_PLATFORM = "PLATFORM";
+    private static final String VERIFYING = "VERIFYING";
+    private static final int TASK_STATUS_RUNNING = 1;
 
     private final AccountMapper accountMapper;
     private final ServiceMapper serviceMapper;
@@ -40,6 +46,8 @@ public class AssetDataServiceImpl implements AssetDataService {
     private final AppMapper appMapper;
     private final MqErrorLogMapper mqErrorLogMapper;
     private final HostMapper hostMapper;
+    private final HostVulnResultMapper hostVulnResultMapper;
+    private final HostVulnTaskMapper hostVulnTaskMapper;
     private final VulnRuleEngine vulnRuleEngine;
 
     @Override
@@ -86,6 +94,13 @@ public class AssetDataServiceImpl implements AssetDataService {
                 return;
             }
             String macAddress = macNode.asText();
+            HostEntity host = hostMapper.selectByNormalizedMac(normalizeMac(macAddress));
+            if (host == null) {
+                saveError(queueName, message, "未找到匹配主机: mac=" + macAddress);
+                log.warn("资产探测消息未关联到主机: mac={}", macAddress);
+                return;
+            }
+            Long tenantId = host.getTenantId() == null ? 0L : host.getTenantId();
 
             // 按类型确定资产数组字段与统计字段
             String arrayField;
@@ -125,43 +140,51 @@ public class AssetDataServiceImpl implements AssetDataService {
             switch (type) {
                 case "account" -> {
                     AccountEntity entity = new AccountEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     accountMapper.insert(entity);
                 }
                 case "service" -> {
                     ServiceEntity entity = new ServiceEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     serviceMapper.insert(entity);
                 }
                 case "process" -> {
                     ProcessEntity entity = new ProcessEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     processMapper.insert(entity);
                 }
                 case "app" -> {
                     AppEntity entity = new AppEntity();
+                    entity.setTenantId(tenantId);
                     entity.setTaskId(taskId);
                     entity.setHostName(hostName);
                     entity.setMacAddress(macAddress);
+                    entity.setSource(SOURCE_PLATFORM);
                     entity.setAssetCount(assetCount);
                     entity.setAssetJson(assetJson);
                     appMapper.insert(entity);
                 }
             }
             hostMapper.updateLastScanTimeByMac(macAddress, LocalDateTime.now());
-            triggerStaticVulnMatch(macAddress);
+            triggerStaticVulnMatch(macAddress, tenantId);
             log.info("资产探测结果已入库: queue={}, type={}, host={}, count={}", queueName, type, hostName, assetCount);
 
         } catch (Exception e) {
@@ -170,20 +193,32 @@ public class AssetDataServiceImpl implements AssetDataService {
         }
     }
 
-    private void triggerStaticVulnMatch(String macAddress) {
+    private void triggerStaticVulnMatch(String macAddress, Long tenantId) {
         try {
-            var host = hostMapper.selectByMac(macAddress);
+            Long resolvedTenantId = tenantId == null ? 0L : tenantId;
+            var host = hostMapper.selectByNormalizedMacAndTenant(normalizeMac(macAddress), resolvedTenantId);
             if (host == null || host.getId() == null) {
                 log.warn("资产入库后未找到主机，跳过静态漏洞匹配: mac={}", macAddress);
                 return;
             }
-            vulnRuleEngine.evaluateHost(host.getId());
+            if (hasOngoingVerification(host.getId(), resolvedTenantId)) {
+                log.info("host {} has ongoing vuln verification, skip asset-triggered rematch", host.getId());
+                return;
+            }
+            vulnRuleEngine.evaluateHostForTenant(host.getId(), resolvedTenantId);
         } catch (Exception e) {
             log.warn("资产入库后静态漏洞匹配失败: mac={}", macAddress, e);
         }
     }
 
     /** 队列名 → type 值映射。 */
+    private boolean hasOngoingVerification(Long hostId, Long tenantId) {
+        if (hostVulnResultMapper.countActiveByHostAndVerifyStatusAndTenant(hostId, VERIFYING, tenantId) > 0) {
+            return true;
+        }
+        return hostVulnTaskMapper.countByHostAndStatusAndTenant(hostId, TASK_STATUS_RUNNING, tenantId) > 0;
+    }
+
     private String queueToType(String queueName) {
         return switch (queueName) {
             case "account_queue" -> "account";
@@ -192,6 +227,10 @@ public class AssetDataServiceImpl implements AssetDataService {
             case "app_queue" -> "app";
             default -> null;
         };
+    }
+
+    private String normalizeMac(String mac) {
+        return mac == null ? "" : mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
     private void saveError(String queueName, String rawMessage, String errorReason) {

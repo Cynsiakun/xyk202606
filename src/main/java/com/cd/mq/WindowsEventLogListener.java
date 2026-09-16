@@ -61,7 +61,7 @@ public class WindowsEventLogListener {
      * 因 SQL 内做 REPLACE/LOWER 无法走索引）。仅缓存命中结果；未命中不缓存，使新注册主机能在
      * 下一条消息被解析。写后 5 分钟过期，兜底主机 mac 变更等场景。
      */
-    private final Cache<String, Long> hostIdCache = Caffeine.newBuilder()
+    private final Cache<String, HostTenantRef> hostCache = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(5))
             .maximumSize(10_000)
             .build();
@@ -112,12 +112,15 @@ public class WindowsEventLogListener {
         }
 
         // 按 mac 映射 host_id（命中缓存则免查库）
-        Long hostId = resolveHostId(macAddress);
-        if (hostId == null) {
+        HostTenantRef hostRef = resolveHost(macAddress);
+        if (hostRef == null) {
             handleHostNotFound(message, macAddress, channel, deliveryTag, retryCount);
             return;
         }
+        Long hostId = hostRef.hostId();
+        Long tenantId = hostRef.tenantId();
         entity.setHostId(hostId);
+        entity.setTenantId(tenantId);
 
         // 分流：登录 / 账户变更事件解析为子记录，随主记录在同一事务内入库（source_log_id 稍后回填）
         LoginSecurityLogEntity login = WindowsSecurityEventParser.isLoginEvent(eventId)
@@ -126,6 +129,12 @@ public class WindowsEventLogListener {
         AccountChangeLogEntity account = WindowsSecurityEventParser.isAccountEvent(eventId)
                 ? WindowsSecurityEventParser.parseAccount(eventId, eventTime, hostId, rawXml)
                 : null;
+        if (login != null) {
+            login.setTenantId(tenantId);
+        }
+        if (account != null) {
+            account.setTenantId(tenantId);
+        }
 
         // 放入批量缓冲；入库与 ACK 由 WindowsEventLogBatchWriter 统一完成
         try {
@@ -141,18 +150,22 @@ public class WindowsEventLogListener {
      * 解析 mac 对应的 host_id：先查本地缓存，未命中再查库，命中库则回填缓存。
      * 主机不存在返回 {@code null}（不缓存，便于主机注册后及时映射）。
      */
-    private Long resolveHostId(String macAddress) {
+    private HostTenantRef resolveHost(String macAddress) {
         String nmac = normalizeMac(macAddress);
-        Long cached = hostIdCache.getIfPresent(nmac);
+        HostTenantRef cached = hostCache.getIfPresent(nmac);
         if (cached != null) {
             return cached;
         }
         HostEntity host = hostMapper.selectByNormalizedMac(nmac);
         if (host != null && host.getId() != null) {
-            hostIdCache.put(nmac, host.getId());
-            return host.getId();
+            HostTenantRef ref = new HostTenantRef(host.getId(), host.getTenantId() == null ? 0L : host.getTenantId());
+            hostCache.put(nmac, ref);
+            return ref;
         }
         return null;
+    }
+
+    private record HostTenantRef(Long hostId, Long tenantId) {
     }
 
     private void handleHostNotFound(String message, String macAddress, Channel channel,

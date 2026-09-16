@@ -5,15 +5,18 @@
 <mapper namespace="com.cd.mapper.BaselineSummaryMapper">
 
     <insert id="upsert" parameterType="com.cd.entity.BaselineSummaryEntity">
-        INSERT INTO baseline_summary (host_id, task_id, pass_count, fail_count, score,
-                                      compliance_rate, last_scan_time)
-        VALUES (#{hostId}, #{taskId}, #{passCount}, #{failCount}, #{score},
-                #{complianceRate}, #{lastScanTime})
+        INSERT INTO baseline_summary (tenant_id, host_id, task_id, level, pass_count, fail_count, score,
+                                      compliance_rate, last_scan_time, asset_type_id, protection_level_id)
+        VALUES (COALESCE(#{tenantId}, 0), #{hostId}, #{taskId}, #{level}, #{passCount}, #{failCount}, #{score},
+                #{complianceRate}, #{lastScanTime}, #{assetTypeId}, #{protectionLevelId})
         ON DUPLICATE KEY UPDATE
+            level = #{level},
             pass_count = #{passCount},
             fail_count = #{failCount},
             score = #{score},
             compliance_rate = #{complianceRate},
-            last_scan_time = #{lastScanTime}
+            last_scan_time = #{lastScanTime},
+            asset_type_id = #{assetTypeId},
+            protection_level_id = #{protectionLevelId}
     </insert>
 </mapper>

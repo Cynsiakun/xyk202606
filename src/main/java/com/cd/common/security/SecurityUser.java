@@ -11,17 +11,20 @@ public class SecurityUser implements UserDetails {
 
     private final Long userId;
     private final String userName;
+    private final Long tenantId;
     private final String password;
     private final Integer status;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public SecurityUser(Long userId,
                         String userName,
+                        Long tenantId,
                         String password,
                         Integer status,
                         Collection<? extends GrantedAuthority> authorities) {
         this.userId = userId;
         this.userName = userName;
+        this.tenantId = tenantId;
         this.password = password;
         this.status = status;
         this.authorities = authorities;

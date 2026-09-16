@@ -31,4 +31,6 @@ public interface SecurityEventService {
     List<PopupAlertDTO> newHighCritical(Long afterId);
 
     List<PopupAlertDTO> recentHighCritical();
+
+    List<PopupAlertDTO> recentHighCritical(Long tenantId, boolean includeAllTenants);
 }

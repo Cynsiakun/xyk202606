@@ -6,6 +6,7 @@
 
     <sql id="filterConditions">
         <where>
+            a.tenant_id = #{q.tenantId}
             <if test="q.level != null and q.level != ''">
                 AND a.level = #{q.level}
             </if>
@@ -50,7 +51,7 @@
                a.event_time   AS eventTime,
                a.create_time  AS createTime
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
         <include refid="filterConditions"/>
         ORDER BY a.${q.sortColumn} ${q.sortDirection}, a.id DESC
         LIMIT #{q.size} OFFSET #{q.offset}
@@ -59,7 +60,7 @@
     <select id="countPage" resultType="long">
         SELECT COUNT(1)
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
         <include refid="filterConditions"/>
     </select>
 
@@ -78,7 +79,7 @@
                a.event_time   AS eventTime,
                a.create_time  AS createTime
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
         <include refid="filterConditions"/>
         ORDER BY a.${q.sortColumn} ${q.sortDirection}, a.id DESC
         LIMIT #{limit}
@@ -106,17 +107,18 @@
                w.message      AS logMessage,
                w.raw_json     AS rawXml
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
-        LEFT JOIN windows_event_logs w ON w.id = a.source_log_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
+        LEFT JOIN windows_event_logs w ON w.id = a.source_log_id AND w.tenant_id = a.tenant_id
         WHERE a.id = #{id}
+          AND a.tenant_id = #{tenantId}
     </select>
 
     <select id="countByLevel" resultType="long">
-        SELECT COUNT(1) FROM security_alerts WHERE level = #{level}
+        SELECT COUNT(1) FROM security_alerts WHERE level = #{level} AND tenant_id = #{tenantId}
     </select>
 
     <select id="countByStatus" resultType="long">
-        SELECT COUNT(1) FROM security_alerts WHERE status = #{status}
+        SELECT COUNT(1) FROM security_alerts WHERE status = #{status} AND tenant_id = #{tenantId}
     </select>
 
     <update id="updateStatus">
@@ -126,6 +128,7 @@
         <foreach collection="ids" item="it" open="(" separator="," close=")">
             #{it}
         </foreach>
+          AND tenant_id = #{tenantId}
         <if test="fromStatuses != null and fromStatuses.size() > 0">
             AND status IN
             <foreach collection="fromStatuses" item="st" open="(" separator="," close=")">
@@ -137,6 +140,7 @@
     <select id="selectHostOptions" resultType="com.cd.dto.HostOptionDTO">
         SELECT h.id AS id, h.hostname AS hostname, h.ipv4 AS ipv4
         FROM hosts h
+        WHERE h.tenant_id = #{tenantId}
         ORDER BY h.id ASC
     </select>
 
@@ -146,6 +150,7 @@
 
     <select id="selectNewHighCritical" resultType="com.cd.dto.PopupAlertDTO">
         SELECT a.id        AS id,
+               a.tenant_id AS tenantId,
                a.level     AS level,
                a.host_id   AS hostId,
                h.hostname  AS hostname,
@@ -153,7 +158,7 @@
                a.description AS description,
                a.event_time AS eventTime
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
         WHERE a.id &gt; #{afterId}
           AND a.status = 'new'
           AND a.level IN ('Critical', 'High')
@@ -163,6 +168,7 @@
 
     <select id="selectRecentHighCritical" resultType="com.cd.dto.PopupAlertDTO">
         SELECT a.id        AS id,
+               a.tenant_id AS tenantId,
                a.level     AS level,
                a.host_id   AS hostId,
                h.hostname  AS hostname,
@@ -170,9 +176,27 @@
                a.description AS description,
                a.event_time AS eventTime
         FROM security_alerts a
-        LEFT JOIN hosts h ON h.id = a.host_id
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
         WHERE a.status = 'new'
           AND a.level IN ('Critical', 'High')
+        ORDER BY a.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectRecentHighCriticalByTenant" resultType="com.cd.dto.PopupAlertDTO">
+        SELECT a.id        AS id,
+               a.tenant_id AS tenantId,
+               a.level     AS level,
+               a.host_id   AS hostId,
+               h.hostname  AS hostname,
+               a.alert_name AS alertName,
+               a.description AS description,
+               a.event_time AS eventTime
+        FROM security_alerts a
+        LEFT JOIN hosts h ON h.id = a.host_id AND h.tenant_id = a.tenant_id
+        WHERE a.status = 'new'
+          AND a.level IN ('Critical', 'High')
+          AND a.tenant_id = #{tenantId}
         ORDER BY a.id DESC
         LIMIT #{limit}
     </select>

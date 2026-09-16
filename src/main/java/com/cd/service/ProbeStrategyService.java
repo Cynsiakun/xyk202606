@@ -26,4 +26,6 @@ public interface ProbeStrategyService {
      * 调度器下发后回写本次执行时间。
      */
     void markRun(LocalDateTime runAt);
+    /** 调度器下发端口扫描后回写本次执行时间。 */
+    void markPortScanRun(LocalDateTime runAt);
 }

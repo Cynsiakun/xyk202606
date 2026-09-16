@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.AssetFingerprintRuleMapper">
+
+    <resultMap id="AssetFingerprintRuleMap" type="com.cd.entity.AssetFingerprintRuleEntity">
+        <id column="id" property="id"/>
+        <result column="rule_code" property="ruleCode"/>
+        <result column="name" property="name"/>
+        <result column="category" property="category"/>
+        <result column="sub_category" property="subCategory"/>
+        <result column="protocol" property="protocol"/>
+        <result column="port" property="port"/>
+        <result column="banner_regex" property="bannerRegex"/>
+        <result column="vendor" property="vendor"/>
+        <result column="product" property="product"/>
+        <result column="version_expr" property="versionExpr"/>
+        <result column="confidence" property="confidence"/>
+        <result column="description" property="description"/>
+        <result column="enabled" property="enabled"/>
+        <result column="priority" property="priority"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectEnabledRules" resultMap="AssetFingerprintRuleMap">
+        SELECT id, rule_code, name, category, sub_category, protocol, port, banner_regex,
+               vendor, product, version_expr, confidence, description, enabled, priority, created_at, updated_at
+        FROM asset_fingerprint_rule
+        WHERE enabled = 1
+        ORDER BY priority ASC, id ASC
+    </select>
+
+    <select id="selectManagePage" resultMap="AssetFingerprintRuleMap">
+        SELECT id, rule_code, name, category, sub_category, protocol, port, banner_regex,
+               vendor, product, version_expr, confidence, description, enabled, priority, created_at, updated_at
+        FROM asset_fingerprint_rule
+        WHERE 1 = 1
+          <if test="keyword != null and keyword != ''">
+              AND (
+                  rule_code LIKE CONCAT('%', #{keyword}, '%')
+                  OR name LIKE CONCAT('%', #{keyword}, '%')
+                  OR product LIKE CONCAT('%', #{keyword}, '%')
+                  OR sub_category LIKE CONCAT('%', #{keyword}, '%')
+                  OR banner_regex LIKE CONCAT('%', #{keyword}, '%')
+              )
+          </if>
+          <if test="category != null and category != ''">
+              AND category = #{category}
+          </if>
+          <if test="port != null">
+              AND port = #{port}
+          </if>
+          <if test="enabled != null">
+              AND enabled = #{enabled}
+          </if>
+        ORDER BY priority ASC, id ASC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countManagePage" resultType="long">
+        SELECT COUNT(1)
+        FROM asset_fingerprint_rule
+        WHERE 1 = 1
+          <if test="keyword != null and keyword != ''">
+              AND (
+                  rule_code LIKE CONCAT('%', #{keyword}, '%')
+                  OR name LIKE CONCAT('%', #{keyword}, '%')
+                  OR product LIKE CONCAT('%', #{keyword}, '%')
+                  OR sub_category LIKE CONCAT('%', #{keyword}, '%')
+                  OR banner_regex LIKE CONCAT('%', #{keyword}, '%')
+              )
+          </if>
+          <if test="category != null and category != ''">
+              AND category = #{category}
+          </if>
+          <if test="port != null">
+              AND port = #{port}
+          </if>
+          <if test="enabled != null">
+              AND enabled = #{enabled}
+          </if>
+    </select>
+
+    <select id="selectById" resultMap="AssetFingerprintRuleMap">
+        SELECT id, rule_code, name, category, sub_category, protocol, port, banner_regex,
+               vendor, product, version_expr, confidence, description, enabled, priority, created_at, updated_at
+        FROM asset_fingerprint_rule
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByRuleCode" resultMap="AssetFingerprintRuleMap">
+        SELECT id, rule_code, name, category, sub_category, protocol, port, banner_regex,
+               vendor, product, version_expr, confidence, description, enabled, priority, created_at, updated_at
+        FROM asset_fingerprint_rule
+        WHERE rule_code = #{ruleCode}
+        LIMIT 1
+    </select>
+
+    <insert id="insertManage" parameterType="com.cd.entity.AssetFingerprintRuleEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO asset_fingerprint_rule
+        (rule_code, name, category, sub_category, protocol, port, banner_regex, vendor, product,
+         version_expr, confidence, description, enabled, priority)
+        VALUES
+        (#{ruleCode}, #{name}, #{category}, #{subCategory}, #{protocol}, #{port}, #{bannerRegex}, #{vendor}, #{product},
+         #{versionExpr}, #{confidence}, #{description}, #{enabled}, #{priority})
+    </insert>
+
+    <update id="updateManage" parameterType="com.cd.entity.AssetFingerprintRuleEntity">
+        UPDATE asset_fingerprint_rule
+        SET name = #{name},
+            category = #{category},
+            sub_category = #{subCategory},
+            protocol = #{protocol},
+            port = #{port},
+            banner_regex = #{bannerRegex},
+            vendor = #{vendor},
+            product = #{product},
+            version_expr = #{versionExpr},
+            confidence = #{confidence},
+            description = #{description},
+            enabled = #{enabled},
+            priority = #{priority}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM asset_fingerprint_rule
+        WHERE id = #{id}
+    </delete>
+</mapper>

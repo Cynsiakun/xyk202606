@@ -18,15 +18,15 @@ public interface LoginSecurityLogViewMapper {
 
     long countPage(@Param("q") LoginSecurityLogQueryDTO query);
 
-    LoginSecurityLogDetailDTO selectDetailById(@Param("id") Long id);
+    LoginSecurityLogDetailDTO selectDetailById(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /** 今日某结果数量（按 event_time）。 */
-    long countTodayByResult(@Param("result") String result);
+    long countTodayByResult(@Param("result") String result, @Param("tenantId") Long tenantId);
 
     /** 今日提权登录数量（按 event_time）。 */
-    long countTodayElevated();
+    long countTodayElevated(@Param("tenantId") Long tenantId);
 
-    List<HostOptionDTO> selectHostOptions();
+    List<HostOptionDTO> selectHostOptions(@Param("tenantId") Long tenantId);
 
     List<LoginSecurityLogItemDTO> selectForExport(@Param("q") LoginSecurityLogQueryDTO query, @Param("limit") int limit);
 }

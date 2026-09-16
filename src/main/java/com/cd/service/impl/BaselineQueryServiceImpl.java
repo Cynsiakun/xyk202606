@@ -1,12 +1,15 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.BaselineHostResultItemDTO;
 import com.cd.dto.BaselineProblemHostDTO;
 import com.cd.dto.BaselineRuleOptionDTO;
 import com.cd.dto.BaselineTaskExportRowDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
+import com.cd.entity.BaselineAssetTypeEntity;
+import com.cd.entity.BaselineProtectionLevelEntity;
 import com.cd.mapper.BaselineQueryMapper;
 import com.cd.service.BaselineQueryService;
 import lombok.RequiredArgsConstructor;
@@ -44,15 +47,16 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
         String safeExecuteType = normalizeEnum(executeType, List.of("MANUAL", "SCHEDULED"));
         String safeTaskType = normalizeEnum(taskType, List.of("SCAN", "RECHECK"));
         String safeStatus = normalizeStatus(status);
-        long total = baselineQueryMapper.countTasks(safeKeyword, safeExecuteType, safeTaskType, safeStatus);
+        Long tenantId = currentTenantId();
+        long total = baselineQueryMapper.countTasks(safeKeyword, safeExecuteType, safeTaskType, safeStatus, tenantId);
         List<BaselineTaskListItemDTO> list = baselineQueryMapper.selectTaskPage(
-                safeKeyword, safeExecuteType, safeTaskType, safeStatus, (safePage - 1) * safeSize, safeSize);
+                safeKeyword, safeExecuteType, safeTaskType, safeStatus, tenantId, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
     @Override
     public BaselineTaskResultOverviewDTO getResultOverview(Long taskId) {
-        BaselineTaskResultOverviewDTO overview = baselineQueryMapper.selectResultOverview(taskId);
+        BaselineTaskResultOverviewDTO overview = baselineQueryMapper.selectResultOverview(taskId, currentTenantId());
         if (overview == null) {
             overview = new BaselineTaskResultOverviewDTO();
             overview.setTaskId(taskId);
@@ -68,29 +72,42 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
     }
 
     @Override
-    public PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size) {
+    public PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size, String assetTypeCode) {
         int safePage = normalizePage(page);
         int safeSize = normalizeSize(size);
-        long total = baselineQueryMapper.countProblemHosts(taskId);
+        String safeAssetTypeCode = normalizeAssetTypeCode(assetTypeCode);
+        Long tenantId = currentTenantId();
+        long total = baselineQueryMapper.countProblemHosts(taskId, tenantId, safeAssetTypeCode);
         List<BaselineProblemHostDTO> list = baselineQueryMapper.selectProblemHostPage(
-                taskId, (safePage - 1) * safeSize, safeSize);
+                taskId, tenantId, safeAssetTypeCode, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
     @Override
     public List<BaselineHostResultItemDTO> listTaskHostResults(Long taskId, Long hostId) {
-        return baselineQueryMapper.selectTaskHostResults(taskId, hostId);
+        return baselineQueryMapper.selectTaskHostResults(taskId, hostId, currentTenantId());
     }
 
     @Override
-    public List<BaselineRuleOptionDTO> listRuleOptions(String keyword) {
+    public List<BaselineRuleOptionDTO> listRuleOptions(String keyword, List<String> assetTypeCodes, String protectionLevelCode) {
         String trimmed = keyword == null ? null : keyword.trim();
-        return baselineQueryMapper.selectRuleOptions(trimmed);
+        return baselineQueryMapper.selectRuleOptions(trimmed, normalizeAssetTypeCodes(assetTypeCodes),
+                normalizeText(protectionLevelCode));
+    }
+
+    @Override
+    public List<BaselineProtectionLevelEntity> listProtectionLevels() {
+        return baselineQueryMapper.selectProtectionLevels();
+    }
+
+    @Override
+    public List<BaselineAssetTypeEntity> listAssetTypes() {
+        return baselineQueryMapper.selectAssetTypes();
     }
 
     @Override
     public byte[] exportTaskResultCsv(Long taskId) {
-        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectTaskExportRows(taskId);
+        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectTaskExportRows(taskId, currentTenantId());
         StringBuilder builder = new StringBuilder("\uFEFF");
         builder.append("主机ID,主机名,IP,规则ID,规则名称,分类,检测项,检测状态,修复状态,期望值,实际值,证据\n");
         for (BaselineTaskExportRowDTO row : rows) {
@@ -122,7 +139,7 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
 
     @Override
     public byte[] exportHostResultCsv(Long hostId) {
-        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectHostExportRows(hostId);
+        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectHostExportRows(hostId, currentTenantId());
         StringBuilder builder = new StringBuilder("\uFEFF");
         builder.append("主机ID,主机名,IP,规则ID,规则名称,分类,检测项,检测状态,修复状态,期望值,实际值,证据\n");
         for (BaselineTaskExportRowDTO row : rows) {
@@ -154,7 +171,7 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
 
     private BaselineReport buildTaskReport(Long taskId) {
         BaselineTaskResultOverviewDTO overview = getResultOverview(taskId);
-        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectTaskExportRows(taskId);
+        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectTaskExportRows(taskId, currentTenantId());
         BaselineReport report = buildReport("TASK", taskId, "基线任务检测报告", "任务 #" + taskId, rows);
         report.finishedHostCount = value(overview.getFinishedHostCount());
         report.hostCount = value(overview.getTotalHostCount());
@@ -169,7 +186,7 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
     }
 
     private BaselineReport buildHostReport(Long hostId) {
-        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectHostExportRows(hostId);
+        List<BaselineTaskExportRowDTO> rows = baselineQueryMapper.selectHostExportRows(hostId, currentTenantId());
         String subject = "主机 #" + hostId;
         if (!rows.isEmpty()) {
             BaselineTaskExportRowDTO first = rows.get(0);
@@ -848,6 +865,22 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
         return text == null || text.trim().isEmpty() ? null : text.trim();
     }
 
+    private List<String> normalizeAssetTypeCodes(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        return values.stream()
+                .filter(this::hasText)
+                .map(value -> value.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+    }
+
+    private String normalizeAssetTypeCode(String value) {
+        String normalized = normalizeText(value);
+        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+    }
+
     private String normalizeEnum(String value, List<String> allowed) {
         if (value == null || value.trim().isEmpty()) {
             return null;
@@ -859,6 +892,11 @@ public class BaselineQueryServiceImpl implements BaselineQueryService {
     private String csv(Object value) {
         String text = value == null ? "" : String.valueOf(value);
         return "\"" + text.replace("\"", "\"\"").replace("\r", " ").replace("\n", " ") + "\"";
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private static class BaselineReport {

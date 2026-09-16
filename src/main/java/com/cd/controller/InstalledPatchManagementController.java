@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/installed-patch")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('PATCH')")
 public class InstalledPatchManagementController {
 
     private final InstalledPatchManagementService installedPatchManagementService;

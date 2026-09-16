@@ -1,7 +1,6 @@
 package com.cd.common.security;
 
 import com.cd.common.constant.AuthConstants;
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,9 +31,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtTokenProvider.isValid(token) && !jwtTokenBlacklistService.isRevoked(token)
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
-            Claims claims = jwtTokenProvider.parseClaims(token);
             Long userId = jwtTokenProvider.getUserId(token);
+            Long tenantId = jwtTokenProvider.getTenantId(token);
             SecurityUser securityUser = customUserDetailsService.loadUserById(userId);
+            Long currentTenantId = tenantId == null ? securityUser.getTenantId() : tenantId;
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     securityUser,
@@ -46,10 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             request.setAttribute(AuthConstants.CURRENT_USER_ID, userId);
             request.setAttribute(AuthConstants.CURRENT_TOKEN, token);
-            request.setAttribute(AuthConstants.CURRENT_USER_NAME, claims.get("userName"));
+            request.setAttribute(AuthConstants.CURRENT_USER_NAME, jwtTokenProvider.getUserName(token));
+            request.setAttribute(AuthConstants.CURRENT_TENANT_ID, currentTenantId);
+            TenantContextHolder.setTenantId(currentTenantId);
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContextHolder.clear();
+        }
     }
 
     private String extractToken(String authorizationHeader) {

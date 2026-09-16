@@ -16,23 +16,32 @@ public interface BaselineWorkorderMapper {
                                                   @Param("status") String status,
                                                   @Param("priority") String priority,
                                                   @Param("assigneeId") Long assigneeId,
+                                                  @Param("tenantId") Long tenantId,
                                                   @Param("offset") int offset,
                                                   @Param("limit") int limit);
 
     long countPage(@Param("keyword") String keyword,
                    @Param("status") String status,
                    @Param("priority") String priority,
-                   @Param("assigneeId") Long assigneeId);
+                   @Param("assigneeId") Long assigneeId,
+                   @Param("tenantId") Long tenantId);
 
-    BaselineWorkorderDetailDTO selectDetail(@Param("id") Long id);
+    BaselineWorkorderDetailDTO selectDetail(@Param("id") Long id,
+                                            @Param("tenantId") Long tenantId);
 
-    BaselineWorkorderEntity selectEntityById(@Param("id") Long id);
+    BaselineWorkorderEntity selectEntityById(@Param("id") Long id,
+                                             @Param("tenantId") Long tenantId);
 
-    int markProcessing(@Param("id") Long id);
+    int markProcessing(@Param("id") Long id,
+                       @Param("tenantId") Long tenantId);
 
-    int markDone(@Param("id") Long id, @Param("closeRemark") String closeRemark);
+    int markDone(@Param("id") Long id,
+                 @Param("closeRemark") String closeRemark,
+                 @Param("tenantId") Long tenantId);
 
-    boolean userHasRole(@Param("userId") Long userId, @Param("roleCode") String roleCode);
+    boolean userHasRole(@Param("userId") Long userId,
+                        @Param("roleCode") String roleCode,
+                        @Param("tenantId") Long tenantId);
 
-    List<BaselineOperatorOptionDTO> selectOperatorOptions();
+    List<BaselineOperatorOptionDTO> selectOperatorOptions(@Param("tenantId") Long tenantId);
 }

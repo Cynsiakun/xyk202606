@@ -5,7 +5,7 @@
 <mapper namespace="com.cd.mapper.BaselineCheckDataMapper">
 
     <insert id="insert" parameterType="com.cd.entity.BaselineCheckDataEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO baseline_check_data (task_id, host_id, check_data, create_time)
-        VALUES (#{taskId}, #{hostId}, #{checkData}, #{createTime})
+        INSERT INTO baseline_check_data (tenant_id, task_id, host_id, check_data, create_time)
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostId}, #{checkData}, #{createTime})
     </insert>
 </mapper>

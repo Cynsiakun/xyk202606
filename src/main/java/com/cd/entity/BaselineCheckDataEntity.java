@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class BaselineCheckDataEntity {
 
     private Long id;
+    private Long tenantId;
     private Long taskId;
     private Long hostId;
     private String checkData;

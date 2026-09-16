@@ -13,6 +13,8 @@ public class BaselineProblemHostDTO {
     private Long hostId;
     private String hostName;
     private String ipv4;
+    private String assetTypes;
+    private String protectionLevels;
     private BigDecimal complianceRate;
     private Integer passRuleCount;
     private Integer failRuleCount;

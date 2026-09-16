@@ -2,6 +2,7 @@ package com.cd.service.impl;
 
 import com.cd.common.PageResult;
 import com.cd.common.config.RabbitMQConfig;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.PatchRiskDetailDTO;
 import com.cd.dto.PatchRiskHostDTO;
 import com.cd.dto.PatchSecurityActionResultDTO;
@@ -44,7 +45,7 @@ public class PatchSecurityServiceImpl implements PatchSecurityService {
 
     @Override
     public PatchSecuritySummaryDTO summary() {
-        PatchSecuritySummaryDTO summary = patchSecurityMapper.selectSummary();
+        PatchSecuritySummaryDTO summary = patchSecurityMapper.selectSummary(currentTenantId());
         return summary == null ? new PatchSecuritySummaryDTO() : summary;
     }
 
@@ -61,22 +62,23 @@ public class PatchSecurityServiceImpl implements PatchSecurityService {
         String normalizedRiskLevel = emptyToNull(riskLevel);
         String normalizedRiskType = emptyToNull(riskType);
         String normalizedOsName = emptyToNull(osName);
+        Long tenantId = currentTenantId();
         long total = patchSecurityMapper.countRiskHosts(
-                normalizedKeyword, normalizedRiskLevel, normalizedRiskType, pendingReboot, normalizedOsName);
+                normalizedKeyword, normalizedRiskLevel, normalizedRiskType, pendingReboot, normalizedOsName, tenantId);
         List<PatchRiskHostDTO> list = patchSecurityMapper.selectRiskHostPage(
-                offset, size, normalizedKeyword, normalizedRiskLevel, normalizedRiskType, pendingReboot, normalizedOsName);
+                offset, size, normalizedKeyword, normalizedRiskLevel, normalizedRiskType, pendingReboot, normalizedOsName, tenantId);
         return new PageResult<>(total, list);
     }
 
     @Override
     public List<PatchRiskDetailDTO> listHostRisks(Long hostId) {
-        return patchSecurityMapper.selectRiskDetailsByHostId(hostId);
+        return patchSecurityMapper.selectRiskDetailsByHostId(hostId, currentTenantId());
     }
 
     @Override
     public PatchSecurityActionResultDTO analyze(List<Long> hostIds) {
         List<Long> targets = hostIds == null || hostIds.isEmpty()
-                ? patchSecurityMapper.selectHostIdsWithPatchStatus()
+                ? patchSecurityMapper.selectHostIdsWithPatchStatus(currentTenantId())
                 : hostIds;
         PatchSecurityActionResultDTO result = new PatchSecurityActionResultDTO();
         result.setTotal(targets.size());
@@ -95,7 +97,7 @@ public class PatchSecurityServiceImpl implements PatchSecurityService {
     @Override
     public PatchSecurityActionResultDTO scan(List<Long> hostIds) {
         List<Long> targets = hostIds == null || hostIds.isEmpty()
-                ? patchSecurityMapper.selectOnlineHostIds()
+                ? patchSecurityMapper.selectOnlineHostIds(currentTenantId())
                 : hostIds;
         PatchSecurityActionResultDTO result = new PatchSecurityActionResultDTO();
         result.setTotal(targets.size());
@@ -117,12 +119,12 @@ public class PatchSecurityServiceImpl implements PatchSecurityService {
         List<String> activeRiskIds = risks.stream()
                 .map(HostPatchRiskEntity::getRiskId)
                 .toList();
-        hostPatchRiskMapper.markFixedByHostIdExceptRiskIds(hostId, activeRiskIds);
+        hostPatchRiskMapper.markFixedByHostIdExceptRiskIdsAndTenant(hostId, activeRiskIds, currentTenantId());
         return risks;
     }
 
     private void sendPatchScan(Long hostId) {
-        HostEntity host = hostMapper.selectById(hostId);
+        HostEntity host = hostMapper.selectByIdAndTenant(hostId, currentTenantId());
         if (host == null) {
             throw new IllegalArgumentException("主机不存在: " + hostId);
         }
@@ -163,5 +165,10 @@ public class PatchSecurityServiceImpl implements PatchSecurityService {
 
     private String emptyToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

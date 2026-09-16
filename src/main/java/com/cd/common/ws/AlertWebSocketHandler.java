@@ -34,7 +34,7 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.add(session);
         try {
-            List<PopupAlertDTO> recent = securityEventService.recentHighCritical();
+            List<PopupAlertDTO> recent = securityEventService.recentHighCritical(sessionTenantId(session), canViewAll(session));
             String payload = objectMapper.writeValueAsString(Map.of("type", "init", "data", recent));
             session.sendMessage(new TextMessage(payload));
         } catch (Exception e) {
@@ -65,9 +65,27 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         TextMessage message = new TextMessage(payload);
+        Long alertTenantId = alert.getTenantId() == null ? 0L : alert.getTenantId();
         for (WebSocketSession session : sessions) {
-            sendQuietly(session, message);
+            if (canViewAll(session) || alertTenantId.equals(sessionTenantId(session))) {
+                sendQuietly(session, message);
+            }
         }
+    }
+
+    private Long sessionTenantId(WebSocketSession session) {
+        Object tenantId = session.getAttributes().get(AlertHandshakeInterceptor.ATTR_TENANT_ID);
+        if (tenantId instanceof Long value) {
+            return value;
+        }
+        if (tenantId instanceof Number value) {
+            return value.longValue();
+        }
+        return 0L;
+    }
+
+    private boolean canViewAll(WebSocketSession session) {
+        return Boolean.TRUE.equals(session.getAttributes().get(AlertHandshakeInterceptor.ATTR_PLATFORM_ADMIN));
     }
 
     private void sendQuietly(WebSocketSession session, TextMessage message) {

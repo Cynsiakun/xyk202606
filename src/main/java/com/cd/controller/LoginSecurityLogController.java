@@ -36,6 +36,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/login-security-log")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('LOG')")
 public class LoginSecurityLogController {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

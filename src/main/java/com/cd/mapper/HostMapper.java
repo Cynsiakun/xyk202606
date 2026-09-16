@@ -13,11 +13,20 @@ public interface HostMapper {
 
     int deleteById(@Param("id") Long id);
 
+    int deleteByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     HostEntity selectById(@Param("id") Long id);
+
+    HostEntity selectByIdAndTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     HostEntity selectByMac(@Param("macAddress") String macAddress);
 
+    HostEntity selectByMacAndTenant(@Param("macAddress") String macAddress, @Param("tenantId") Long tenantId);
+
     HostEntity selectByNormalizedMac(@Param("normalizedMac") String normalizedMac);
+
+    HostEntity selectByNormalizedMacAndTenant(@Param("normalizedMac") String normalizedMac,
+                                              @Param("tenantId") Long tenantId);
 
     /**
      * 按 MAC 唯一键做存在即更新、不存在即插入。
@@ -28,6 +37,14 @@ public interface HostMapper {
      * 心跳：按 MAC 将主机置为在线（status=1）并刷新 updated_at；不存在则插入新记录。
      */
     int heartbeatByMac(@Param("macAddress") String macAddress);
+
+    int claimTenantByNormalizedMac(@Param("normalizedMac") String normalizedMac,
+                                   @Param("tenantId") Long tenantId,
+                                   @Param("hostname") String hostname);
+
+    int insertAuthorizedPlaceholder(@Param("tenantId") Long tenantId,
+                                    @Param("hostname") String hostname,
+                                    @Param("macAddress") String macAddress);
 
     /**
      * 离线检测：将所有 status=1 且 updated_at 早于（当前时间 - seconds 秒）的主机置为离线（status=0）。
@@ -54,11 +71,26 @@ public interface HostMapper {
 
     List<HostEntity> selectAutoProbeCandidates(@Param("limit") int limit);
 
+    List<HostEntity> selectPortScanCandidates(@Param("limit") int limit);
+
+    List<String> selectAllMacAddresses();
+
     List<Long> selectAllIds();
+
+    List<Long> selectAllIdsByTenant(@Param("tenantId") Long tenantId);
 
     List<HostEntity> selectPage(@Param("offset") int offset,
                                 @Param("size") int size,
                                 @Param("keyword") String keyword);
 
+    List<HostEntity> selectPageByTenant(@Param("offset") int offset,
+                                        @Param("size") int size,
+                                        @Param("keyword") String keyword,
+                                        @Param("tenantId") Long tenantId);
+
     long countAll(@Param("keyword") String keyword);
+
+    long countAllByTenant(@Param("keyword") String keyword, @Param("tenantId") Long tenantId);
+
+    long countByTenantId(@Param("tenantId") Long tenantId);
 }

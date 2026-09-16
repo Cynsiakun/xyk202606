@@ -16,6 +16,7 @@ import com.cd.service.BaselineRemediationService;
 import com.cd.service.BaselineTaskService;
 import com.cd.util.BaselineWindowsPathNormalizer;
 import com.cd.common.security.SecurityUtils;
+import com.cd.common.security.TenantContextHolder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (distinctIds.isEmpty()) {
             throw new IllegalArgumentException("修复目标不能为空");
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(distinctIds);
+        Long tenantId = currentTenantId();
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(distinctIds, tenantId);
         Map<Long, BaselineRuleEntity> ruleById = loadRules(results);
 
         int success = 0;
@@ -95,7 +97,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (distinctIds.isEmpty()) {
             throw new IllegalArgumentException("回滚目标不能为空");
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(distinctIds);
+        Long tenantId = currentTenantId();
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(distinctIds, tenantId);
 
         int success = 0;
         int failed = 0;
@@ -125,7 +128,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             log.warn("修复跳过：规则缺少修复脚本 resultId={}, ruleId={}", result.getId(), rule.getId());
             return false;
         }
-        HostEntity host = hostMapper.selectById(result.getHostId());
+        Long tenantId = result.getTenantId() == null ? currentTenantId() : result.getTenantId();
+        HostEntity host = hostMapper.selectByIdAndTenant(result.getHostId(), tenantId);
         if (!isDispatchable(host)) {
             log.warn("修复跳过：主机不存在或缺少 MAC resultId={}, hostId={}", result.getId(), result.getHostId());
             return false;
@@ -138,7 +142,7 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             return false;
         }
         baselineRemediationMapper.updateStarted(remediation.getId());
-        baselineResultMapper.updateRemediationStatus(result.getId(), RESULT_STATUS_IN_PROGRESS);
+        baselineResultMapper.updateRemediationStatusByTenant(result.getId(), RESULT_STATUS_IN_PROGRESS, tenantId);
         return true;
     }
 
@@ -147,7 +151,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             log.warn("回滚跳过：找不到成功修复记录 resultId={}", result.getId());
             return false;
         }
-        HostEntity host = hostMapper.selectById(result.getHostId());
+        Long tenantId = result.getTenantId() == null ? currentTenantId() : result.getTenantId();
+        HostEntity host = hostMapper.selectByIdAndTenant(result.getHostId(), tenantId);
         if (!isDispatchable(host)) {
             log.warn("回滚跳过：主机不存在或缺少 MAC resultId={}, hostId={}", result.getId(), result.getHostId());
             return false;
@@ -156,12 +161,13 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (!sendToAgent(host, message, "基线回滚")) {
             return false;
         }
-        baselineResultMapper.updateRemediationStatus(result.getId(), RESULT_STATUS_IN_PROGRESS);
+        baselineResultMapper.updateRemediationStatusByTenant(result.getId(), RESULT_STATUS_IN_PROGRESS, tenantId);
         return true;
     }
 
     private BaselineRemediationEntity createRemediationRecord(BaselineResultEntity result, BaselineRuleEntity rule) {
         BaselineRemediationEntity remediation = new BaselineRemediationEntity();
+        remediation.setTenantId(result.getTenantId() == null ? currentTenantId() : result.getTenantId());
         remediation.setResultId(result.getId());
         remediation.setHostId(result.getHostId());
         remediation.setRuleId(result.getRuleId());
@@ -232,7 +238,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
     @Transactional
     public void handleResult(Long remediationId, Long resultId, boolean success,
                              String oldValue, String newValue, String backupData, String message) {
-        Long resolvedRemediationId = resolveRemediationId(remediationId, resultId);
+        Long tenantId = resolveTenantIdForCallback(remediationId, resultId);
+        Long resolvedRemediationId = resolveRemediationId(remediationId, resultId, tenantId);
         boolean completed = success && resolvedRemediationId != null;
         if (success && resolvedRemediationId == null) {
             log.warn("基线修复成功回传找不到 remediation 记录，按失败处理以避免闭环断裂: resultId={}", resultId);
@@ -242,29 +249,30 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (resolvedRemediationId != null) {
             baselineRemediationMapper.updateResult(resolvedRemediationId, remediationStatus, oldValue, newValue, backupData, message);
         }
-        int updated = baselineResultMapper.updateRemediationStatus(resultId, resultStatus);
+        int updated = baselineResultMapper.updateRemediationStatusByTenant(resultId, resultStatus, tenantId);
         log.info("基线修复结果回填: remediationId={}, resultId={}, status={}, updated={}",
                 resolvedRemediationId, resultId, resultStatus, updated);
         if (completed) {
-            dispatchAutoRecheck(resultId);
+            dispatchAutoRecheck(resultId, tenantId);
         }
     }
 
     @Override
     @Transactional
     public void handleRollbackResult(Long remediationId, Long resultId, boolean success, String message) {
-        Long resolvedRemediationId = resolveRollbackRemediationId(remediationId, resultId);
+        Long tenantId = resolveTenantIdForCallback(remediationId, resultId);
+        Long resolvedRemediationId = resolveRollbackRemediationId(remediationId, resultId, tenantId);
         BaselineRemediationEntity source = resolvedRemediationId == null ? null : baselineRemediationMapper.selectById(resolvedRemediationId);
         BaselineRemediationEntity rollbackRecord = null;
         if (source != null) {
             rollbackRecord = createRollbackRecord(source, success, message);
         }
         String resultStatus = success ? RESULT_STATUS_ROLLED_BACK : RESULT_STATUS_FIXED;
-        int updated = baselineResultMapper.updateRemediationStatus(resultId, resultStatus);
+        int updated = baselineResultMapper.updateRemediationStatusByTenant(resultId, resultStatus, tenantId);
         log.info("基线回滚结果回填: remediationId={}, rollbackRecordId={}, resultId={}, success={}, updated={}",
                 resolvedRemediationId, rollbackRecord == null ? null : rollbackRecord.getId(), resultId, success, updated);
         if (success) {
-            dispatchAutoRecheck(resultId);
+            dispatchAutoRecheck(resultId, tenantId);
         }
     }
 
@@ -273,13 +281,13 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (resultId == null || resultId < 1) {
             return List.of();
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(List.of(resultId), currentTenantId());
         if (results.isEmpty()) {
             return List.of();
         }
         BaselineResultEntity result = results.get(0);
-        return baselineRemediationMapper.selectByResultScope(
-                        result.getHostId(), result.getRuleId(), result.getCheckKey()).stream()
+        return baselineRemediationMapper.selectByResultScopeAndTenant(
+                        result.getHostId(), result.getRuleId(), result.getCheckKey(), currentTenantId()).stream()
                 .map(this::toRecordDTO)
                 .toList();
     }
@@ -357,25 +365,41 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         return rules.isEmpty() ? null : rules.get(0);
     }
 
-    private Long resolveRemediationId(Long remediationId, Long resultId) {
+    private Long resolveRemediationId(Long remediationId, Long resultId, Long tenantId) {
         if (remediationId != null) {
             return remediationId;
         }
         if (resultId == null) {
             return null;
         }
-        BaselineRemediationEntity pending = baselineRemediationMapper.selectLatestPendingByResultId(resultId);
+        BaselineRemediationEntity pending = baselineRemediationMapper.selectLatestPendingByResultIdAndTenant(resultId, tenantId);
         return pending == null ? null : pending.getId();
     }
 
-    private Long resolveRollbackRemediationId(Long remediationId, Long resultId) {
+    private Long resolveTenantIdForCallback(Long remediationId, Long resultId) {
+        if (remediationId != null) {
+            BaselineRemediationEntity remediation = baselineRemediationMapper.selectById(remediationId);
+            if (remediation != null && remediation.getTenantId() != null) {
+                return remediation.getTenantId();
+            }
+        }
+        if (resultId != null) {
+            List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+            if (!results.isEmpty() && results.get(0).getTenantId() != null) {
+                return results.get(0).getTenantId();
+            }
+        }
+        return 0L;
+    }
+
+    private Long resolveRollbackRemediationId(Long remediationId, Long resultId, Long tenantId) {
         if (remediationId != null) {
             return remediationId;
         }
         if (resultId == null) {
             return null;
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(List.of(resultId), tenantId);
         if (results.isEmpty()) {
             return null;
         }
@@ -387,18 +411,20 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         if (result == null) {
             return null;
         }
-        BaselineRemediationEntity remediation = baselineRemediationMapper.selectLatestSuccessfulByResultId(result.getId());
+        Long tenantId = result.getTenantId() == null ? currentTenantId() : result.getTenantId();
+        BaselineRemediationEntity remediation = baselineRemediationMapper.selectLatestSuccessfulByResultIdAndTenant(result.getId(), tenantId);
         if (remediation != null) {
             return remediation;
         }
-        return baselineRemediationMapper.selectLatestSuccessfulByResultScope(
-                result.getHostId(), result.getRuleId(), result.getCheckKey());
+        return baselineRemediationMapper.selectLatestSuccessfulByResultScopeAndTenant(
+                result.getHostId(), result.getRuleId(), result.getCheckKey(), tenantId);
     }
 
     private BaselineRemediationEntity createRollbackRecord(BaselineRemediationEntity source,
                                                            boolean success,
                                                            String message) {
         BaselineRemediationEntity rollback = new BaselineRemediationEntity();
+        rollback.setTenantId(source.getTenantId());
         rollback.setResultId(source.getResultId());
         rollback.setHostId(source.getHostId());
         rollback.setRuleId(source.getRuleId());
@@ -417,8 +443,8 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
         return rollback;
     }
 
-    private void dispatchAutoRecheck(Long resultId) {
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(List.of(resultId));
+    private void dispatchAutoRecheck(Long resultId, Long tenantId) {
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(List.of(resultId), tenantId);
         if (results.isEmpty()) {
             return;
         }
@@ -432,7 +458,7 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
             request.setExecuteType("MANUAL");
             request.setHostIds(List.of(result.getHostId()));
             request.setRuleIds(List.of(result.getRuleId()));
-            baselineTaskService.createAndDispatch(request);
+            baselineTaskService.createAndDispatchForTenant(request, tenantId);
             log.info("修复成功后自动复检已下发: resultId={}, hostId={}, ruleId={}",
                     resultId, result.getHostId(), result.getRuleId());
         } catch (Exception e) {
@@ -478,5 +504,10 @@ public class BaselineRemediationServiceImpl implements BaselineRemediationServic
     private String currentUsername() {
         String username = SecurityUtils.getCurrentUsername();
         return StringUtils.hasText(username) ? username : "system";
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

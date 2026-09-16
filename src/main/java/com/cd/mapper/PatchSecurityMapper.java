@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface PatchSecurityMapper {
 
-    PatchSecuritySummaryDTO selectSummary();
+    PatchSecuritySummaryDTO selectSummary(@Param("tenantId") Long tenantId);
 
     List<PatchRiskHostDTO> selectRiskHostPage(@Param("offset") int offset,
                                               @Param("size") int size,
@@ -17,17 +17,20 @@ public interface PatchSecurityMapper {
                                               @Param("riskLevel") String riskLevel,
                                               @Param("riskType") String riskType,
                                               @Param("pendingReboot") Integer pendingReboot,
-                                              @Param("osName") String osName);
+                                              @Param("osName") String osName,
+                                              @Param("tenantId") Long tenantId);
 
     long countRiskHosts(@Param("keyword") String keyword,
                         @Param("riskLevel") String riskLevel,
                         @Param("riskType") String riskType,
                         @Param("pendingReboot") Integer pendingReboot,
-                        @Param("osName") String osName);
+                        @Param("osName") String osName,
+                        @Param("tenantId") Long tenantId);
 
-    List<PatchRiskDetailDTO> selectRiskDetailsByHostId(@Param("hostId") Long hostId);
+    List<PatchRiskDetailDTO> selectRiskDetailsByHostId(@Param("hostId") Long hostId,
+                                                       @Param("tenantId") Long tenantId);
 
-    List<Long> selectHostIdsWithPatchStatus();
+    List<Long> selectHostIdsWithPatchStatus(@Param("tenantId") Long tenantId);
 
-    List<Long> selectOnlineHostIds();
+    List<Long> selectOnlineHostIds(@Param("tenantId") Long tenantId);
 }

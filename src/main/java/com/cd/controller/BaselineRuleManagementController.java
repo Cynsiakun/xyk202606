@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/baseline/rule-management")
 @RequiredArgsConstructor
+@PreAuthorize("@perm.isSuperAdmin()")
 public class BaselineRuleManagementController {
 
     private final BaselineRuleManagementService baselineRuleManagementService;
@@ -38,8 +39,11 @@ public class BaselineRuleManagementController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Integer enabled) {
-        return Result.success(baselineRuleManagementService.list(page, size, keyword, category, severity, status, enabled));
+            @RequestParam(required = false) Integer enabled,
+            @RequestParam(required = false) String assetTypeCode,
+            @RequestParam(required = false) String protectionLevelCode) {
+        return Result.success(baselineRuleManagementService.list(page, size, keyword, category, severity, status,
+                enabled, assetTypeCode, protectionLevelCode));
     }
 
     @PreAuthorize("@perm.has('baseline-rule:view')")

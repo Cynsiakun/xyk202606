@@ -5,9 +5,9 @@
 <mapper namespace="com.cd.mapper.BaselineWorkorderMapper">
 
     <insert id="insert" parameterType="com.cd.entity.BaselineWorkorderEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO baseline_workorder (result_id, host_id, rule_id, title, advice, assignee_id,
+        INSERT INTO baseline_workorder (tenant_id, result_id, host_id, rule_id, title, advice, assignee_id,
                                         priority, status, close_remark, create_by)
-        VALUES (#{resultId}, #{hostId}, #{ruleId}, #{title}, #{advice}, #{assigneeId},
+        VALUES (COALESCE(#{tenantId}, 0), #{resultId}, #{hostId}, #{ruleId}, #{title}, #{advice}, #{assigneeId},
                 #{priority}, #{status}, #{closeRemark}, #{createBy})
     </insert>
 
@@ -44,10 +44,10 @@
                w.start_time    AS startTime,
                w.finish_time   AS finishTime
         FROM baseline_workorder w
-        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule r ON r.id = w.rule_id
         LEFT JOIN user u ON u.id = w.assignee_id
-        WHERE 1 = 1
+        WHERE w.tenant_id = #{tenantId}
         <include refid="workorderFilter"/>
         ORDER BY FIELD(w.status, 'OPEN', 'PROCESSING', 'DONE'), w.id DESC
         LIMIT #{offset}, #{limit}
@@ -56,8 +56,8 @@
     <select id="countPage" resultType="long">
         SELECT COUNT(*)
         FROM baseline_workorder w
-        LEFT JOIN hosts h ON h.id = w.host_id
-        WHERE 1 = 1
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = #{tenantId}
+        WHERE w.tenant_id = #{tenantId}
         <include refid="workorderFilter"/>
     </select>
 
@@ -90,16 +90,18 @@
                COALESCE(br.evidence, br.message) AS evidence,
                br.status                    AS resultStatus
         FROM baseline_workorder w
-        LEFT JOIN hosts h ON h.id = w.host_id
+        LEFT JOIN hosts h ON h.id = w.host_id AND h.tenant_id = #{tenantId}
         LEFT JOIN baseline_rule r ON r.id = w.rule_id
-        LEFT JOIN baseline_result br ON br.id = w.result_id
+        LEFT JOIN baseline_result br ON br.id = w.result_id AND br.tenant_id = #{tenantId}
         LEFT JOIN user assignee ON assignee.id = w.assignee_id
         LEFT JOIN user creator ON creator.id = w.create_by
         WHERE w.id = #{id}
+          AND w.tenant_id = #{tenantId}
     </select>
 
     <select id="selectEntityById" resultType="com.cd.entity.BaselineWorkorderEntity">
         SELECT id            AS id,
+               tenant_id     AS tenantId,
                result_id     AS resultId,
                host_id       AS hostId,
                rule_id       AS ruleId,
@@ -116,6 +118,7 @@
                update_time   AS updateTime
         FROM baseline_workorder
         WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </select>
 
     <update id="markProcessing">
@@ -123,6 +126,7 @@
         SET status = 'PROCESSING',
             start_time = COALESCE(start_time, NOW())
         WHERE id = #{id}
+          AND tenant_id = #{tenantId}
           AND status = 'OPEN'
     </update>
 
@@ -132,6 +136,7 @@
             close_remark = #{closeRemark},
             finish_time = NOW()
         WHERE id = #{id}
+          AND tenant_id = #{tenantId}
           AND status = 'PROCESSING'
     </update>
 
@@ -144,6 +149,7 @@
           AND r.role_code = #{roleCode}
           AND r.status = 1
           AND u.status = 1
+          AND u.tenant_id = #{tenantId}
     </select>
 
     <select id="selectOperatorOptions" resultType="com.cd.dto.BaselineOperatorOptionDTO">
@@ -155,6 +161,7 @@
         WHERE r.role_code = 'SECURITY_OPERATOR'
           AND r.status = 1
           AND u.status = 1
+          AND u.tenant_id = #{tenantId}
         ORDER BY u.user_name ASC, u.id ASC
     </select>
 </mapper>

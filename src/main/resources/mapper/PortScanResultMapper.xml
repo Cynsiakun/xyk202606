@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.PortScanResultMapper">
+
+    <resultMap id="PortScanResultMap" type="com.cd.entity.PortScanResultEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="task_id" property="taskId"/>
+        <result column="host_name" property="hostName"/>
+        <result column="mac_address" property="macAddress"/>
+        <result column="source" property="source"/>
+        <result column="port_count" property="portCount"/>
+        <result column="port_json" property="portJson"/>
+        <result column="deleted" property="deleted"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, tenant_id, task_id, host_name, mac_address, source, port_count, port_json, deleted, created_at, updated_at
+    </sql>
+
+    <sql id="listWhere">
+        WHERE deleted = 0
+        <if test="keyword != null and keyword != ''">
+            AND (host_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR mac_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="macAddress != null and macAddress != ''">
+            AND mac_address = #{macAddress}
+        </if>
+    </sql>
+
+    <sql id="listWhereByTenant">
+        WHERE deleted = 0
+          AND tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (host_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR mac_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="macAddress != null and macAddress != ''">
+            AND mac_address = #{macAddress}
+        </if>
+    </sql>
+
+    <insert id="insert" parameterType="com.cd.entity.PortScanResultEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO port_scan_results (tenant_id, task_id, host_name, mac_address, source, port_count, port_json)
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostName}, #{macAddress}, #{source}, #{portCount}, #{portJson})
+    </insert>
+
+    <select id="selectById" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectByIdAndTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE id = #{id} AND deleted = 0 AND tenant_id = #{tenantId}
+    </select>
+
+    <select id="selectPage" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        <include refid="listWhere"/>
+        ORDER BY created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectPageByTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        <include refid="listWhereByTenant"/>
+        ORDER BY created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countFiltered" resultType="long">
+        SELECT COUNT(1) FROM port_scan_results
+        <include refid="listWhere"/>
+    </select>
+
+    <select id="countFilteredByTenant" resultType="long">
+        SELECT COUNT(1) FROM port_scan_results
+        <include refid="listWhereByTenant"/>
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE port_scan_results SET deleted = 1 WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="softDeleteByIdAndTenant">
+        UPDATE port_scan_results SET deleted = 1
+        WHERE id = #{id} AND deleted = 0 AND tenant_id = #{tenantId}
+    </update>
+
+    <select id="selectLatestPerMac" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results a
+        WHERE deleted = 0
+          AND a.id = (SELECT MAX(id) FROM port_scan_results WHERE mac_address = a.mac_address AND deleted = 0)
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectLatestPerMacByTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results a
+        WHERE deleted = 0
+          AND tenant_id = #{tenantId}
+          AND a.id = (SELECT MAX(id) FROM port_scan_results
+                       WHERE mac_address = a.mac_address AND deleted = 0 AND tenant_id = #{tenantId})
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectLatestByMac" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE mac_address = #{macAddress} AND deleted = 0
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestByMacAndTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE mac_address = #{macAddress} AND deleted = 0 AND tenant_id = #{tenantId}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestByTaskIdAndTenant" resultMap="PortScanResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM port_scan_results
+        WHERE task_id = #{taskId} AND deleted = 0 AND tenant_id = #{tenantId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+</mapper>

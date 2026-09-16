@@ -1,14 +1,18 @@
 package com.cd.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class UserLoginDTO {
 
-    @NotBlank(message = "用户名不能为空")
+    @NotNull(message = "tenantId must not be null")
+    private Long tenantId;
+
+    @NotBlank(message = "userName must not be blank")
     private String userName;
 
-    @NotBlank(message = "密码不能为空")
+    @NotBlank(message = "password must not be blank")
     private String password;
 }

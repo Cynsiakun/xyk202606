@@ -21,6 +21,12 @@
             <div class="toolbar-group">
                 <input type="text" id="keywordInput" class="layui-input toolbar-search" placeholder="编码 / 名称 / 分类" autocomplete="off">
                 <input type="text" id="categoryInput" class="layui-input toolbar-category" placeholder="分类" autocomplete="off">
+                <select name="assetTypeCode" lay-filter="assetTypeFilter" id="assetTypeFilter">
+                    <option value="">全部资产</option>
+                </select>
+                <select name="protectionLevelCode" lay-filter="protectionLevelFilter" id="protectionLevelFilter">
+                    <option value="">全部等保</option>
+                </select>
                 <select name="severity" lay-filter="severityFilter">
                     <option value="">全部风险</option>
                     <option value="LOW">LOW</option>
@@ -118,6 +124,7 @@
                         <option value="REGISTRY">REGISTRY</option>
                         <option value="SERVICE">SERVICE</option>
                         <option value="POWERSHELL">POWERSHELL</option>
+                        <option value="COMMAND">COMMAND</option>
                         <option value="WMI">WMI</option>
                     </select>
                 </div>

@@ -21,4 +21,6 @@ public interface ProbeStrategyMapper {
      * 调度器下发后回写本次执行时间。
      */
     int updateLastRunAt(@Param("lastRunAt") LocalDateTime lastRunAt);
+
+    int updateLastPortScanAt(@Param("lastPortScanAt") LocalDateTime lastPortScanAt);
 }

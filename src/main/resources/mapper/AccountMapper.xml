@@ -6,9 +6,11 @@
 
     <resultMap id="AccountResultMap" type="com.cd.entity.AccountEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="task_id" property="taskId"/>
         <result column="host_name" property="hostName"/>
         <result column="mac_address" property="macAddress"/>
+        <result column="source" property="source"/>
         <result column="asset_count" property="assetCount"/>
         <result column="asset_json" property="assetJson"/>
         <result column="deleted" property="deleted"/>
@@ -17,7 +19,7 @@
     </resultMap>
 
     <sql id="baseColumns">
-        id, task_id, host_name, mac_address, asset_count, asset_json, deleted, created_at, updated_at
+        id, tenant_id, task_id, host_name, mac_address, source, asset_count, asset_json, deleted, created_at, updated_at
     </sql>
 
     <sql id="listWhere">
@@ -31,15 +33,35 @@
         </if>
     </sql>
 
+    <sql id="listWhereByTenant">
+        WHERE deleted = 0
+          AND tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            AND (host_name LIKE CONCAT('%', #{keyword}, '%')
+                 OR mac_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="macAddress != null and macAddress != ''">
+            AND mac_address = #{macAddress}
+        </if>
+    </sql>
+
     <insert id="insert" parameterType="com.cd.entity.AccountEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO accounts (task_id, host_name, mac_address, asset_count, asset_json)
-        VALUES (#{taskId}, #{hostName}, #{macAddress}, #{assetCount}, #{assetJson})
+        INSERT INTO accounts (tenant_id, task_id, host_name, mac_address, source, asset_count, asset_json)
+        VALUES (COALESCE(#{tenantId}, 0), #{taskId}, #{hostName}, #{macAddress}, #{source}, #{assetCount}, #{assetJson})
     </insert>
 
     <select id="selectById" resultMap="AccountResultMap">
         SELECT <include refid="baseColumns"/>
         FROM accounts
         WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectByIdAndTenant" resultMap="AccountResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM accounts
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
     </select>
 
     <select id="selectPage" resultMap="AccountResultMap">
@@ -50,13 +72,34 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <select id="selectPageByTenant" resultMap="AccountResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM accounts
+        <include refid="listWhereByTenant"/>
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
     <select id="countFiltered" resultType="long">
         SELECT COUNT(1) FROM accounts
         <include refid="listWhere"/>
     </select>
 
+    <select id="countFilteredByTenant" resultType="long">
+        SELECT COUNT(1) FROM accounts
+        <include refid="listWhereByTenant"/>
+    </select>
+
     <update id="softDeleteById">
         UPDATE accounts SET deleted = 1 WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="softDeleteByIdAndTenant">
+        UPDATE accounts
+        SET deleted = 1
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
     </update>
 
     <update id="updateAssetJsonById">
@@ -66,12 +109,35 @@
         WHERE id = #{id} AND deleted = 0
     </update>
 
+    <update id="updateAssetJsonByIdAndTenant">
+        UPDATE accounts
+        SET asset_json = #{assetJson},
+            asset_count = #{assetCount}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+          AND deleted = 0
+    </update>
+
     <!-- 每个 MAC 最新一条记录（用于总览聚合） -->
     <select id="selectLatestPerMac" resultMap="AccountResultMap">
         SELECT <include refid="baseColumns"/>
         FROM accounts a
         WHERE a.deleted = 0
           AND a.id = (SELECT MAX(id) FROM accounts WHERE mac_address = a.mac_address AND deleted = 0)
+    </select>
+
+    <select id="selectLatestPerMacByTenant" resultMap="AccountResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM accounts a
+        WHERE a.deleted = 0
+          AND a.tenant_id = #{tenantId}
+          AND a.id = (
+              SELECT MAX(id)
+              FROM accounts
+              WHERE mac_address = a.mac_address
+                AND tenant_id = #{tenantId}
+                AND deleted = 0
+          )
     </select>
 
     <select id="selectLatestRiskSnapshotByHostIds" resultType="com.cd.dto.AccountRiskSnapshotDTO">

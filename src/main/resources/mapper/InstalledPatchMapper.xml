@@ -6,6 +6,7 @@
 
     <resultMap id="InstalledPatchResultMap" type="com.cd.entity.InstalledPatchEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="host_id" property="hostId"/>
         <result column="patch_id" property="patchId"/>
         <result column="patch_type" property="patchType"/>
@@ -26,12 +27,12 @@
 
     <insert id="insert" parameterType="com.cd.entity.InstalledPatchEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO installed_patch (
-            host_id, patch_id, patch_type, product_name, product_version,
+            tenant_id, host_id, patch_id, patch_type, product_name, product_version,
             install_time, install_status, source, signature_status,
             reboot_required, superseded_by, is_security_patch, raw_data,
             scan_time
         ) VALUES (
-            #{hostId}, #{patchId}, #{patchType}, #{productName}, #{productVersion},
+            COALESCE(#{tenantId}, 0), #{hostId}, #{patchId}, #{patchType}, #{productName}, #{productVersion},
             #{installTime}, #{installStatus}, #{source}, #{signatureStatus},
             #{rebootRequired}, #{supersededBy}, #{isSecurityPatch}, #{rawData},
             #{scanTime}
@@ -66,10 +67,28 @@
         LIMIT 1
     </select>
 
+    <select id="selectLatestByHostIdAndPatchIdAndTenant" resultMap="InstalledPatchResultMap">
+        SELECT *
+        FROM installed_patch
+        WHERE host_id = #{hostId}
+          AND patch_id = #{patchId}
+          AND tenant_id = #{tenantId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
     <delete id="deleteByHostIdAndPatchIdExcludeId">
         DELETE FROM installed_patch
         WHERE host_id = #{hostId}
           AND patch_id = #{patchId}
+          AND id &lt;&gt; #{excludeId}
+    </delete>
+
+    <delete id="deleteByHostIdAndPatchIdAndTenantExcludeId">
+        DELETE FROM installed_patch
+        WHERE host_id = #{hostId}
+          AND patch_id = #{patchId}
+          AND tenant_id = #{tenantId}
           AND id &lt;&gt; #{excludeId}
     </delete>
 </mapper>

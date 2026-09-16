@@ -2,10 +2,12 @@ package com.cd.common.handler;
 
 import com.cd.common.Result;
 import com.cd.common.ai.AiException;
+import com.cd.common.exception.LicenseAccessDeniedException;
 import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
 import com.cd.common.exception.UnauthorizedException;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -60,6 +62,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public Result<Void> handleUnauthorizedException(UnauthorizedException e) {
         return Result.fail(401, e.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
+        return Result.fail(403, "Access denied");
+    }
+
+    @ExceptionHandler(LicenseAccessDeniedException.class)
+    public Result<Void> handleLicenseAccessDeniedException(LicenseAccessDeniedException e) {
+        return Result.fail(403, e.getMessage());
     }
 
     @ExceptionHandler(AiException.class)

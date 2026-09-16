@@ -4,14 +4,19 @@ import com.cd.common.PageResult;
 import com.cd.common.config.RabbitMQConfig;
 import com.cd.common.exception.ProbeConfirmRequiredException;
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.license.LicenseFeature;
+import com.cd.common.license.LicenseGuard;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetProbeDTO;
 import com.cd.dto.CsvImportResultDTO;
 import com.cd.dto.HostCreateDTO;
 import com.cd.dto.HostResponseDTO;
 import com.cd.dto.HostUpdateDTO;
+import com.cd.dto.PortScanDTO;
 import com.cd.entity.HostEntity;
 import com.cd.mapper.HostMapper;
 import com.cd.service.HostService;
+import com.cd.service.ProbeStrategyService;
 import com.cd.util.CsvImportUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +33,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +45,7 @@ public class HostServiceImpl implements HostService {
 
     private static final int ONLINE_THRESHOLD_SECONDS = 4;
     private static final String PROBE_TYPE_ASSETS = "assets";
+    private static final String PROBE_TYPE_PORT_SCAN = "port_scan";
     private static final int PROBE_ONLINE_THRESHOLD_SECONDS = 15;
     private static final Duration MANUAL_PROBE_VALID_DURATION = Duration.ofHours(8);
     private static final List<DateTimeFormatter> CSV_DATE_TIME_FORMATTERS = List.of(
@@ -51,11 +58,17 @@ public class HostServiceImpl implements HostService {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
     private final AmqpAdmin amqpAdmin;
+    private final LicenseGuard licenseGuard;
+    private final ProbeStrategyService probeStrategyService;
 
     @Override
     public HostResponseDTO create(HostCreateDTO dto) {
         validateMacUnique(null, dto.getMacAddress());
+        Long tenantId = currentTenantId();
+        licenseGuard.requireFeature(LicenseFeature.HOST);
+        licenseGuard.requireHostQuotaBeforeCreate();
         HostEntity entity = new HostEntity();
+        entity.setTenantId(tenantId);
         entity.setHostname(dto.getHostname());
         entity.setIpv4(dto.getIpv4());
         entity.setMacAddress(dto.getMacAddress());
@@ -72,11 +85,13 @@ public class HostServiceImpl implements HostService {
         entity.setMemUsage(dto.getMemUsage());
         entity.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         hostMapper.insert(entity);
-        return toResponse(hostMapper.selectById(entity.getId()));
+        return toResponse(hostMapper.selectByIdAndTenant(entity.getId(), tenantId));
     }
 
     @Override
     public HostResponseDTO update(Long id, HostUpdateDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.HOST);
+        Long tenantId = currentTenantId();
         HostEntity existing = ensureExists(id);
         validateMacUnique(id, dto.getMacAddress());
         existing.setHostname(dto.getHostname());
@@ -95,13 +110,15 @@ public class HostServiceImpl implements HostService {
         existing.setMemUsage(dto.getMemUsage());
         existing.setStatus(dto.getStatus() == null ? existing.getStatus() : dto.getStatus());
         hostMapper.updateById(existing);
-        return toResponse(hostMapper.selectById(id));
+        return toResponse(hostMapper.selectByIdAndTenant(id, tenantId));
     }
 
     @Override
     public void deleteById(Long id) {
+        licenseGuard.requireFeature(LicenseFeature.HOST);
+        Long tenantId = currentTenantId();
         ensureExists(id);
-        hostMapper.deleteById(id);
+        hostMapper.deleteByIdAndTenant(id, tenantId);
     }
 
     @Override
@@ -114,8 +131,9 @@ public class HostServiceImpl implements HostService {
         hostMapper.reconcileStatusByHeartbeat(ONLINE_THRESHOLD_SECONDS);
         int offset = (page - 1) * size;
         String normalizedKeyword = emptyToNull(keyword);
-        long total = hostMapper.countAll(normalizedKeyword);
-        List<HostResponseDTO> list = hostMapper.selectPage(offset, size, normalizedKeyword)
+        Long tenantId = currentTenantId();
+        long total = hostMapper.countAllByTenant(normalizedKeyword, tenantId);
+        List<HostResponseDTO> list = hostMapper.selectPageByTenant(offset, size, normalizedKeyword, tenantId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -148,30 +166,53 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public int autoProbeOnlineHosts(int limit) {
-        return autoProbeOnlineHosts(limit, true, true, true, true);
+        return autoProbeOnlineHosts(limit, true, true, true, true, false, false);
     }
 
     @Override
     public int autoProbeOnlineHosts(int limit, boolean account, boolean service, boolean process, boolean app) {
+        return autoProbeOnlineHosts(limit, account, service, process, app, false, false);
+    }
+
+    @Override
+    public int autoProbeOnlineHosts(int limit,
+                                    boolean account,
+                                    boolean service,
+                                    boolean process,
+                                    boolean app,
+                                    boolean portScan,
+                                    boolean fingerprint) {
         int batchSize = Math.max(1, limit);
         List<HostEntity> hosts = hostMapper.selectAutoProbeCandidates(batchSize);
+        var strategy = probeStrategyService.getStrategyEntity();
         int sentCount = 0;
         for (HostEntity host : hosts) {
             if (host == null || !StringUtils.hasText(host.getMacAddress())) {
                 continue;
             }
-            AssetProbeDTO dto = new AssetProbeDTO();
-            dto.setAccount(account);
-            dto.setService(service);
-            dto.setProcess(process);
-            dto.setApp(app);
-            dto.setMacAddress(host.getMacAddress());
-            dto.setForce(true);
             try {
-                sendAssetProbeInternal(dto, false);
+                if (account || service || process || app) {
+                    AssetProbeDTO dto = new AssetProbeDTO();
+                    dto.setAccount(account);
+                    dto.setService(service);
+                    dto.setProcess(process);
+                    dto.setApp(app);
+                    dto.setMacAddress(host.getMacAddress());
+                    dto.setForce(true);
+                    sendAssetProbeInternal(dto, false);
+                }
+                if (portScan) {
+                    PortScanDTO dto = new PortScanDTO();
+                    dto.setMacAddress(host.getMacAddress());
+                    dto.setScanRange(strategy != null && strategy.getPortScanRange() != null
+                            ? strategy.getPortScanRange() : "common");
+                    dto.setCustomPorts(strategy != null ? strategy.getPortScanCustomPorts() : null);
+                    dto.setGrabBanner(fingerprint);
+                    sendPortScanInternal(dto);
+                }
                 sentCount++;
             } catch (Exception e) {
-                log.warn("自动资产探测下发失败: hostId={}, mac={}, reason={}",
+                log.warn("自动探测下发失败: hostId={}, mac={}, reason={}",
                         host.getId(), host.getMacAddress(), e.getMessage());
             }
         }
@@ -180,12 +221,13 @@ public class HostServiceImpl implements HostService {
 
     @Override
     public void sendAssetProbe(AssetProbeDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
         String macAddress = dto.getMacAddress();
         if (!StringUtils.hasText(macAddress)) {
             throw new IllegalArgumentException("MAC地址不能为空");
         }
 
-        HostEntity host = hostMapper.selectByMac(macAddress);
+        HostEntity host = hostMapper.selectByMacAndTenant(macAddress, currentTenantId());
         if (!dto.isForce()
                 && host != null
                 && host.getLastScanTime() != null
@@ -198,7 +240,9 @@ public class HostServiceImpl implements HostService {
 
     private void sendAssetProbeInternal(AssetProbeDTO dto, boolean strictOnlineCheck) {
         String macAddress = dto.getMacAddress();
-        HostEntity host = hostMapper.selectByMac(macAddress);
+        HostEntity host = strictOnlineCheck
+                ? hostMapper.selectByMacAndTenant(macAddress, currentTenantId())
+                : hostMapper.selectByMac(macAddress);
         LocalDateTime updatedAt = host == null ? null : host.getUpdatedAt();
         if (strictOnlineCheck && (updatedAt == null
                 || Duration.between(updatedAt, LocalDateTime.now()).getSeconds() > PROBE_ONLINE_THRESHOLD_SECONDS)) {
@@ -251,8 +295,12 @@ public class HostServiceImpl implements HostService {
     }
 
     private void saveImportedRecord(HostEntity imported, CsvImportResultDTO result) {
-        HostEntity existing = hostMapper.selectByNormalizedMac(normalizeMac(imported.getMacAddress()));
+        Long tenantId = currentTenantId();
+        imported.setTenantId(tenantId);
+        HostEntity existing = hostMapper.selectByNormalizedMacAndTenant(normalizeMac(imported.getMacAddress()), tenantId);
         if (existing == null) {
+            licenseGuard.requireFeature(LicenseFeature.HOST);
+            licenseGuard.requireHostQuotaBeforeCreate();
             if (imported.getStatus() == null) {
                 imported.setStatus(1);
             }
@@ -262,6 +310,7 @@ public class HostServiceImpl implements HostService {
         }
 
         imported.setId(existing.getId());
+        imported.setTenantId(tenantId);
         if (imported.getStatus() == null) {
             imported.setStatus(existing.getStatus());
         }
@@ -277,6 +326,85 @@ public class HostServiceImpl implements HostService {
             return "";
         }
         return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
+    }
+
+    @Override
+    public void sendPortScan(PortScanDTO dto) {
+        licenseGuard.requireFeature(LicenseFeature.ASSET);
+        String macAddress = dto.getMacAddress();
+        if (!StringUtils.hasText(macAddress)) {
+            throw new IllegalArgumentException("MAC地址不能为空");
+        }
+        sendPortScanInternal(dto);
+    }
+
+    @Override
+    public int autoPortScanOnlineHosts(int limit) {
+        var strategy = probeStrategyService.getStrategyEntity();
+        if (strategy == null
+                || strategy.getEnabled() == null
+                || strategy.getEnabled() != 1
+                || strategy.getProbePortScan() == null
+                || strategy.getProbePortScan() != 1) {
+            log.info("自动端口扫描入口已跳过: enabled={}, probePortScan={}",
+                    strategy == null ? null : strategy.getEnabled(),
+                    strategy == null ? null : strategy.getProbePortScan());
+            return 0;
+        }
+        int batchSize = Math.max(1, limit);
+        List<HostEntity> hosts = hostMapper.selectPortScanCandidates(batchSize);
+        int sentCount = 0;
+        for (HostEntity host : hosts) {
+            if (host == null || !StringUtils.hasText(host.getMacAddress())) {
+                continue;
+            }
+            PortScanDTO dto = new PortScanDTO();
+            dto.setMacAddress(host.getMacAddress());
+            dto.setScanRange(strategy != null && strategy.getPortScanRange() != null
+                    ? strategy.getPortScanRange() : "common");
+            dto.setCustomPorts(strategy != null ? strategy.getPortScanCustomPorts() : null);
+            dto.setGrabBanner(strategy != null && strategy.getProbeFingerprint() != null
+                    && strategy.getProbeFingerprint() == 1);
+            try {
+                sendPortScanInternal(dto);
+                sentCount++;
+            } catch (Exception e) {
+                log.warn("自动端口扫描下发失败: hostId={}, mac={}, reason={}",
+                        host.getId(), host.getMacAddress(), e.getMessage());
+            }
+        }
+        return sentCount;
+    }
+
+    private void sendPortScanInternal(PortScanDTO dto) {
+        String macAddress = dto.getMacAddress();
+        String queueName = RabbitMQConfig.AGENT_QUEUE_PREFIX + normalizeMac(macAddress)
+                + RabbitMQConfig.AGENT_QUEUE_SUFFIX;
+        if (amqpAdmin.getQueueProperties(queueName) == null) {
+            throw new IllegalArgumentException("客户端队列不存在，无法发送端口扫描指令");
+        }
+
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("type", PROBE_TYPE_PORT_SCAN);
+        message.put("macAddress", macAddress);
+        message.put("scanRange", dto.getScanRange() != null ? dto.getScanRange() : "common");
+        message.put("customPorts", dto.getCustomPorts() != null ? dto.getCustomPorts() : "");
+        message.put("grabBanner", dto.isGrabBanner());
+
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            throw new IllegalStateException("组装端口扫描消息失败", e);
+        }
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, macAddress, payload, msg -> {
+            msg.getMessageProperties().setExpiration(String.valueOf(RabbitMQConfig.PORT_SCAN_COMMAND_TTL));
+            msg.getMessageProperties().setTimestamp(new Date());
+            msg.getMessageProperties().setHeader("commandType", PROBE_TYPE_PORT_SCAN);
+            return msg;
+        });
+        log.info("端口扫描任务已下发: routingKey={}, payload={}", macAddress, payload);
     }
 
     private String requireField(CSVRecord record, String... headerNames) {
@@ -318,14 +446,13 @@ public class HostServiceImpl implements HostService {
             try {
                 return LocalDateTime.parse(text, formatter);
             } catch (DateTimeParseException ignored) {
-                // try next
             }
         }
         throw new IllegalArgumentException(fieldName + " 时间格式不正确，支持 yyyy-MM-dd HH:mm:ss 或 ISO_LOCAL_DATE_TIME");
     }
 
     private HostEntity ensureExists(Long id) {
-        HostEntity entity = hostMapper.selectById(id);
+        HostEntity entity = hostMapper.selectByIdAndTenant(id, currentTenantId());
         if (entity == null) {
             throw new ResourceNotFoundException("记录不存在，id=" + id);
         }
@@ -340,6 +467,11 @@ public class HostServiceImpl implements HostService {
         if (hostByMac != null && !hostByMac.getId().equals(id)) {
             throw new IllegalArgumentException("MAC地址已存在");
         }
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 
     private String emptyToNull(String value) {

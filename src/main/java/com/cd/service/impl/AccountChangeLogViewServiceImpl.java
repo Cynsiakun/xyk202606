@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AccountChangeLogDetailDTO;
 import com.cd.dto.AccountChangeLogItemDTO;
 import com.cd.dto.AccountChangeLogQueryDTO;
@@ -40,6 +41,7 @@ public class AccountChangeLogViewServiceImpl implements AccountChangeLogViewServ
 
     @Override
     public PageResult<AccountChangeLogItemDTO> page(AccountChangeLogQueryDTO query, int page, int size, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         query.setSize(size);
         query.setOffset((page - 1) * size);
@@ -50,26 +52,28 @@ public class AccountChangeLogViewServiceImpl implements AccountChangeLogViewServ
 
     @Override
     public AccountChangeLogStatDTO stats() {
+        Long tenantId = currentTenantId();
         AccountChangeLogStatDTO stat = new AccountChangeLogStatDTO();
-        stat.setTodayTotal(mapper.countToday());
-        stat.setTodayCreate(mapper.countTodayByAction("create"));
-        stat.setTodayModify(mapper.countTodayByAction("modify"));
-        stat.setTodayDelete(mapper.countTodayByAction("delete"));
+        stat.setTodayTotal(mapper.countToday(tenantId));
+        stat.setTodayCreate(mapper.countTodayByAction("create", tenantId));
+        stat.setTodayModify(mapper.countTodayByAction("modify", tenantId));
+        stat.setTodayDelete(mapper.countTodayByAction("delete", tenantId));
         return stat;
     }
 
     @Override
     public AccountChangeLogDetailDTO detail(Long id) {
-        return mapper.selectDetailById(id);
+        return mapper.selectDetailById(id, currentTenantId());
     }
 
     @Override
     public List<HostOptionDTO> hostOptions() {
-        return mapper.selectHostOptions();
+        return mapper.selectHostOptions(currentTenantId());
     }
 
     @Override
     public byte[] exportCsv(AccountChangeLogQueryDTO query, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         List<AccountChangeLogItemDTO> rows = mapper.selectForExport(query, EXPORT_LIMIT);
 
@@ -109,5 +113,10 @@ public class AccountChangeLogViewServiceImpl implements AccountChangeLogViewServ
         String column = sortField == null ? null : SORT_COLUMNS.get(sortField);
         query.setSortColumn(column != null ? column : "event_time");
         query.setSortDirection("asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC");
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

@@ -9,6 +9,7 @@ public class UserLoginResponseDTO {
 
     private String token;
     private Long userId;
+    private Long tenantId;
     private String userName;
     private LocalDateTime lastLoginTime;
 }

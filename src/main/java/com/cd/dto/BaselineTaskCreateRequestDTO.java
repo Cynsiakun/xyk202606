@@ -16,6 +16,12 @@ public class BaselineTaskCreateRequestDTO {
 
     private String cronExpr;
 
+    private Long protectionLevelId;
+
+    private String protectionLevelCode;
+
+    private List<String> assetTypeCodes;
+
     @NotEmpty(message = "主机范围不能为空")
     private List<Long> hostIds;
 

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class AssetExportLogEntity {
 
     private Long id;
+    private Long tenantId;
     private Long userId;
     private Long hostId;
     private LocalDateTime exportTime;

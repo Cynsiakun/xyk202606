@@ -34,6 +34,12 @@ layui.use(["layer"], function () {
         },
         vulnHosts: function (ruleId) {
             return "/api/vuln-detection/vulnerabilities/" + ruleId + "/hosts";
+        },
+        fixHost: function (hostId) {
+            return "/api/vuln-detection/hosts/" + hostId + "/fix";
+        },
+        fixVuln: function (ruleId) {
+            return "/api/vuln-detection/vulnerabilities/" + ruleId + "/fix";
         }
     };
 
@@ -132,6 +138,17 @@ layui.use(["layer"], function () {
                 return;
             }
 
+            var fixHostButton = event.target.closest("[data-action='fix-host']");
+            if (fixHostButton) {
+                event.stopPropagation();
+                var hostId = fixHostButton.dataset.hostId;
+                var count = fixHostButton.dataset.count || "0";
+                confirmAction("一键修复", "将修复该主机上 " + count + " 条已验证漏洞，确认继续？", function () {
+                    fixHost(hostId, fixHostButton);
+                });
+                return;
+            }
+
             var detailButton = event.target.closest("[data-action='view-detail']");
             if (detailButton) {
                 event.stopPropagation();
@@ -182,6 +199,16 @@ layui.use(["layer"], function () {
                 var ruleId = vulnVerify.dataset.ruleId;
                 confirmAction("一键下发验证", "将对该漏洞的所有可验证主机下发任务，确认继续？", function () {
                     verifyRule(ruleId, vulnVerify);
+                });
+                return;
+            }
+
+            var vulnFix = event.target.closest("[data-action='fix-vuln']");
+            if (vulnFix) {
+                var ruleId = vulnFix.dataset.ruleId;
+                var count = vulnFix.dataset.count || "0";
+                confirmAction("一键修复", "将修复该漏洞下 " + count + " 条已验证结果，确认继续？", function () {
+                    fixVuln(ruleId, vulnFix);
                 });
                 return;
             }
@@ -478,6 +505,7 @@ layui.use(["layer"], function () {
             + '<div class="host-actions">'
             + '<button type="button" class="ghost-btn" data-action="toggle-vuln-hosts" data-rule-id="' + escapeHtml(ruleId) + '">' + (expanded ? "收起影响主机" : "查看影响主机") + '</button>'
             + '<button type="button" class="solid-btn" data-action="verify-vuln" data-rule-id="' + escapeHtml(ruleId) + '"' + (total > 0 ? "" : " disabled") + '>一键下发验证</button>'
+            + (repair > 0 ? '<button type="button" class="solid-btn fix-btn" data-action="fix-vuln" data-count="' + repair + '" data-rule-id="' + escapeHtml(ruleId) + '">一键修复</button>' : '')
             + '</div>'
             + '</div>'
             + '<div class="affected-host-panel' + (expanded ? ' is-open' : '') + '" id="affectedHosts-' + escapeHtml(ruleId) + '">'
@@ -561,6 +589,7 @@ layui.use(["layer"], function () {
             + '<div class="host-actions">'
             + '<button type="button" class="ghost-btn" data-action="view-detail" data-host-id="' + escapeHtml(hostId) + '">查看漏洞</button>'
             + '<button type="button" class="solid-btn" data-action="verify-host" data-retry="' + retry + '" data-host-id="' + escapeHtml(hostId) + '"' + disabled + '>' + actionText + '</button>'
+            + (verified > 0 ? '<button type="button" class="solid-btn fix-btn" data-action="fix-host" data-count="' + verified + '" data-host-id="' + escapeHtml(hostId) + '">一键修复</button>' : '')
             + '</div>'
             + '</div>'
             + '</article>';
@@ -650,11 +679,14 @@ layui.use(["layer"], function () {
         var retry = state.key === "verifying";
         var actionText = retry ? "重新验证" : "下发验证";
         var checked = selected[String(row.resultId)] ? " checked" : "";
+        var matchedCount = numberValue(row.matchedItemCount);
+        var matchedSummary = buildMatchedItemSummary(row);
         return '<div class="affected-host-row">'
             + '<label class="affected-check"><input type="checkbox" data-action="select-result" data-rule-id="' + escapeHtml(ruleId) + '" data-result-id="' + escapeHtml(row.resultId || "") + '"' + checked + '></label>'
             + '<div class="affected-host-main">'
             + '<strong>' + escapeHtml(row.hostname || ("Host #" + (row.hostId || "-"))) + '</strong>'
             + '<span>' + escapeHtml(row.ipv4 || "-") + ' · ' + escapeHtml(row.macAddress || "-") + '</span>'
+            + (matchedCount > 1 || matchedSummary ? '<div class="affected-host-hit">命中 ' + matchedCount + ' 项' + (matchedSummary ? ' · ' + escapeHtml(matchedSummary) : '') + '</div>' : '')
             + '</div>'
             + renderStatusTag(state)
             + '<button type="button" class="solid-btn small" data-action="verify-vuln-host" data-retry="' + retry + '" data-result-id="' + escapeHtml(row.resultId || "") + '">' + actionText + '</button>'
@@ -753,6 +785,25 @@ layui.use(["layer"], function () {
             var result = await AppRequest.request(API.verifyHost(hostId), {method: "POST"});
             showDispatchMessage(result);
             await refreshPage(false, false);
+        });
+    }
+
+    async function fixHost(hostId, button) {
+        await withButtonLoading(button, async function () {
+            var result = await AppRequest.request(API.fixHost(hostId), {method: "POST"});
+            var updated = numberValue(result.data && result.data.updated);
+            AppRequest.showMessage("已下发修复任务，" + updated + " 条", 1, 2000);
+            await refreshPage(false, false);
+        });
+    }
+
+    async function fixVuln(ruleId, button) {
+        await withButtonLoading(button, async function () {
+            var result = await AppRequest.request(API.fixVuln(ruleId), {method: "POST"});
+            var updated = numberValue(result.data && result.data.updated);
+            AppRequest.showMessage("已下发修复任务，" + updated + " 条", 1, 2000);
+            await refreshPage(false, false);
+            await reloadExpandedAffectedHosts();
         });
     }
 
@@ -943,7 +994,7 @@ layui.use(["layer"], function () {
         var normalized = String(verifyStatus || "").toUpperCase();
         if (normalized === "VERIFYING") return {key: "verifying", label: "验证中"};
         if (normalized === "VERIFIED" || normalized === "NOT_AFFECTED") return {key: "verified", label: "已验证"};
-        if (normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "待修复"};
+        if (normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "修复中"};
         if (normalized === "FIXED") return {key: "fixed", label: "已修复"};
         return {key: "pending", label: "待验证"};
     }
@@ -952,7 +1003,7 @@ layui.use(["layer"], function () {
         if (Number(status) === 0) return {key: "fixed", label: "已修复"};
         var normalized = String(verifyStatus || "").toUpperCase();
         if (normalized === "VERIFYING") return {key: "verifying", label: "验证中"};
-        if (normalized === "VERIFIED" || normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "待修复"};
+        if (normalized === "VERIFIED" || normalized === "REPAIR_PENDING" || normalized === "TO_FIX") return {key: "repair", label: "修复中"};
         if (normalized === "FIXED" || normalized === "NOT_AFFECTED") return {key: "fixed", label: "已修复"};
         return {key: "pending", label: "待验证"};
     }
@@ -1012,6 +1063,18 @@ layui.use(["layer"], function () {
         } catch (error) {
             return String(value);
         }
+    }
+
+    function buildMatchedItemSummary(row) {
+        var summary = String(row && row.matchedItemSummary ? row.matchedItemSummary : "").trim();
+        if (!summary) return "";
+        return truncateText(summary, 72);
+    }
+
+    function truncateText(text, maxLength) {
+        var value = String(text == null ? "" : text);
+        if (!maxLength || value.length <= maxLength) return value;
+        return value.slice(0, Math.max(0, maxLength - 1)) + "…";
     }
 
     function sum() {

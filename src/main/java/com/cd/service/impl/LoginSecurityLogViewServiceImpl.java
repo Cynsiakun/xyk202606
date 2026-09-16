@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.HostOptionDTO;
 import com.cd.dto.LoginSecurityLogDetailDTO;
 import com.cd.dto.LoginSecurityLogItemDTO;
@@ -40,6 +41,7 @@ public class LoginSecurityLogViewServiceImpl implements LoginSecurityLogViewServ
 
     @Override
     public PageResult<LoginSecurityLogItemDTO> page(LoginSecurityLogQueryDTO query, int page, int size, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         query.setSize(size);
         query.setOffset((page - 1) * size);
@@ -50,26 +52,28 @@ public class LoginSecurityLogViewServiceImpl implements LoginSecurityLogViewServ
 
     @Override
     public LoginSecurityLogStatDTO stats() {
+        Long tenantId = currentTenantId();
         LoginSecurityLogStatDTO stat = new LoginSecurityLogStatDTO();
-        stat.setTodaySuccess(mapper.countTodayByResult("success"));
-        stat.setTodayFail(mapper.countTodayByResult("fail"));
-        stat.setTodayLogout(mapper.countTodayByResult("logout"));
-        stat.setTodayElevated(mapper.countTodayElevated());
+        stat.setTodaySuccess(mapper.countTodayByResult("success", tenantId));
+        stat.setTodayFail(mapper.countTodayByResult("fail", tenantId));
+        stat.setTodayLogout(mapper.countTodayByResult("logout", tenantId));
+        stat.setTodayElevated(mapper.countTodayElevated(tenantId));
         return stat;
     }
 
     @Override
     public LoginSecurityLogDetailDTO detail(Long id) {
-        return mapper.selectDetailById(id);
+        return mapper.selectDetailById(id, currentTenantId());
     }
 
     @Override
     public List<HostOptionDTO> hostOptions() {
-        return mapper.selectHostOptions();
+        return mapper.selectHostOptions(currentTenantId());
     }
 
     @Override
     public byte[] exportCsv(LoginSecurityLogQueryDTO query, String sortField, String sortOrder) {
+        query.setTenantId(currentTenantId());
         applySort(query, sortField, sortOrder);
         List<LoginSecurityLogItemDTO> rows = mapper.selectForExport(query, EXPORT_LIMIT);
 
@@ -111,5 +115,10 @@ public class LoginSecurityLogViewServiceImpl implements LoginSecurityLogViewServ
         String column = sortField == null ? null : SORT_COLUMNS.get(sortField);
         query.setSortColumn(column != null ? column : "event_time");
         query.setSortDirection("asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC");
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

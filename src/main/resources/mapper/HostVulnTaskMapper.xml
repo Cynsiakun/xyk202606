@@ -6,6 +6,7 @@
 
     <resultMap id="HostVulnTaskMap" type="com.cd.entity.HostVulnTaskEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="task_name" property="taskName"/>
         <result column="task_type" property="taskType"/>
         <result column="host_id" property="hostId"/>
@@ -22,19 +23,35 @@
 
     <insert id="insert" parameterType="com.cd.entity.HostVulnTaskEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO host_vuln_task (
-            task_name, task_type, host_id, mac_address, scan_mode, rule_count,
+            tenant_id, task_name, task_type, host_id, mac_address, scan_mode, rule_count,
             status, triggered_by, started_at, summary_json, created_at
         ) VALUES (
-            #{taskName}, #{taskType}, #{hostId}, #{macAddress}, #{scanMode}, #{ruleCount},
+            COALESCE(#{tenantId}, 0), #{taskName}, #{taskType}, #{hostId}, #{macAddress}, #{scanMode}, #{ruleCount},
             #{status}, #{triggeredBy}, #{startedAt}, #{summaryJson}, #{createdAt}
         )
     </insert>
 
     <select id="selectById" resultMap="HostVulnTaskMap">
-        SELECT id, task_name, task_type, host_id, mac_address, scan_mode, rule_count,
+        SELECT id, tenant_id, task_name, task_type, host_id, mac_address, scan_mode, rule_count,
                status, triggered_by, started_at, finished_at, summary_json, created_at
         FROM host_vuln_task
         WHERE id = #{id}
+    </select>
+
+    <select id="selectByIdAndTenant" resultMap="HostVulnTaskMap">
+        SELECT id, tenant_id, task_name, task_type, host_id, mac_address, scan_mode, rule_count,
+               status, triggered_by, started_at, finished_at, summary_json, created_at
+        FROM host_vuln_task
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+    </select>
+
+    <select id="countByHostAndStatusAndTenant" resultType="int">
+        SELECT COUNT(1)
+        FROM host_vuln_task
+        WHERE host_id = #{hostId}
+          AND tenant_id = #{tenantId}
+          AND status = #{status}
     </select>
 
     <update id="updateStatus">
@@ -44,11 +61,28 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateStatusByTenant">
+        UPDATE host_vuln_task
+        SET status = #{status},
+            summary_json = #{summaryJson}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+    </update>
+
     <update id="markFinished">
         UPDATE host_vuln_task
         SET status = #{status},
             finished_at = CURRENT_TIMESTAMP,
             summary_json = #{summaryJson}
         WHERE id = #{id}
+    </update>
+
+    <update id="markFinishedByTenant">
+        UPDATE host_vuln_task
+        SET status = #{status},
+            finished_at = CURRENT_TIMESTAMP,
+            summary_json = #{summaryJson}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </update>
 </mapper>

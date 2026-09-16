@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class BaselineResultEntity {
 
     private Long id;
+    private Long tenantId;
     private Long taskId;
     private Long taskHostId;
     private Long hostId;
@@ -28,4 +29,7 @@ public class BaselineResultEntity {
     private String remediationStatus;
     private LocalDateTime scanTime;
     private LocalDateTime createTime;
+    private Long assetTypeId;
+    private Long protectionLevelId;
+    private Long itemId;
 }

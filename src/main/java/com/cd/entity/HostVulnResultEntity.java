@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class HostVulnResultEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private Long ruleId;
     private String severity;

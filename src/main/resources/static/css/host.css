@@ -150,6 +150,9 @@
 .asset-detail-info { margin-bottom: 10px; }
 .asset-info-table td { padding: 6px 12px; }
 .asset-info-table .detail-label { width: 90px; font-weight: 600; color: #555; }
+.asset-detail-filters { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.asset-detail-filters .asset-detail-type { min-width: 180px; }
+.asset-detail-filters .asset-detail-search { flex: 1 1 260px; min-width: 220px; }
 .asset-detail-actions { margin-bottom: 8px; }
 .asset-detail-array { margin-bottom: 8px; }
 .asset-table-scroll { max-height: 320px; overflow: auto; }

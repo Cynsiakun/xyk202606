@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.exception.ResourceNotFoundException;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.AssetInfoDTO;
 import com.cd.entity.AppEntity;
 import com.cd.entity.HostEntity;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -57,11 +59,21 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
     @Override
     @Transactional
     public List<HostVulnResultEntity> evaluateHost(Long hostId) {
+        return evaluateHostInternal(hostId, currentTenantId());
+    }
+
+    @Override
+    @Transactional
+    public List<HostVulnResultEntity> evaluateHostForTenant(Long hostId, Long tenantId) {
+        return evaluateHostInternal(hostId, tenantId == null ? 0L : tenantId);
+    }
+
+    private List<HostVulnResultEntity> evaluateHostInternal(Long hostId, Long tenantId) {
         if (hostId == null) {
             return List.of();
         }
 
-        HostEntity host = hostMapper.selectById(hostId);
+        HostEntity host = hostMapper.selectByIdAndTenant(hostId, tenantId);
         if (host == null) {
             throw new ResourceNotFoundException("主机不存在: id=" + hostId);
         }
@@ -76,7 +88,7 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
                     if (!VersionExpressionParser.matches(rule.getMatchType(), rule.getAffectedVersionExpr(), asset)) {
                         continue;
                     }
-                    HostVulnResultEntity result = buildResult(hostId, rule, asset);
+                    HostVulnResultEntity result = buildResult(hostId, tenantId, rule, asset);
                     results.add(ruleEnrichmentService.enrich(result, rule, asset));
                 } catch (Exception e) {
                     log.warn("漏洞规则匹配失败: hostId={}, ruleId={}, assetType={}, assetName={}",
@@ -85,7 +97,7 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             }
         }
 
-        hostVulnResultMapper.markInactiveByHostId(hostId);
+        hostVulnResultMapper.markInactiveByHostIdAndTenant(hostId, tenantId);
         for (HostVulnResultEntity result : results) {
             hostVulnResultMapper.insert(result);
         }
@@ -109,18 +121,60 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             return assets;
         }
 
-        AppEntity appRecord = appMapper.selectLatestByMac(host.getMacAddress());
-        ServiceEntity serviceRecord = serviceMapper.selectLatestByMac(host.getMacAddress());
-        ProcessEntity processRecord = processMapper.selectLatestByMac(host.getMacAddress());
-
-        assets.addAll(parseAssetJson(TYPE_APP, appRecord == null ? null : appRecord.getAssetJson()));
-        assets.addAll(parseAssetJson(TYPE_SERVICE, serviceRecord == null ? null : serviceRecord.getAssetJson()));
-        assets.addAll(parseAssetJson(TYPE_PROCESS, processRecord == null ? null : processRecord.getAssetJson()));
+        Long tenantId = host.getTenantId() == null ? currentTenantId() : host.getTenantId();
+        assets.addAll(loadLatestAppAssets(host.getMacAddress(), tenantId));
+        assets.addAll(loadLatestServiceAssets(host.getMacAddress(), tenantId));
+        assets.addAll(loadLatestProcessAssets(host.getMacAddress(), tenantId));
 
         for (AssetInfoDTO asset : assets) {
             asset.setHostId(host.getId());
         }
         return assets;
+    }
+
+    private List<AssetInfoDTO> loadLatestAppAssets(String macAddress, Long tenantId) {
+        AppEntity latestRecord = appMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_APP, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        AppEntity latestNonEmptyRecord = appMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_APP, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_APP);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<AssetInfoDTO> loadLatestServiceAssets(String macAddress, Long tenantId) {
+        ServiceEntity latestRecord = serviceMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_SERVICE, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        ServiceEntity latestNonEmptyRecord = serviceMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_SERVICE, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_SERVICE);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<AssetInfoDTO> loadLatestProcessAssets(String macAddress, Long tenantId) {
+        ProcessEntity latestRecord = processMapper.selectLatestByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> latestAssets = parseAssetJson(TYPE_PROCESS, latestRecord == null ? null : latestRecord.getAssetJson());
+        if (!latestAssets.isEmpty()) {
+            return latestAssets;
+        }
+        ProcessEntity latestNonEmptyRecord = processMapper.selectLatestNonEmptyByMacAndTenant(macAddress, tenantId);
+        List<AssetInfoDTO> fallbackAssets = parseAssetJson(TYPE_PROCESS, latestNonEmptyRecord == null ? null : latestNonEmptyRecord.getAssetJson());
+        if (!fallbackAssets.isEmpty()) {
+            log.info("Vuln match fallback to latest non-empty asset snapshot: type={}", TYPE_PROCESS);
+            return fallbackAssets;
+        }
+        return Collections.emptyList();
     }
 
     private List<AssetInfoDTO> parseAssetJson(String type, String assetJson) {
@@ -210,8 +264,9 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
         return matches;
     }
 
-    private HostVulnResultEntity buildResult(Long hostId, VulnRuleEntity rule, AssetInfoDTO asset) {
+    private HostVulnResultEntity buildResult(Long hostId, Long tenantId, VulnRuleEntity rule, AssetInfoDTO asset) {
         HostVulnResultEntity result = new HostVulnResultEntity();
+        result.setTenantId(tenantId);
         result.setHostId(hostId);
         result.setRuleId(rule.getId());
         result.setSeverity(rule.getSeverity());
@@ -322,5 +377,10 @@ public class VulnRuleEngineImpl implements VulnRuleEngine {
             }
         }
         return null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

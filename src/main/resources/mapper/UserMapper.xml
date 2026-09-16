@@ -6,6 +6,7 @@
 
     <resultMap id="UserEntityResultMap" type="com.cd.entity.UserEntity">
         <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
         <result column="user_name" property="userName"/>
         <result column="user_pwd" property="userPwd"/>
         <result column="user_avatar" property="userAvatar"/>
@@ -18,12 +19,18 @@
     </resultMap>
 
     <insert id="insert" parameterType="com.cd.entity.UserEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user (user_name, user_pwd, user_avatar, user_phone, user_email, status)
-        VALUES (#{userName}, #{userPwd}, #{userAvatar}, #{userPhone}, #{userEmail}, #{status})
+        INSERT INTO user (tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status)
+        VALUES (COALESCE(#{tenantId}, 0), #{userName}, #{userPwd}, #{userAvatar}, #{userPhone}, #{userEmail}, #{status})
     </insert>
 
     <delete id="deleteById">
         DELETE FROM user WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByIdAndTenant">
+        DELETE FROM user
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </delete>
 
     <update id="updateById" parameterType="com.cd.entity.UserEntity">
@@ -34,6 +41,17 @@
             user_email = #{userEmail},
             status = #{status}
         WHERE id = #{id}
+    </update>
+
+    <update id="updateByIdAndTenant" parameterType="com.cd.entity.UserEntity">
+        UPDATE user
+        SET user_name = #{userName},
+            user_avatar = #{userAvatar},
+            user_phone = #{userPhone},
+            user_email = #{userEmail},
+            status = #{status}
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
     </update>
 
     <update id="updateSelfById" parameterType="com.cd.entity.UserEntity">
@@ -51,17 +69,37 @@
     </update>
 
     <select id="selectById" resultMap="UserEntityResultMap">
-        SELECT id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
         FROM user
         WHERE id = #{id}
     </select>
 
+    <select id="selectByIdAndTenant" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE id = #{id}
+          AND tenant_id = #{tenantId}
+    </select>
+
     <select id="selectPage" resultMap="UserEntityResultMap">
-        SELECT id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
         FROM user
         <where>
             <if test="userName != null and userName != ''">
                 user_name LIKE CONCAT('%', #{userName}, '%')
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectPageByTenant" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        <where>
+            tenant_id = #{tenantId}
+            <if test="userName != null and userName != ''">
+                AND user_name LIKE CONCAT('%', #{userName}, '%')
             </if>
         </where>
         ORDER BY id DESC
@@ -78,22 +116,74 @@
         </where>
     </select>
 
+    <select id="countAllByTenant" resultType="long">
+        SELECT COUNT(1)
+        FROM user
+        <where>
+            tenant_id = #{tenantId}
+            <if test="userName != null and userName != ''">
+                AND user_name LIKE CONCAT('%', #{userName}, '%')
+            </if>
+        </where>
+    </select>
+
     <select id="selectByUserName" resultMap="UserEntityResultMap">
-        SELECT id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
         FROM user
         WHERE user_name = #{userName}
     </select>
 
+    <select id="selectByUserNameAndTenant" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_name = #{userName}
+          AND tenant_id = #{tenantId}
+    </select>
+
     <select id="selectByUserPhone" resultMap="UserEntityResultMap">
-        SELECT id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
         FROM user
         WHERE user_phone = #{userPhone}
     </select>
 
+    <select id="selectByUserPhoneAndTenant" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_phone = #{userPhone}
+          AND tenant_id = #{tenantId}
+    </select>
+
     <select id="selectByUserEmail" resultMap="UserEntityResultMap">
-        SELECT id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
         FROM user
         WHERE user_email = #{userEmail}
+    </select>
+
+    <select id="selectByUserEmailAndTenant" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_email = #{userEmail}
+          AND tenant_id = #{tenantId}
+    </select>
+
+    <select id="selectByUserPhoneAndTenantExcludingId" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_phone = #{userPhone}
+          AND tenant_id = #{tenantId}
+          <if test="id != null">
+              AND id &lt;&gt; #{id}
+          </if>
+    </select>
+
+    <select id="selectByUserEmailAndTenantExcludingId" resultMap="UserEntityResultMap">
+        SELECT id, tenant_id, user_name, user_pwd, user_avatar, user_phone, user_email, status, create_at, update_at, last_login_time
+        FROM user
+        WHERE user_email = #{userEmail}
+          AND tenant_id = #{tenantId}
+          <if test="id != null">
+              AND id &lt;&gt; #{id}
+          </if>
     </select>
 
     <update id="updateLastLoginTime">
@@ -106,5 +196,12 @@
         SELECT COUNT(1)
         FROM user
         WHERE DATE(create_at) = CURDATE()
+    </select>
+
+    <select id="countCreatedTodayByTenant" resultType="long">
+        SELECT COUNT(1)
+        FROM user
+        WHERE tenant_id = #{tenantId}
+          AND DATE(create_at) = CURDATE()
     </select>
 </mapper>

@@ -13,11 +13,22 @@ public interface BaselineRemediationMapper {
 
     BaselineRemediationEntity selectLatestSuccessfulByResultId(@Param("resultId") Long resultId);
 
+    BaselineRemediationEntity selectLatestSuccessfulByResultIdAndTenant(@Param("resultId") Long resultId,
+                                                                        @Param("tenantId") Long tenantId);
+
     BaselineRemediationEntity selectLatestSuccessfulByResultScope(@Param("hostId") Long hostId,
                                                                   @Param("ruleId") Long ruleId,
                                                                   @Param("checkKey") String checkKey);
 
+    BaselineRemediationEntity selectLatestSuccessfulByResultScopeAndTenant(@Param("hostId") Long hostId,
+                                                                           @Param("ruleId") Long ruleId,
+                                                                           @Param("checkKey") String checkKey,
+                                                                           @Param("tenantId") Long tenantId);
+
     BaselineRemediationEntity selectLatestPendingByResultId(@Param("resultId") Long resultId);
+
+    BaselineRemediationEntity selectLatestPendingByResultIdAndTenant(@Param("resultId") Long resultId,
+                                                                     @Param("tenantId") Long tenantId);
 
     BaselineRemediationEntity selectLatestFinishedByResultId(@Param("resultId") Long resultId);
 
@@ -26,6 +37,11 @@ public interface BaselineRemediationMapper {
     List<BaselineRemediationEntity> selectByResultScope(@Param("hostId") Long hostId,
                                                         @Param("ruleId") Long ruleId,
                                                         @Param("checkKey") String checkKey);
+
+    List<BaselineRemediationEntity> selectByResultScopeAndTenant(@Param("hostId") Long hostId,
+                                                                 @Param("ruleId") Long ruleId,
+                                                                 @Param("checkKey") String checkKey,
+                                                                 @Param("tenantId") Long tenantId);
 
     int updateStarted(@Param("id") Long id);
 

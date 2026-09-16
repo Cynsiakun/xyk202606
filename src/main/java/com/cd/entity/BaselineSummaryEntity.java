@@ -13,12 +13,16 @@ import lombok.Data;
 public class BaselineSummaryEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private Long taskId;
+    private Integer level;
     private Integer passCount;
     private Integer failCount;
     private Integer score;
     private BigDecimal complianceRate;
     private LocalDateTime lastScanTime;
     private LocalDateTime updateTime;
+    private Long assetTypeId;
+    private Long protectionLevelId;
 }

@@ -6,6 +6,8 @@ import com.cd.dto.BaselineHostResultItemDTO;
 import com.cd.dto.BaselineRuleOptionDTO;
 import com.cd.dto.BaselineTaskListItemDTO;
 import com.cd.dto.BaselineTaskResultOverviewDTO;
+import com.cd.entity.BaselineAssetTypeEntity;
+import com.cd.entity.BaselineProtectionLevelEntity;
 
 import java.util.List;
 
@@ -19,11 +21,15 @@ public interface BaselineQueryService {
 
     BaselineTaskResultOverviewDTO getResultOverview(Long taskId);
 
-    PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size);
+    PageResult<BaselineProblemHostDTO> listProblemHosts(Long taskId, Integer page, Integer size, String assetTypeCode);
 
     List<BaselineHostResultItemDTO> listTaskHostResults(Long taskId, Long hostId);
 
-    List<BaselineRuleOptionDTO> listRuleOptions(String keyword);
+    List<BaselineRuleOptionDTO> listRuleOptions(String keyword, List<String> assetTypeCodes, String protectionLevelCode);
+
+    List<BaselineProtectionLevelEntity> listProtectionLevels();
+
+    List<BaselineAssetTypeEntity> listAssetTypes();
 
     byte[] exportTaskResultCsv(Long taskId);
 

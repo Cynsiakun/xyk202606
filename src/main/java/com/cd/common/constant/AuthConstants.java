@@ -7,6 +7,7 @@ public final class AuthConstants {
     public static final String CURRENT_USER_ID = "currentUserId";
     public static final String CURRENT_TOKEN = "currentToken";
     public static final String CURRENT_USER_NAME = "currentUserName";
+    public static final String CURRENT_TENANT_ID = "currentTenantId";
 
     private AuthConstants() {
     }

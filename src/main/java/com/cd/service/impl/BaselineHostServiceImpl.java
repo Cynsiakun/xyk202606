@@ -1,6 +1,7 @@
 package com.cd.service.impl;
 
 import com.cd.common.PageResult;
+import com.cd.common.security.TenantContextHolder;
 import com.cd.dto.BaselineActionResponseDTO;
 import com.cd.dto.BaselineHostOverviewDTO;
 import com.cd.dto.BaselineHostResultItemDTO;
@@ -48,15 +49,16 @@ public class BaselineHostServiceImpl implements BaselineHostService {
         int safeSize = normalizeSize(size);
         String safeKeyword = normalizeText(keyword);
         String safeLevel = normalizeLevel(level);
-        long total = baselineQueryMapper.countHostOverview(safeKeyword, safeLevel);
+        Long tenantId = currentTenantId();
+        long total = baselineQueryMapper.countHostOverview(safeKeyword, safeLevel, tenantId);
         List<BaselineHostOverviewDTO> list = baselineQueryMapper.selectHostOverviewPage(
-                safeKeyword, safeLevel, (safePage - 1) * safeSize, safeSize);
+                safeKeyword, safeLevel, tenantId, (safePage - 1) * safeSize, safeSize);
         return new PageResult<>(total, list);
     }
 
     @Override
     public List<BaselineHostResultItemDTO> listHostResults(Long hostId, boolean onlyFail) {
-        return baselineQueryMapper.selectHostResults(hostId, onlyFail);
+        return baselineQueryMapper.selectHostResults(hostId, onlyFail, currentTenantId());
     }
 
     @Override
@@ -106,7 +108,7 @@ public class BaselineHostServiceImpl implements BaselineHostService {
         if (distinctIds.isEmpty()) {
             throw new IllegalArgumentException("复检目标不能为空");
         }
-        List<BaselineResultEntity> results = baselineResultMapper.selectByIds(distinctIds);
+        List<BaselineResultEntity> results = baselineResultMapper.selectByIdsAndTenant(distinctIds, currentTenantId());
         Map<Long, List<BaselineResultEntity>> resultsByHost = new LinkedHashMap<>();
         for (BaselineResultEntity result : results) {
             if (result.getHostId() == null || result.getRuleId() == null) {
@@ -147,7 +149,7 @@ public class BaselineHostServiceImpl implements BaselineHostService {
     }
 
     private List<Long> resolveRuleIds(Long hostId) {
-        String scope = baselineTaskMapper.selectLatestRuleScopeByHost(hostId);
+        String scope = baselineTaskMapper.selectLatestRuleScopeByHostAndTenant(hostId, currentTenantId());
         if (!StringUtils.hasText(scope)) {
             return List.of();
         }
@@ -176,7 +178,7 @@ public class BaselineHostServiceImpl implements BaselineHostService {
     }
 
     private List<Long> allPublishedRuleIds() {
-        return baselineQueryMapper.selectRuleOptions(null).stream()
+        return baselineQueryMapper.selectRuleOptions(null, List.of(), null).stream()
                 .map(BaselineRuleOptionDTO::getId)
                 .toList();
     }
@@ -211,5 +213,10 @@ public class BaselineHostServiceImpl implements BaselineHostService {
         }
         String normalized = level.trim().toLowerCase();
         return LEVELS.contains(normalized) ? normalized : null;
+    }
+
+    private Long currentTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId == null ? 0L : tenantId;
     }
 }

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class HostPatchStatusEntity {
 
     private Long id;
+    private Long tenantId;
     private Long hostId;
     private String osFamily;
     private String osBuild;

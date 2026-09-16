@@ -1,5 +1,6 @@
 package com.cd.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,6 +12,8 @@ import java.time.LocalDateTime;
 public class PopupAlertDTO {
 
     private Long id;
+    @JsonIgnore
+    private Long tenantId;
     private String level;
     private Long hostId;
     private String hostname;

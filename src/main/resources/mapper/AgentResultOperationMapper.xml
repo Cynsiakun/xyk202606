@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cd.mapper.AgentResultOperationMapper">
+
+    <resultMap id="AgentResultOperationResultMap" type="com.cd.entity.AgentResultOperationEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="operation_id" property="operationId"/>
+        <result column="type" property="type"/>
+        <result column="host_name" property="hostName"/>
+        <result column="mac_address" property="macAddress"/>
+        <result column="status" property="status"/>
+        <result column="request_json" property="requestJson"/>
+        <result column="result_json" property="resultJson"/>
+        <result column="raw_message" property="rawMessage"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="received_at" property="receivedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.cd.entity.AgentResultOperationEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO agent_result_operation
+        (tenant_id, operation_id, type, host_name, mac_address, status, request_json, result_json, raw_message, created_at, finished_at, received_at)
+        VALUES
+        (COALESCE(#{tenantId}, 0), #{operationId}, #{type}, #{hostName}, #{macAddress}, #{status},
+         #{requestJson}, #{resultJson}, #{rawMessage}, #{createdAt}, #{finishedAt}, COALESCE(#{receivedAt}, NOW()))
+    </insert>
+
+    <select id="selectByOperationId" resultMap="AgentResultOperationResultMap">
+        SELECT id, tenant_id, operation_id, type, host_name, mac_address, status,
+               request_json, result_json, raw_message, created_at, finished_at, received_at
+        FROM agent_result_operation
+        WHERE operation_id = #{operationId}
+        LIMIT 1
+    </select>
+</mapper>

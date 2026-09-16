@@ -21,14 +21,20 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
+    private static final String LOGIN_SEPARATOR = "::";
+
     private final UserMapper userMapper;
     private final RbacMapper rbacMapper;
 
+    public static String loginUsername(Long tenantId, String userName) {
+        return (tenantId == null ? 0L : tenantId) + LOGIN_SEPARATOR + userName;
+    }
+
     @Override
     public SecurityUser loadUserByUsername(String username) throws UsernameNotFoundException {
-        UserEntity user = userMapper.selectByUserName(username);
+        UserEntity user = loadUserForLogin(username);
         if (user == null) {
-            throw new UsernameNotFoundException("用户不存在");
+            throw new UsernameNotFoundException("User not found");
         }
         return buildSecurityUser(user);
     }
@@ -37,13 +43,25 @@ public class CustomUserDetailsService implements UserDetailsService {
     public SecurityUser loadUserById(Long userId) {
         UserEntity user = userMapper.selectById(userId);
         if (user == null) {
-            throw new UsernameNotFoundException("用户不存在");
+            throw new UsernameNotFoundException("User not found");
         }
         return buildSecurityUser(user);
     }
 
     public List<String> loadRoleCodes(Long userId) {
         return rbacMapper.selectRoleCodesByUserId(userId);
+    }
+
+    private UserEntity loadUserForLogin(String username) {
+        if (username != null) {
+            int separator = username.indexOf(LOGIN_SEPARATOR);
+            if (separator > -1) {
+                Long tenantId = Long.valueOf(username.substring(0, separator));
+                String userName = username.substring(separator + LOGIN_SEPARATOR.length());
+                return userMapper.selectByUserNameAndTenant(userName, tenantId);
+            }
+        }
+        return userMapper.selectByUserName(username);
     }
 
     private SecurityUser buildSecurityUser(UserEntity user) {
@@ -61,6 +79,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new SecurityUser(
                 user.getId(),
                 user.getUserName(),
+                user.getTenantId(),
                 user.getUserPwd(),
                 user.getStatus(),
                 authorities

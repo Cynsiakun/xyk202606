@@ -42,6 +42,8 @@ public class RabbitMQConfig {
     public static final long AGENT_QUEUE_EXPIRES = 259_200_000L;
     /** 队列内消息最大存活 3 小时（10800000ms）。 */
     public static final long AGENT_MESSAGE_TTL = 10_800_000L;
+    /** 端口扫描指令单条过期时间，避免客户端长时间消费旧扫描任务。 */
+    public static final long PORT_SCAN_COMMAND_TTL = 120_000L;
 
     /** 资产探测结果队列：账户。 */
     public static final String ACCOUNT_QUEUE = "account_queue";
@@ -54,6 +56,13 @@ public class RabbitMQConfig {
     public static final String PATCH_SCAN_EXCHANGE = "patch_exchange";
     public static final String PATCH_SCAN_ROUTING_KEY = "patch_scan";
     public static final String PATCH_SCAN_QUEUE = "patch_scan_queue";
+
+    /** 端口扫描结果队列。 */
+    public static final String PORT_SCAN_QUEUE = "port_scan_queue";
+    public static final String PORT_SCAN_ROUTING_KEY = "port_scan";
+    public static final String AGENT_RESULT_EXCHANGE = "agent_result_exchange";
+    public static final String AGENT_RESULT_QUEUE = "agent_result_queue";
+    public static final String AGENT_RESULT_ROUTING_KEY = "agent_result";
 
     /**
      * Windows 事件日志队列：采集端通过 {@code log_exchange} + 路由键 {@code security_log}
@@ -163,6 +172,37 @@ public class RabbitMQConfig {
     @Bean
     public Binding patchScanBinding() {
         return BindingBuilder.bind(patchScanQueue()).to(patchScanExchange()).with(PATCH_SCAN_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue portScanQueue() {
+        return new Queue(PORT_SCAN_QUEUE, true);
+    }
+
+    @Bean
+    public Binding portScanBinding() {
+        return new Binding(
+                PORT_SCAN_QUEUE,
+                Binding.DestinationType.QUEUE,
+                SYSINFO_EXCHANGE,
+                PORT_SCAN_ROUTING_KEY,
+                null
+        );
+    }
+
+    @Bean
+    public DirectExchange agentResultExchange() {
+        return new DirectExchange(AGENT_RESULT_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue agentResultQueue() {
+        return new Queue(AGENT_RESULT_QUEUE, true);
+    }
+
+    @Bean
+    public Binding agentResultBinding() {
+        return BindingBuilder.bind(agentResultQueue()).to(agentResultExchange()).with(AGENT_RESULT_ROUTING_KEY);
     }
 
     /**

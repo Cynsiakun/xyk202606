@@ -3,20 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>威胁分析</title>
+    <title>全屏态势大屏</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/css/layui.css">
     <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/threat.css">
 </head>
-<body class="page-body">
-<div class="page-shell">
-    <div class="module-placeholder">
-        <h1>威胁分析</h1>
-        <p>功能建设中</p>
-        <div class="placeholder-panel">
-            <span>预留接口调用区域</span>
-            <code>/api/threat/*</code>
+<body class="threat-screen-body">
+<div class="threat-screen-shell">
+    <canvas class="threat-backdrop-canvas" id="threatBackdropCanvas"></canvas>
+    <div class="threat-backdrop-grid"></div>
+    <div class="threat-backdrop-noise"></div>
+    <div class="threat-backdrop-scan"></div>
+    <div class="threat-backdrop-radar threat-backdrop-radar-left"></div>
+    <div class="threat-backdrop-radar threat-backdrop-radar-right"></div>
+
+    <header class="threat-topbar">
+        <div class="threat-topbar-actions">
+            <button type="button" class="layui-btn layui-btn-primary threat-action-button" id="backToPlatformButton">返回平台</button>
+            <button type="button" class="layui-btn layui-btn-primary threat-action-button" id="refreshThreatScreenButton">刷新</button>
+            <button type="button" class="layui-btn threat-action-button threat-action-button-strong" id="toggleFullscreenButton">全屏</button>
         </div>
-    </div>
+        <div class="threat-title-block">
+            <div class="threat-title-kicker">Threat Situation Command Center</div>
+            <h1 id="threatScreenTitle">安全态势大屏</h1>
+            <p id="threatScreenSubtitle">以全屏视角展示资产、基线、漏洞、补丁和日志五类态势信号。</p>
+        </div>
+        <div class="threat-topbar-meta" id="threatLastUpdatedLabel">最后更新时间 -</div>
+    </header>
+
+    <section class="threat-metrics-strip" id="threatMetricsStrip"></section>
+
+    <main class="threat-main-layout">
+        <aside class="threat-side-column threat-side-column-left">
+            <section class="threat-panel threat-panel-side">
+                <div class="threat-panel-head">
+                    <div>
+                        <div class="threat-panel-kicker">Asset Mix</div>
+                        <h2 id="threatAssetCategoryTitle">资产分类玫瑰图</h2>
+                    </div>
+                </div>
+                <div class="threat-chart threat-chart-side" id="threatAssetCategoryChart"></div>
+            </section>
+
+            <section class="threat-panel threat-panel-side">
+                <div class="threat-panel-head">
+                    <div>
+                        <div class="threat-panel-kicker">Product Ranking</div>
+                        <h2 id="threatTopProductsTitle">TOP 服务 / 产品</h2>
+                    </div>
+                </div>
+                <div class="threat-chart threat-chart-side" id="threatTopProductsChart"></div>
+            </section>
+        </aside>
+
+        <section class="threat-center-stage">
+            <div class="threat-stage-core">
+                <canvas class="threat-stage-particles" id="threatStageParticles"></canvas>
+                <div class="threat-stage-energy"></div>
+                <div class="threat-stage-pulse threat-stage-pulse-a"></div>
+                <div class="threat-stage-pulse threat-stage-pulse-b"></div>
+                <div class="threat-stage-ring threat-stage-ring-outer"></div>
+                <div class="threat-stage-ring threat-stage-ring-middle"></div>
+                <div class="threat-stage-ring threat-stage-ring-inner"></div>
+                <div class="threat-stage-orbit threat-stage-orbit-a"></div>
+                <div class="threat-stage-orbit threat-stage-orbit-b"></div>
+                <div class="threat-stage-orbit threat-stage-orbit-c"></div>
+                <div class="threat-stage-orbit threat-stage-orbit-d"></div>
+                <div class="threat-stage-signal threat-stage-signal-baseline"><span>BASELINE</span></div>
+                <div class="threat-stage-signal threat-stage-signal-vuln"><span>VULNERABILITY</span></div>
+                <div class="threat-stage-signal threat-stage-signal-patch"><span>PATCH</span></div>
+                <div class="threat-stage-signal threat-stage-signal-log"><span>LOG</span></div>
+                <div class="threat-core-chart" id="threatCoreChart"></div>
+            </div>
+        </section>
+
+        <aside class="threat-side-column threat-side-column-right">
+            <section class="threat-panel threat-panel-side">
+                <div class="threat-panel-head">
+                    <div>
+                        <div class="threat-panel-kicker">Baseline</div>
+                        <h2>基线结果状态</h2>
+                    </div>
+                </div>
+                <div class="threat-chart threat-chart-small" id="threatBaselineStatusChart"></div>
+            </section>
+
+            <section class="threat-panel threat-panel-side">
+                <div class="threat-panel-head">
+                    <div>
+                        <div class="threat-panel-kicker">Severity</div>
+                        <h2>漏洞严重度金字塔</h2>
+                    </div>
+                </div>
+                <div class="threat-chart threat-chart-small" id="threatSeverityChart"></div>
+            </section>
+
+            <section class="threat-panel threat-panel-side">
+                <div class="threat-panel-head">
+                    <div>
+                        <div class="threat-panel-kicker">Disposition</div>
+                        <h2>漏洞处置阶段漏斗</h2>
+                    </div>
+                </div>
+                <div class="threat-chart threat-chart-small" id="threatFunnelChart"></div>
+            </section>
+        </aside>
+    </main>
+
+    <footer class="threat-bottom-zone">
+        <section class="threat-panel threat-panel-trends">
+            <div class="threat-panel-head">
+                <div>
+                    <div class="threat-panel-kicker">Four Signals</div>
+                    <h2>风险趋势联动</h2>
+                </div>
+            </div>
+            <div class="threat-trends-grid" id="threatTrendsGrid"></div>
+        </section>
+
+        <section class="threat-panel threat-panel-feed">
+            <div class="threat-panel-head">
+                <div>
+                    <div class="threat-panel-kicker">Event Feed</div>
+                    <h2>实时事件跑马灯</h2>
+                </div>
+            </div>
+            <div class="threat-feed-shell">
+                <div class="threat-feed-track" id="threatEventFeedTrack"></div>
+            </div>
+        </section>
+    </footer>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/layui@2.9.21/dist/layui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="../js/common/auth.js"></script>
+<script src="../js/common/utils.js"></script>
+<script src="../js/common/dialog.js"></script>
+<script src="../js/common/request.js"></script>
+<script src="../js/pages/threat.js"></script>
 </body>
 </html>

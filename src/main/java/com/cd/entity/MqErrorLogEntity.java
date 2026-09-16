@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class MqErrorLogEntity {
 
     private Long id;
+    private Long tenantId;
     private String queueName;
     private String rawMessage;
     private String errorReason;

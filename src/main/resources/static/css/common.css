@@ -94,6 +94,112 @@ body {
     color: var(--text-secondary);
 }
 
+.license-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.license-strip:hover .license-pill {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.license-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid #bbf7d0;
+    border-radius: 999px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.license-pill.muted {
+    border-color: var(--surface-border);
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+}
+
+.license-pill.warn {
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.license-pill.danger {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.license-status-dialog {
+    padding: 20px 22px 18px;
+}
+
+.license-status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.license-status-item {
+    padding: 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    background: var(--surface-muted);
+}
+
+.license-status-label {
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.license-status-value {
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.license-status-alert {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.license-status-alert.warn {
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.license-status-alert.danger {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.license-status-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
 .logout-button {
     height: 42px;
     padding: 0 18px;
@@ -553,6 +659,10 @@ body {
         justify-content: space-between;
     }
 
+    .license-strip {
+        width: 100%;
+    }
+
     .profile-grid {
         grid-template-columns: 1fr;
     }
@@ -560,6 +670,10 @@ body {
 
 @media (max-width: 640px) {
     .current-user {
+        display: none;
+    }
+
+    .license-strip {
         display: none;
     }
 

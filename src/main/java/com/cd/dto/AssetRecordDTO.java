@@ -16,6 +16,10 @@ public class AssetRecordDTO {
     private String taskId;
     private String hostName;
     private String macAddress;
+    private String source;
+    private String productName;
+    private String productType;
+    private Integer portCount;
     private Integer assetCount;
     private String assetJson;
     private LocalDateTime createdAt;

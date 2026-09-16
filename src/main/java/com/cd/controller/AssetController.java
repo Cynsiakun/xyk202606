@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/assets")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('ASSET')")
 public class AssetController {
 
     private final AssetQueryService assetQueryService;
@@ -72,7 +73,7 @@ public class AssetController {
         return Result.success(assetQueryService.accountDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI')")
     @PostMapping("/account/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeAccount(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -104,7 +105,7 @@ public class AssetController {
         return Result.success(assetQueryService.serviceDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI')")
     @PostMapping("/service/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeService(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -136,7 +137,7 @@ public class AssetController {
         return Result.success(assetQueryService.processDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI')")
     @PostMapping("/process/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeProcess(@PathVariable @Min(1) Long id,
                                                  @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -168,7 +169,7 @@ public class AssetController {
         return Result.success(assetQueryService.appDetail(id));
     }
 
-    @PreAuthorize("@perm.has('asset:view')")
+    @PreAuthorize("@perm.has('asset:view') and @licenseGuard.hasFeature('AI')")
     @PostMapping("/app/{id}/ai-analysis")
     public Result<AssetRecordDTO> analyzeApp(@PathVariable @Min(1) Long id,
                                              @RequestBody(required = false) AssetAiAnalysisRequestDTO dto) {
@@ -181,5 +182,40 @@ public class AssetController {
     public Result<Void> deleteApp(@PathVariable @Min(1) Long id) {
         assetQueryService.deleteApp(id);
         return Result.success();
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @GetMapping("/port/list")
+    public Result<PageResult<AssetRecordDTO>> portList(
+            @RequestParam(defaultValue = "1") @Min(1) Integer page,
+            @RequestParam(defaultValue = "10") @Min(1) Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String hostScope) {
+        return Result.success(assetQueryService.portList(page, size, keyword, hostScope));
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @GetMapping("/port/{id}")
+    public Result<AssetRecordDTO> portDetail(@PathVariable @Min(1) Long id) {
+        return Result.success(assetQueryService.portDetail(id));
+    }
+
+    @PreAuthorize("@perm.has('asset:delete')")
+    @DeleteMapping("/port/{id}")
+    public Result<Void> deletePort(@PathVariable @Min(1) Long id) {
+        assetQueryService.deletePort(id);
+        return Result.success();
+    }
+
+    @PreAuthorize("@perm.has('asset:view')")
+    @PostMapping("/port/{id}/rematch")
+    public Result<Integer> rematchPort(@PathVariable @Min(1) Long id) {
+        return Result.success(assetQueryService.rematchPort(id));
+    }
+
+    @PreAuthorize("@perm.has('host:asset:view') or @perm.has('asset:view')")
+    @PostMapping("/port/rematch-by-mac")
+    public Result<Integer> rematchPortByMac(@RequestParam String mac) {
+        return Result.success(assetQueryService.rematchLatestPortByMac(mac));
     }
 }

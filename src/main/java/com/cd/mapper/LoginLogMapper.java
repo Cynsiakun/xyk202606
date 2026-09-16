@@ -12,13 +12,16 @@ public interface LoginLogMapper {
     List<LoginLogEntity> selectPage(@Param("offset") int offset,
                                     @Param("size") int size,
                                     @Param("userName") String userName,
-                                    @Param("status") Integer status);
+                                    @Param("status") Integer status,
+                                    @Param("tenantId") Long tenantId);
 
-    long countAll(@Param("userName") String userName, @Param("status") Integer status);
+    long countAll(@Param("userName") String userName,
+                  @Param("status") Integer status,
+                  @Param("tenantId") Long tenantId);
 
-    long countTodaySuccess();
+    long countTodaySuccess(@Param("tenantId") Long tenantId);
 
-    long countWeekActiveUsers();
+    long countWeekActiveUsers(@Param("tenantId") Long tenantId);
 
-    long countTotalLogs();
+    long countTotalLogs(@Param("tenantId") Long tenantId);
 }

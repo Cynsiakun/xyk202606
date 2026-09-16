@@ -37,7 +37,7 @@ public class RbacController {
 
     private final RbacService rbacService;
 
-    @PreAuthorize("@perm.has('role:view')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @GetMapping("/role/list")
     public Result<PageResult<SysRoleResponseDTO>> roleList(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,
@@ -46,19 +46,19 @@ public class RbacController {
         return Result.success(rbacService.rolePage(page, size, keyword));
     }
 
-    @PreAuthorize("@perm.has('role:view')")
+    @PreAuthorize("@perm.has('role:view') and @licenseGuard.hasFeature('USER')")
     @GetMapping("/role/all")
     public Result<List<SysRoleResponseDTO>> allRoles() {
         return Result.success(rbacService.allRoles());
     }
 
-    @PreAuthorize("@perm.has('role:create')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @PostMapping("/role")
     public Result<SysRoleResponseDTO> createRole(@Valid @RequestBody SysRoleCreateDTO dto) {
         return Result.success(rbacService.createRole(dto));
     }
 
-    @PreAuthorize("@perm.has('role:update')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @PutMapping("/role/{id}")
     public Result<SysRoleResponseDTO> updateRole(
             @PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
@@ -66,14 +66,14 @@ public class RbacController {
         return Result.success(rbacService.updateRole(id, dto));
     }
 
-    @PreAuthorize("@perm.has('role:delete')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @DeleteMapping("/role/{id}")
     public Result<Void> deleteRole(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         rbacService.deleteRole(id);
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('role:permission:assign')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @PostMapping("/role/{id}/permissions")
     public Result<Void> assignPermissions(
             @PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
@@ -82,7 +82,7 @@ public class RbacController {
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('permission:view')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @GetMapping("/permission/list")
     public Result<PageResult<SysPermissionResponseDTO>> permissionList(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page must be greater than 0") Integer page,
@@ -91,19 +91,19 @@ public class RbacController {
         return Result.success(rbacService.permissionPage(page, size, keyword));
     }
 
-    @PreAuthorize("@perm.has('permission:view')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @GetMapping("/permission/all")
     public Result<List<SysPermissionResponseDTO>> allPermissions() {
         return Result.success(rbacService.allPermissions());
     }
 
-    @PreAuthorize("@perm.has('permission:create')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @PostMapping("/permission")
     public Result<SysPermissionResponseDTO> createPermission(@Valid @RequestBody SysPermissionCreateDTO dto) {
         return Result.success(rbacService.createPermission(dto));
     }
 
-    @PreAuthorize("@perm.has('permission:update')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @PutMapping("/permission/{id}")
     public Result<SysPermissionResponseDTO> updatePermission(
             @PathVariable @Min(value = 1, message = "id must be greater than 0") Long id,
@@ -111,14 +111,14 @@ public class RbacController {
         return Result.success(rbacService.updatePermission(id, dto));
     }
 
-    @PreAuthorize("@perm.has('permission:delete')")
+    @PreAuthorize("@perm.isSuperAdmin()")
     @DeleteMapping("/permission/{id}")
     public Result<Void> deletePermission(@PathVariable @Min(value = 1, message = "id must be greater than 0") Long id) {
         rbacService.deletePermission(id);
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('user:role:assign')")
+    @PreAuthorize("@perm.has('user:role:assign') and @licenseGuard.hasFeature('USER')")
     @PostMapping("/user/{userId}/roles")
     public Result<Void> assignUserRoles(
             @PathVariable @Min(value = 1, message = "userId must be greater than 0") Long userId,
@@ -127,7 +127,7 @@ public class RbacController {
         return Result.success();
     }
 
-    @PreAuthorize("@perm.has('user:role:assign')")
+    @PreAuthorize("@perm.has('user:role:assign') and @licenseGuard.hasFeature('USER')")
     @GetMapping("/user/{userId}/roles")
     public Result<List<Long>> userRoleIds(
             @PathVariable @Min(value = 1, message = "userId must be greater than 0") Long userId) {

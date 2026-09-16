@@ -17,12 +17,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-/**
- * 监听 {@code sysinfo_queue}，将采集端上报的主机系统信息入库。
- *
- * <p>消息为中文键的嵌套 JSON，使用 {@link JsonNode} 逐层取值最稳健。解析或入库失败时
- * 仅记录日志而不抛异常，避免消息被无限重新投递。</p>
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -40,29 +34,88 @@ public class SysInfoListener {
             JsonNode root = OBJECT_MAPPER.readTree(message);
 
             HostEntity host = new HostEntity();
-            host.setHostname(text(root, "主机名", "主机名"));
-            host.setIpv4(text(root, "本机IPv4地址", "本机IPv4"));
-            host.setMacAddress(text(root, "MAC地址", "MAC地址"));
+            host.setHostname(firstText(
+                    text(root, "hostName"),
+                    text(root, "hostname"),
+                    text(root, "主机名")
+            ));
+            host.setIpv4(firstText(
+                    text(root, "ipv4"),
+                    text(root, "本机IPv4地址"),
+                    text(root, "本机IPv4"),
+                    nestedText(root, "system", "ipv4")
+            ));
+            host.setMacAddress(firstText(
+                    text(root, "macAddress"),
+                    text(root, "mac"),
+                    text(root, "MAC地址"),
+                    nestedText(root, "system", "macAddress")
+            ));
 
-            JsonNode os = root.path("操作系统信息");
-            host.setOsName(text(os, "系统名称"));
-            host.setOsVersion(text(os, "系统版本"));
-            host.setOsArch(text(os, "系统架构"));
-            host.setOsRelease(text(os, "具体版本"));
+            host.setOsName(firstText(
+                    text(root, "osName"),
+                    nestedText(root, "os", "name"),
+                    nestedText(root, "system", "osName"),
+                    nestedText(root, "操作系统信息", "系统名称")
+            ));
+            host.setOsVersion(firstText(
+                    text(root, "osVersion"),
+                    nestedText(root, "os", "version"),
+                    nestedText(root, "system", "osVersion"),
+                    nestedText(root, "操作系统信息", "系统版本")
+            ));
+            host.setOsArch(firstText(
+                    text(root, "osArch"),
+                    nestedText(root, "os", "arch"),
+                    nestedText(root, "system", "osArch"),
+                    nestedText(root, "操作系统信息", "系统架构")
+            ));
+            host.setOsRelease(firstText(
+                    text(root, "osRelease"),
+                    nestedText(root, "os", "release"),
+                    nestedText(root, "system", "osRelease"),
+                    nestedText(root, "操作系统信息", "具体版本")
+            ));
 
-            JsonNode cpu = root.path("CPU信息");
-            host.setCpuModel(text(cpu, "CPU型号"));
-            host.setCpuPhysicalCores(integer(cpu, "物理核心数"));
-            host.setCpuLogicalCores(integer(cpu, "逻辑核心数"));
+            host.setCpuModel(firstText(
+                    text(root, "cpuModel"),
+                    nestedText(root, "cpu", "model"),
+                    nestedText(root, "CPU信息", "CPU型号")
+            ));
+            host.setCpuPhysicalCores(firstInteger(
+                    integer(root, "cpuPhysicalCores"),
+                    nestedInteger(root, "cpu", "physicalCores"),
+                    nestedInteger(root, "CPU信息", "物理核心数")
+            ));
+            host.setCpuLogicalCores(firstInteger(
+                    integer(root, "cpuLogicalCores"),
+                    nestedInteger(root, "cpu", "logicalCores"),
+                    nestedInteger(root, "CPU信息", "逻辑核心数")
+            ));
 
-            JsonNode mem = root.path("内存信息");
-            host.setMemTotal(text(mem, "总内存"));
-            host.setMemUsed(text(mem, "已使用内存"));
-            host.setMemAvailable(text(mem, "可用内存"));
-            host.setMemUsage(text(mem, "使用率"));
+            host.setMemTotal(firstText(
+                    text(root, "memTotal"),
+                    nestedText(root, "memory", "total"),
+                    nestedText(root, "内存信息", "总内存")
+            ));
+            host.setMemUsed(firstText(
+                    text(root, "memUsed"),
+                    nestedText(root, "memory", "used"),
+                    nestedText(root, "内存信息", "已用内存")
+            ));
+            host.setMemAvailable(firstText(
+                    text(root, "memAvailable"),
+                    nestedText(root, "memory", "available"),
+                    nestedText(root, "内存信息", "可用内存")
+            ));
+            host.setMemUsage(firstText(
+                    text(root, "memUsage"),
+                    nestedText(root, "memory", "usage"),
+                    nestedText(root, "内存信息", "使用率")
+            ));
 
             if (!StringUtils.hasText(host.getMacAddress())) {
-                log.warn("收到的主机信息缺少 MAC 地址，已跳过入库: {}", message);
+                log.warn("收到的主机信息缺少 MAC 地址，跳过入库: {}", message);
                 return;
             }
 
@@ -76,16 +129,10 @@ public class SysInfoListener {
         }
     }
 
-    /**
-     * 为指定 MAC 客户端声明专属队列并将消息转发到 {@code agent_exchange}。
-     *
-     * <p>交换机、队列、绑定的声明均为幂等操作，已存在时不会报错。声明完成后将原始消息
-     * 以 MAC 地址为 routingKey 重新发布，使其进入对应的 {@code agent_<mac>_queue}。</p>
-     */
     private void routeToAgentQueue(String rawMac, String message) {
         String normalizedMac = normalizeMac(rawMac);
         if (!StringUtils.hasText(normalizedMac)) {
-            log.warn("MAC 地址标准化后为空，跳过转发: {}", rawMac);
+            log.warn("MAC 标准化后为空，跳过转发: {}", rawMac);
             return;
         }
 
@@ -101,12 +148,10 @@ public class SysInfoListener {
         amqpAdmin.declareQueue(queue);
 
         amqpAdmin.declareBinding(BindingBuilder.bind(queue).to(exchange).with(rawMac));
-
         rabbitTemplate.convertAndSend(RabbitMQConfig.AGENT_EXCHANGE, rawMac, message);
-        log.info("消息已转发至客户端专属队列: queue={}, routingKey={}", queueName, rawMac);
+        log.info("sysinfo 注册确认已转发到客户端专属队列: queue={}, routingKey={}", queueName, rawMac);
     }
 
-    /** 标准化 MAC：转小写并去除冒号、横杠、空格等分隔符。 */
     private String normalizeMac(String mac) {
         if (mac == null) {
             return null;
@@ -114,16 +159,55 @@ public class SysInfoListener {
         return mac.toLowerCase().replaceAll("[^0-9a-f]", "");
     }
 
-    private String text(JsonNode parent, String... path) {
-        JsonNode node = parent;
-        for (String key : path) {
-            node = node.path(key);
+    private String text(JsonNode node, String key) {
+        JsonNode child = node.path(key);
+        if (child.isMissingNode() || child.isNull()) {
+            return null;
         }
-        return node.isMissingNode() || node.isNull() ? null : node.asText();
+        String value = child.isValueNode() ? child.asText() : child.toString();
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private Integer integer(JsonNode parent, String key) {
-        JsonNode node = parent.path(key);
-        return node.isMissingNode() || node.isNull() || !node.canConvertToInt() ? null : node.asInt();
+    private String nestedText(JsonNode node, String objectField, String valueField) {
+        JsonNode nested = node.path(objectField);
+        return nested.isObject() ? text(nested, valueField) : null;
+    }
+
+    private Integer integer(JsonNode node, String key) {
+        JsonNode child = node.path(key);
+        if (child.isMissingNode() || child.isNull()) {
+            return null;
+        }
+        if (child.canConvertToInt()) {
+            return child.asInt();
+        }
+        try {
+            return Integer.parseInt(child.asText().trim());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Integer nestedInteger(JsonNode node, String objectField, String valueField) {
+        JsonNode nested = node.path(objectField);
+        return nested.isObject() ? integer(nested, valueField) : null;
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Integer firstInteger(Integer... values) {
+        for (Integer value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 }

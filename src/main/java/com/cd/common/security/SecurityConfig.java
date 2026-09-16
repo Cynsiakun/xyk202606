@@ -43,6 +43,10 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/api/user/login",
+                                "/api/tenant/options",
+                                "/api/client/machine/validate",
+                                "/api/license/activate",
+                                "/api/license/check",
                                 "/login.html",
                                 "/index.html",
                                 "/favicon.ico",

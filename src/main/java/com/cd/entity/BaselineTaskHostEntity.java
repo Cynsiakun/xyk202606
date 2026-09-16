@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class BaselineTaskHostEntity {
 
     private Long id;
+    private Long tenantId;
     private Long taskId;
     private Long hostId;
     private String status;

@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 @RestController
 @RequestMapping("/api/asset/export")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('ASSET')")
 public class AssetExportController {
 
     private final AssetExportService assetExportService;

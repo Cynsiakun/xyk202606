@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping
 @RequiredArgsConstructor
+@PreAuthorize("@perm.isSuperAdmin()")
 public class VulnRuleManagementController {
 
     private final VulnRuleManagementService vulnRuleManagementService;

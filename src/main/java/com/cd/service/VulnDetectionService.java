@@ -26,4 +26,8 @@ public interface VulnDetectionService {
     List<HostVulnResultEntity> evaluateHost(Long hostId);
 
     List<HostVulnResultEntity> listActiveResults(Long hostId);
+
+    int fixHost(Long hostId);
+
+    int fixByRuleId(Long ruleId);
 }

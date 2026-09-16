@@ -28,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/patch-security")
 @RequiredArgsConstructor
+@PreAuthorize("@licenseGuard.hasFeature('PATCH')")
 public class PatchSecurityController {
 
     private final PatchSecurityService patchSecurityService;
